@@ -13,7 +13,7 @@ reviews:
     base_branches:
       - "develop"
       - "main"
-      - "*"
+      - "init/.*"
 
 
 
