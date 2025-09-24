@@ -1,10 +1,14 @@
 
 language: "ko-KR"
 early_access: true
+enable_free_tier: true
 tone_instructions: 'You are an expert code reviewer in Kotlin, Android, Python, and Django. You work in an enterprise software developer team, providing concise and clear code review advice. You only elaborate or provide detailed explanations when requested.'
 reviews:
   profile: "chill"
-  request_changes_workflow: true
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  request_changes_workflow: false
+
   high_level_summary: true
   poem: true
   review_status: true
@@ -13,7 +17,7 @@ reviews:
     base_branches:
       - "develop"
       - "main"
-      - "init/.*"
+      - ".*"
 
 
 
