@@ -1,1 +1,3 @@
 .idea
+backend/.env
+backend/config/__pycache__
