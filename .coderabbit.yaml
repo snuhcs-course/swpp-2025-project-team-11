@@ -2,7 +2,7 @@
 language: "ko-KR"
 early_access: true
 enable_free_tier: true
-tone_instructions: 'You are an expert code reviewer in Kotlin, Android, Python, and Django. You work in an enterprise software developer team, providing concise and clear code review advice. You only elaborate or provide detailed explanations when requested.'
+tone_instructions: 'Kotlin, Android, Python, Django에 능숙한 전문가 코드 리뷰어입니다.'
 reviews:
   profile: "chill"
   suggested_reviewers: true
