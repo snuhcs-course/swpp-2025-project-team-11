@@ -1,0 +1,65 @@
+name: "Python Lint (Backend • Poetry • Py3.13)"
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "backend/**"
+      - ".github/workflows/lint-python.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/lint-python.yml"
+
+permissions:
+  contents: read
+
+env:
+  python-version: "3.13"
+
+defaults:
+  run:
+    working-directory: ./backend
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: pipx install poetry
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.python-version }}
+          cache: "poetry"
+
+      - name: Install deps (dev)
+        run: poetry install --no-interaction
+
+      - name: Ruff (lint)
+        run: poetry run ruff check .
+
+  Black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: pipx install poetry
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.python-version }}
+          cache: "poetry"
+
+      - name: Install deps (dev)
+        run: poetry install --no-interaction
+
+      - name: Black (format check)
+        run: poetry run black . --check --verbose
