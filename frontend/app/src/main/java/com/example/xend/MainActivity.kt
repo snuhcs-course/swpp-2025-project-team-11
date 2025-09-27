@@ -1,6 +1,7 @@
 package com.example.xend
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -89,9 +90,8 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
             Toast.makeText(this, "로그인에 실패했습니다: ${e.message}", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            // 기타 Firebase 인증 오류 등
-            e.printStackTrace()
-            Toast.makeText(this, "로그인 중 에러 발생", Toast.LENGTH_SHORT).show()
+            Log.e("Auth", "Firebase error", e)
+            Toast.makeText(this, "로그인 중 에러 발생: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
         }
     }
 }

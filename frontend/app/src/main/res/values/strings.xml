@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Xend</string>
+
+    <!-- Firebase Web Client ID 추가 -->
+    <string name="default_web_client_id">
+        138717702131-tvbm9v347gj7ncr3q1tf65k7ekbghvie.apps.googleusercontent.com
+    </string>
 </resources>
