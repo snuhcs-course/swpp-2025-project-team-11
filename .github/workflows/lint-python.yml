@@ -1,4 +1,4 @@
-name: "Python Lint (Backend • Poetry • Py3.13)"
+name: "Python Lint (Backend)"
 
 on:
   push:
