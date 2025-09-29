@@ -3,16 +3,15 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 
-    id("com.google.gms.google-services")
 
 }
 
 android {
-    namespace = "com.example.xend"
+    namespace = "com.fiveis.xend"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.xend"
+        applicationId = "com.fiveis.xend"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -60,11 +59,6 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-    // Firebase BoM (Bill of Materials)
-    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
 
     // Credential Manager + Google Sign-In (최신 방식)
     implementation("androidx.credentials:credentials:1.3.0")
