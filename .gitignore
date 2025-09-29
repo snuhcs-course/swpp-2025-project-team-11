@@ -3,3 +3,8 @@ backend/.env
 backend/config/__pycache__
 frontend/.gradle
 frontend/app/build
+
+*.txt
+*.pyc
+**/migrations/*.py
+!**/migrations/__init__.py
