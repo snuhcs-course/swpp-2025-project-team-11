@@ -1,4 +1,4 @@
-package com.example.xend
+package com.fiveis.xend
 
 import android.os.Bundle
 import android.util.Log
