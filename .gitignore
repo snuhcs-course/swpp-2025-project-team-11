@@ -1,0 +1,5 @@
+.idea
+backend/.env
+backend/config/__pycache__
+frontend/.gradle
+frontend/app/build

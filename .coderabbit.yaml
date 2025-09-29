@@ -1,0 +1,25 @@
+
+language: "ko-KR"
+early_access: true
+enable_free_tier: true
+tone_instructions: 'Kotlin, Android, Python, Django에 능숙한 전문가 코드 리뷰어입니다.'
+reviews:
+  profile: "chill"
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  request_changes_workflow: false
+
+  high_level_summary: true
+  poem: true
+  review_status: true
+  auto_review:
+    enabled: true
+    base_branches:
+      - "develop"
+      - "main"
+      - ".*"
+
+
+
+chat:
+  auto_reply: true

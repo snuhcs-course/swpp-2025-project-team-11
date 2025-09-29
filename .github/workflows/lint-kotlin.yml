@@ -1,0 +1,53 @@
+name: Lint (Kotlin)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lint-kotlin.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lint-kotlin.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ktlint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Run ktlint
+        run: ./gradlew :app:ktlintMainSourceSetCheck --no-daemon
+
+      - name: Upload ktlint reports (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ktlint-reports
+          path: |
+            **/build/reports/ktlint/**
+          if-no-files-found: ignore

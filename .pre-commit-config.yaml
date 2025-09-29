@@ -1,0 +1,32 @@
+exclude: |
+  (^backend/.*/migrations/)
+
+default_language_version:
+  python: python3.13
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff (lint + fix)
+        args: [--fix]
+        files: ^backend/
+        types_or: [python]
+
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        name: black (format)
+        files: ^backend/
+        types_or: [python]
+
+  - repo: local
+    hooks:
+      - id: ktlint-gradle
+        name: ktlint via Gradle
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(kt|kts)$
+        entry: bash -lc 'cd frontend && ./gradlew :app:ktlintMainSourceSetFormat --no-daemon && ./gradlew :app:ktlintMainSourceSetCheck --no-daemon'

@@ -1,0 +1,19 @@
+root = true
+
+# 공통
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+# Kotlin / Gradle Kotlin DSL
+[*.{kt,kts}]
+max_line_length = 120
+
+ktlint_code_style = android_studio
+
+# Compose 함수 이름은 PascalCase 허용
+ktlint_function_naming_ignore_when_annotated_with = Composable,Preview
