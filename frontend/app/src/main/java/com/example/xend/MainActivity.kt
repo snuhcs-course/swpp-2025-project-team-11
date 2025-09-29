@@ -7,112 +7,185 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var auth: FirebaseAuth
     private lateinit var credentialManager: CredentialManager
+    private lateinit var serverClientId: String
+    private var messages by mutableStateOf("")
+
+
+
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // 1. Firebase 인증 및 CredentialManager 초기화
-        auth = FirebaseAuth.getInstance()
+        //초기화
+        serverClientId = getString(R.string.server_client_id)
         credentialManager = CredentialManager.create(this)
-
+        //화면
         setContent {
-            // Composable 안에서 코루틴을 사용하기 위해 CoroutineScope 생성
-            val scope = rememberCoroutineScope()
-
-            LoginScreen(
-                onLoginClick = {
-                    // 2. 코루틴 내에서 로그인 함수 실행
-                    scope.launch {
-                        signInWithGoogle()
-                    }
-                }
-            )
+            MaterialTheme {
+                LoginScreen(
+                    onLoginClick = { signInWithGoogle() },
+                    messages = messages
+                )
+            }
         }
     }
 
-    private suspend fun signInWithGoogle() {
-        // 3. R.string에서 웹 클라이언트 ID 가져오기
-        val webClientId = getString(R.string.default_web_client_id)
+    /** Credential Manager + Google Sign-In */
+    private fun signInWithGoogle() {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false) // 계정 선택 UI 표시
+                    .setServerClientId(serverClientId)    // OAuth 2.0 Web client ID
+                    .setAutoSelectEnabled(false)
+                    .build()
 
-        // 4. Google 로그인 옵션 설정
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false) // 기존 로그인 계정 외에도 모든 구글 계정을 보여줌
-            .setServerClientId(webClientId)
-            .build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
 
-        // 5. Credential Manager에 요청 객체 생성
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
-            .build()
+                val response: GetCredentialResponse =
+                    credentialManager.getCredential(
+                        context = this@MainActivity,
+                        request = request
+                    )
 
-        try {
-            // 6. Credential Manager를 통해 로그인 UI를 띄우고 결과 받기
-            val result = credentialManager.getCredential(
-                context = this,
-                request = request
-            )
-            val credential = result.credential
+                val credential = response.credential
+                val googleIdTokenCredential =
+                    GoogleIdTokenCredential.createFrom(credential.data)
+                val idToken = googleIdTokenCredential.idToken
 
-            // 7. 결과에서 Google ID 토큰 추출
-            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-            val googleIdToken = googleIdTokenCredential.idToken
+                if (idToken.isNullOrBlank()) {
+                    Toast.makeText(this@MainActivity, "ID Token 없음", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
 
-            // 8. Firebase에 인증할 Credential 생성
-            val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
+                // 서버로 로그인 콜백 호출 (결과만 확인)
+                sendIdTokenToServer(idToken)
 
-            // 9. Firebase에 로그인
-            val authResult = auth.signInWithCredential(firebaseCredential).await()
-            val user = authResult.user
+            } catch (e: GetCredentialException) {
+                Log.e("GoogleAuth", "로그인 실패", e)
+                Toast.makeText(this@MainActivity, "로그인 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                messages = "로그인 실패: ${e.message}"
+            } catch (e: Exception) {
+                Log.e("GoogleAuth", "예외 발생", e)
+                Toast.makeText(this@MainActivity, "오류: ${e.message}", Toast.LENGTH_LONG).show()
+                messages = "오류: ${e.message}"
+            }
+        }
+    }
 
-            Toast.makeText(this, "환영합니다! ${user?.displayName}", Toast.LENGTH_SHORT).show()
+    // 일단 { "result": "success" }만 확인
+    private fun sendIdTokenToServer(idToken: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val endpoint = getString(R.string.google_auth_callback_endpoint)
+            try {
+                val url = URL(endpoint)
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    setRequestProperty("Accept", "application/json")
+                }
 
-        } catch (e: GetCredentialException) {
-            // 로그인 실패 또는 사용자가 취소한 경우
-            e.printStackTrace()
-            Toast.makeText(this, "로그인에 실패했습니다: ${e.message}", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Log.e("Auth", "Firebase error", e)
-            Toast.makeText(this, "로그인 중 에러 발생: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                val body = JSONObject().put("id_token", idToken).toString()
+                conn.outputStream.use { os ->
+                    os.write(body.toByteArray(Charsets.UTF_8))
+                    os.flush()
+                }
+
+                val code = conn.responseCode
+                val text = try {
+                    if (code in 200..299) {
+                        conn.inputStream.bufferedReader().readText()
+                    } else {
+                        conn.errorStream?.bufferedReader()?.readText()
+                            ?: """{"result":"error","message":"HTTP $code"}"""
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+
+                val json = try { JSONObject(text) } catch (_: Exception) { JSONObject() }
+                val result = json.optString("result", "error")
+
+                withContext(Dispatchers.Main) {
+                    if (code in 200..299 && result.equals("success", ignoreCase = true)) {
+                        Toast.makeText(this@MainActivity, "로그인 성공(서버)", Toast.LENGTH_LONG).show()
+                        messages = """서버 응답: $result"""
+                    } else {
+                        Toast.makeText(this@MainActivity, "로그인 실패(서버)", Toast.LENGTH_LONG).show()
+                        messages = """서버 오류: HTTP $code, 응답: $text"""
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ServerAuth", "서버 연동 실패", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "서버 연동 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                    messages = "서버 연동 실패: ${e.message}"
+                }
+            }
         }
     }
 }
 
+
+
+
+
+
+
+
+
+
+
 @Composable
-fun LoginScreen(onLoginClick: () -> Unit) {
+fun LoginScreen(
+    onLoginClick: () -> Unit,
+    messages: String
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
-            Button(
-                onClick = onLoginClick,
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(text = "Google 로그인")
+            Button(onClick = onLoginClick, modifier = Modifier.padding(16.dp)) {
+                Text("백엔드 통신시도")
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(text = if (messages.isEmpty()) "아직 응답 없음" else messages)
         }
     }
 }
