@@ -1,6 +1,6 @@
 
 language: "ko-KR"
-early_access: true
+early_access: false
 enable_free_tier: true
 tone_instructions: 'Kotlin, Android, Python, Django에 능숙한 전문가 코드 리뷰어입니다.'
 reviews:
