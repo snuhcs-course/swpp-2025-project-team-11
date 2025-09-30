@@ -10,25 +10,23 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from config.utils import get_env
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+
+env = get_env()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-grh%mmue@$114wrpp5264p*9@$k%js_3i70535hy*#+r%lof!g"
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+DEBUG = env("DEBUG")
+ALLOWED_HOSTS = ["*"]
+SECRET_KEY = env("SECRET_KEY")
 
 
 # Application definition
@@ -87,11 +85,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "xend"),
-        "USER": os.environ.get("POSTGRES_USER", "xend"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "xendpass"),
-        "HOST": os.environ.get("POSTGRES_HOST", "postgres"),  # compose 서비스명
-        "PORT": int(os.environ.get("POSTGRES_PORT", "5432")),
+        "NAME": env("DATABASE_NAME"),
+        "HOST": env("DATABASE_HOST"),
+        "USER": env("DATABASE_USER"),
+        "PASSWORD": env("DATABASE_PASSWORD"),
+        "PORT": env("DATABASE_PORT"),
     }
 }
 
@@ -137,7 +135,6 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-load_dotenv()
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
