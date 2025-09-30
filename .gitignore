@@ -3,3 +3,5 @@ backend/.env
 backend/config/__pycache__
 frontend/.gradle
 frontend/app/build
+**/__pycache__
+*.pyc
