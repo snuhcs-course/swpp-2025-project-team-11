@@ -20,8 +20,17 @@
             android:theme="@style/Theme.Xend">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- Custom URI Scheme -->
+                <data
+                    android:scheme="com.fiveis.xend"
+                    android:host="oauth2callback" />
             </intent-filter>
         </activity>
     </application>
