@@ -11,6 +11,7 @@ psycopg = {extras = ["binary"], version = "^3.2.10"}
 uvicorn = {extras = ["standard"], version = "^0.37.0"}
 djangorestframework = "^3.16.1"
 djangorestframework-simplejwt = "^5.5.1"
+cryptography = "^46.0.2"
 
 
 [tool.poetry.group.django.dependencies]
@@ -20,6 +21,7 @@ django-environ = "^0.12.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
 
 
 [tool.poetry.group.lint.dependencies]
