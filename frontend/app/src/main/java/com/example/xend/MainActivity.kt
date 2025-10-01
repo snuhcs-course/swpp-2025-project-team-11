@@ -47,6 +47,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Initializes the activity, loads the server client ID, and sets the Compose UI to the login screen.
+     *
+     * @param savedInstanceState The saved instance state bundle provided by the system, or `null` if none.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         serverClientId = getString(R.string.server_client_id)
@@ -64,6 +69,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Starts the Google Sign-In flow requesting a server auth code, the user's email, and Gmail read/send scopes, then launches the sign-in intent.
+     *
+     * Builds GoogleSignInOptions using the activity's serverClientId, obtains a GoogleSignInClient, and triggers the registered signInLauncher to open the sign-in UI.
+     */
     @Suppress("DEPRECATION")
     private fun signInWithGoogle() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -79,6 +89,15 @@ class MainActivity : ComponentActivity() {
         signInLauncher.launch(googleSignInClient.signInIntent)
     }
 
+    /**
+     * Handle the result of a Google sign-in and advance the app's authentication flow.
+     *
+     * If `account` is null, signals the failure by showing a toast and setting `messages` to indicate missing account.
+     * If `account` is present, updates login state (`isLoggedIn`, `userEmail`), and:
+     * - if a server auth code is available, sends it to the app backend, shows a success toast, and updates `messages` with a short code snippet;
+     * - if the auth code is missing, shows an explanatory toast with troubleshooting steps and updates `messages` with that guidance.
+     *
+     * @param account The nullable GoogleSignInAccount returned by the sign-in intent; may be null on failure.
     private fun handleSignInResult(account: GoogleSignInAccount?) {
         if (account == null) {
             Toast.makeText(this, "계정 정보를 가져오지 못했습니다", Toast.LENGTH_LONG).show()
@@ -116,6 +135,13 @@ class MainActivity : ComponentActivity() {
         messages = "✅ Auth Code 받음\n(Gmail 스코프 포함)\n${authCode.take(30)}..."
     }
 
+    /**
+     * Signs out the current Google account and updates local UI state.
+     *
+     * Initiates a GoogleSignInClient sign-out; on success it clears login state (isLoggedIn, userEmail),
+     * updates the messages text, shows a success Toast, and logs the event. On failure it shows a
+     * failure Toast and logs the error.
+     */
     @Suppress("DEPRECATION")
     private fun signOutFromGoogle() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -139,6 +165,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Sends the provided Google authorization code to the backend callback endpoint and surfaces the server response to the UI.
+     *
+     * Performs a network POST of a JSON body containing the `authCode` to the configured callback path, then updates `messages` and shows a success or failure Toast on the main thread based on the HTTP response. On exception, logs the error and updates `messages` with the exception message.
+     *
+     * @param authCode The server authorization code obtained from Google sign-in to forward to the backend.
+     */
     private fun sendAuthCodeToServer(authCode: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val endpoint = getString(R.string.google_auth_callback_endpoint) + "/auth/google/callback"
@@ -191,6 +224,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Composable UI that shows a Gmail authentication button or a logout area and displays status messages.
+ *
+ * When `isLoggedIn` is true the composable displays the logged-in `userEmail` and a logout button that invokes `onLogoutClick`.
+ * When `isLoggedIn` is false it shows a button that invokes `onLoginClick` to start authentication.
+ *
+ * @param onLoginClick Callback invoked when the authentication button is pressed.
+ * @param onLogoutClick Callback invoked when the logout button is pressed.
+ * @param messages Status or response text to display to the user; empty string results in a default placeholder.
+ * @param isLoggedIn True if a user is currently signed in; controls which UI (login vs. logout) is shown.
+ * @param userEmail Email address of the currently signed-in user (displayed when `isLoggedIn` is true).
+ */
 @Composable
 fun LoginScreen(
     onLoginClick: () -> Unit,
