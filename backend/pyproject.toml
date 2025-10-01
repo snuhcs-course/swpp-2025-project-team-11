@@ -12,6 +12,11 @@ uvicorn = {extras = ["standard"], version = "^0.37.0"}
 djangorestframework = "^3.16.1"
 djangorestframework-simplejwt = "^5.5.1"
 cryptography = "^46.0.2"
+google-auth = "^2.37.0"
+google-auth-oauthlib = "^1.2.1"
+google-auth-httplib2 = "^0.2.0"
+google-api-python-client = "^2.161.0"
+requests = "^2.32.3"
 
 
 [tool.poetry.group.django.dependencies]
