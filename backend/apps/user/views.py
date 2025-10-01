@@ -29,7 +29,8 @@ class GoogleCallbackView(APIView):
         data = {
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID,
-            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            # "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            # 안드로이드 클라이언트의 경우 SECRET이 존재하지 않음.
             "redirect_uri": settings.GOOGLE_OAUTH_REDIRECT_URI,
             "grant_type": "authorization_code",
         }
