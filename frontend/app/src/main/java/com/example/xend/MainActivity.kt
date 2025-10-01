@@ -17,7 +17,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -140,7 +140,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendAuthCodeToServer(authCode: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO){
             val endpoint = getString(R.string.google_auth_callback_endpoint) + "/auth/google/callback"
             try {
                 val url = URL(endpoint)
