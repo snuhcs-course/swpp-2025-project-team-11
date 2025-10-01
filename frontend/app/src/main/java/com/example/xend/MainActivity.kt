@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
 
     private fun sendAuthCodeToServer(authCode: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            val endpoint = getString(R.string.google_auth_callback_endpoint)
+            val endpoint = getString(R.string.google_auth_callback_endpoint) + "/auth/google/callback"
             try {
                 val url = URL(endpoint)
                 val conn = (url.openConnection() as HttpURLConnection).apply {
