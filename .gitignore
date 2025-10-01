@@ -5,7 +5,5 @@ frontend/.gradle
 frontend/app/build
 
 *.txt
-**/migrations/*.py
-!**/migrations/__init__.py
 **/__pycache__
 *.pyc
