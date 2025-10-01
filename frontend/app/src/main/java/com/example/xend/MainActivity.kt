@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun signInWithGoogle() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestServerAuthCode(serverClientId)
+            .requestServerAuthCode(serverClientId, true)
             .requestEmail()
             .requestScopes(
                 Scope("https://www.googleapis.com/auth/gmail.readonly"),
@@ -153,7 +153,8 @@ class MainActivity : ComponentActivity() {
 
     private fun sendAuthCodeToServer(authCode: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val endpoint = getString(R.string.google_auth_callback_endpoint) + "/auth/google/callback"
+            val endpoint = "http://10.0.2.2/user/google/callback/" // 로컬 테스트용 (추후 환경변수로 설정 필요함)
+            // val endpoint = getString(R.string.google_auth_callback_endpoint) + "/user/google/callback"
             try {
                 val url = URL(endpoint)
                 val conn = (url.openConnection() as HttpURLConnection).apply {
