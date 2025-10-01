@@ -2,15 +2,16 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+
+
 }
 
 android {
-    namespace = "com.example.xend"
+    namespace = "com.fiveis.xend"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.xend"
+        applicationId = "com.fiveis.xend"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -40,6 +41,7 @@ android {
     }
 }
 
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -57,11 +59,12 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-}
 
-ktlint {
-    filter {
-        exclude("**/src/test/**")
-        exclude("**/src/androidTest/**")
-    }
+
+    // Credential Manager + Google Sign-In (최신 방식)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0") // Play 서비스와 Credential Manager 연동
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
 }
