@@ -21,7 +21,7 @@ djangorestframework-simplejwt = "^5.5.1"
 
 
 [tool.poetry.group.langchain.dependencies]
-langchain-core = "^0.3.76"
+langchain-core = "^0.3.77"
 langchain-openai = "^0.3.33"
 
 
