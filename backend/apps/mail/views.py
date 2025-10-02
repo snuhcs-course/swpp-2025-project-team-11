@@ -49,7 +49,11 @@ class EmailListView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Parse parameters
-        max_results = min(int(request.query_params.get("max_results", 20)), 100)
+        try:
+            max_results = min(int(request.query_params.get("max_results", 20)), 100)
+        except (ValueError, TypeError):
+            max_results = 20
+
         page_token = request.query_params.get("page_token")
         labels = request.query_params.get("labels", "INBOX")
         label_ids = [label.strip() for label in labels.split(",")] if labels else ["INBOX"]
@@ -116,8 +120,16 @@ class EmailDetailView(APIView):
         try:
             message = gmail_service.get_message(message_id)
         except Exception as e:
+            # Check if it's a 404 error from Gmail API
+            error_str = str(e).lower()
+            if "404" in error_str or "not found" in error_str:
+                return Response(
+                    {"detail": f"Message not found: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+                )
+            # Other errors (network, permission, etc.)
             return Response(
-                {"detail": f"Gmail API error: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": f"Gmail API error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         serializer = EmailDetailSerializer(message)
@@ -263,6 +275,14 @@ class EmailMarkReadView(APIView):
                 status=status.HTTP_200_OK,
             )
         except Exception as e:
+            # Check if it's a 404 error from Gmail API
+            error_str = str(e).lower()
+            if "404" in error_str or "not found" in error_str:
+                return Response(
+                    {"detail": f"Message not found: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+                )
+            # Other errors (network, permission, etc.)
             return Response(
-                {"detail": f"Gmail API error: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": f"Gmail API error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

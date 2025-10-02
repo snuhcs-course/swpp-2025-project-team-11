@@ -104,6 +104,7 @@ class GmailService:
     def _get_body(self, payload: dict) -> str:
         """
         Extract message body (recursive parts traversal)
+        Priority: text/plain > text/html
 
         Args:
             payload: message payload
@@ -115,12 +116,24 @@ class GmailService:
             return self._decode_body(payload["body"]["data"])
 
         if "parts" in payload:
+            # Try to find text/plain first
             for part in payload["parts"]:
                 if part["mimeType"] == "text/plain":
                     if "data" in part["body"]:
                         return self._decode_body(part["body"]["data"])
                 elif part["mimeType"] == "multipart/alternative":
                     # Recursive search
+                    body = self._get_body(part)
+                    if body:
+                        return body
+
+            # If no text/plain, try text/html
+            for part in payload["parts"]:
+                if part["mimeType"] == "text/html":
+                    if "data" in part["body"]:
+                        return self._decode_body(part["body"]["data"])
+                elif part["mimeType"] == "multipart/alternative":
+                    # Recursive search for HTML
                     body = self._get_body(part)
                     if body:
                         return body
