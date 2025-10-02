@@ -1,11 +1,11 @@
 """Gmail API integration service"""
 
 import base64
-from datetime import datetime
 from email.utils import parsedate_to_datetime
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 
 class GmailService:
@@ -36,18 +36,23 @@ class GmailService:
                 'nextPageToken': '...',
                 'resultSizeEstimate': 100
             }
+
+        Raises:
+            HttpError: Gmail API error
         """
         if label_ids is None:
             label_ids = ["INBOX"]
 
-        results = (
-            self.service.users()
-            .messages()
-            .list(userId="me", maxResults=max_results, pageToken=page_token, labelIds=label_ids)
-            .execute()
-        )
-
-        return results
+        try:
+            results = (
+                self.service.users()
+                .messages()
+                .list(userId="me", maxResults=max_results, pageToken=page_token, labelIds=label_ids)
+                .execute()
+            )
+            return results
+        except HttpError:
+            raise
 
     def get_message(self, message_id: str):
         """
@@ -58,12 +63,20 @@ class GmailService:
 
         Returns:
             dict: Parsed message details
-        """
-        message = (
-            self.service.users().messages().get(userId="me", id=message_id, format="full").execute()
-        )
 
-        return self._parse_message(message)
+        Raises:
+            HttpError: Gmail API error
+        """
+        try:
+            message = (
+                self.service.users()
+                .messages()
+                .get(userId="me", id=message_id, format="full")
+                .execute()
+            )
+            return self._parse_message(message)
+        except HttpError:
+            raise
 
     def _parse_message(self, message: dict) -> dict:
         """
@@ -85,8 +98,12 @@ class GmailService:
         date_str = headers_dict.get("date", "")
         try:
             received_at = parsedate_to_datetime(date_str)
-        except Exception:
-            received_at = datetime.now()
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+
+            logging.warning(f"Failed to parse date '{date_str}' for message {message['id']}: {e}")
+            received_at = None
 
         return {
             "id": message["id"],
@@ -96,7 +113,8 @@ class GmailService:
             "subject": headers_dict.get("subject", "(No Subject)"),
             "from": headers_dict.get("from", ""),
             "to": headers_dict.get("to", ""),
-            "date": received_at.isoformat(),
+            "date": received_at.isoformat() if received_at else None,
+            "date_raw": date_str,
             "body": body,
             "is_unread": "UNREAD" in message.get("labelIds", []),
         }
@@ -167,25 +185,31 @@ class GmailService:
 
         Returns:
             dict: Sent message info including message ID
+
+        Raises:
+            HttpError: Gmail API error
         """
         from email.mime.text import MIMEText
 
-        # Create message
-        message = MIMEText(body, "plain", "utf-8")
-        message["To"] = to
-        message["Subject"] = subject
+        try:
+            # Create message
+            message = MIMEText(body, "plain", "utf-8")
+            message["To"] = to
+            message["Subject"] = subject
 
-        # Encode message
-        raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+            # Encode message
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 
-        # Send via Gmail API
-        result = self.service.users().messages().send(userId="me", body={"raw": raw}).execute()
+            # Send via Gmail API
+            result = self.service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
-        return {
-            "id": result["id"],
-            "threadId": result.get("threadId"),
-            "labelIds": result.get("labelIds", []),
-        }
+            return {
+                "id": result["id"],
+                "threadId": result.get("threadId"),
+                "labelIds": result.get("labelIds", []),
+            }
+        except HttpError:
+            raise
 
     def mark_as_read(self, message_id: str):
         """
@@ -196,14 +220,20 @@ class GmailService:
 
         Returns:
             dict: Modified message info
+
+        Raises:
+            HttpError: Gmail API error
         """
-        result = (
-            self.service.users()
-            .messages()
-            .modify(userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]})
-            .execute()
-        )
-        return result
+        try:
+            result = (
+                self.service.users()
+                .messages()
+                .modify(userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]})
+                .execute()
+            )
+            return result
+        except HttpError:
+            raise
 
     def mark_as_unread(self, message_id: str):
         """
@@ -214,11 +244,17 @@ class GmailService:
 
         Returns:
             dict: Modified message info
+
+        Raises:
+            HttpError: Gmail API error
         """
-        result = (
-            self.service.users()
-            .messages()
-            .modify(userId="me", id=message_id, body={"addLabelIds": ["UNREAD"]})
-            .execute()
-        )
-        return result
+        try:
+            result = (
+                self.service.users()
+                .messages()
+                .modify(userId="me", id=message_id, body={"addLabelIds": ["UNREAD"]})
+                .execute()
+            )
+            return result
+        except HttpError:
+            raise

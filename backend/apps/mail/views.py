@@ -1,6 +1,7 @@
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.utils import timezone
+from googleapiclient.errors import HttpError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -64,9 +65,25 @@ class EmailListView(APIView):
             result = gmail_service.list_messages(
                 max_results=max_results, page_token=page_token, label_ids=label_ids
             )
-        except Exception as e:
+        except HttpError as e:
+            if e.resp.status == 404:
+                return Response({"detail": "Messages not found"}, status=status.HTTP_404_NOT_FOUND)
+            elif e.resp.status == 403:
+                return Response(
+                    {"detail": "Rate limit exceeded or permission denied"},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            elif e.resp.status == 401:
+                return Response(
+                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
+                )
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -119,16 +136,25 @@ class EmailDetailView(APIView):
         gmail_service = GmailService(access_token)
         try:
             message = gmail_service.get_message(message_id)
-        except Exception as e:
-            # Check if it's a 404 error from Gmail API
-            error_str = str(e).lower()
-            if "404" in error_str or "not found" in error_str:
+        except HttpError as e:
+            if e.resp.status == 404:
+                return Response({"detail": "Message not found"}, status=status.HTTP_404_NOT_FOUND)
+            elif e.resp.status == 403:
                 return Response(
-                    {"detail": f"Message not found: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+                    {"detail": "Rate limit exceeded or permission denied"},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
-            # Other errors (network, permission, etc.)
+            elif e.resp.status == 401:
+                return Response(
+                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
+                )
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -172,9 +198,27 @@ class EmailSendView(APIView):
                 subject=serializer.validated_data["subject"],
                 body=serializer.validated_data["body"],
             )
-        except Exception as e:
+        except HttpError as e:
+            if e.resp.status == 403:
+                return Response(
+                    {"detail": "Rate limit exceeded or permission denied"},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            elif e.resp.status == 401:
+                return Response(
+                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
+                )
+            elif e.resp.status == 400:
+                return Response(
+                    {"detail": "Invalid email format"}, status=status.HTTP_400_BAD_REQUEST
+                )
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -274,15 +318,24 @@ class EmailMarkReadView(APIView):
                 {"id": result.get("id"), "labelIds": result.get("labelIds", [])},
                 status=status.HTTP_200_OK,
             )
-        except Exception as e:
-            # Check if it's a 404 error from Gmail API
-            error_str = str(e).lower()
-            if "404" in error_str or "not found" in error_str:
+        except HttpError as e:
+            if e.resp.status == 404:
+                return Response({"detail": "Message not found"}, status=status.HTTP_404_NOT_FOUND)
+            elif e.resp.status == 403:
                 return Response(
-                    {"detail": f"Message not found: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+                    {"detail": "Rate limit exceeded or permission denied"},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
-            # Other errors (network, permission, etc.)
+            elif e.resp.status == 401:
+                return Response(
+                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
+                )
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
