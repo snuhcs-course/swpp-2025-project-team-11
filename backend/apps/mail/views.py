@@ -224,3 +224,45 @@ class MailTestView(APIView):
                 {"status": "error", "detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class EmailMarkReadView(APIView):
+    """
+    PATCH /api/mail/emails/<message_id>/read/
+    Mark email as read or unread
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, message_id):
+        user = request.user
+        is_read = request.data.get("is_read", True)
+
+        # Get Google access token
+        try:
+            google_account = user.google_accounts.get()
+            access_token = google_refresh(google_account)
+        except GoogleAccount.DoesNotExist:
+            return Response(
+                {"detail": "Google account not linked"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+        except (ValueError, TimeoutError) as e:
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Mark as read or unread
+        gmail_service = GmailService(access_token)
+        try:
+            if is_read:
+                result = gmail_service.mark_as_read(message_id)
+            else:
+                result = gmail_service.mark_as_unread(message_id)
+
+            return Response(
+                {"id": result.get("id"), "labelIds": result.get("labelIds", [])},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Gmail API error: {str(e)}"}, status=status.HTTP_404_NOT_FOUND
+            )

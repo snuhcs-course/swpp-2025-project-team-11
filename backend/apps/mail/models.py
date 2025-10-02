@@ -13,6 +13,7 @@ class Email(models.Model):
     snippet = models.TextField(blank=True)
     body = models.TextField(blank=True)
     received_at = models.DateTimeField()
+    is_unread = models.BooleanField(default=True)  # Unread status
     labels = models.JSONField(default=list)  # ['INBOX', 'UNREAD', etc]
 
     created_at = models.DateTimeField(auto_now_add=True)

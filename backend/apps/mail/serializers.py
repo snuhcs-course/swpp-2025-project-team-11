@@ -46,7 +46,7 @@ class EmailModelSerializer(serializers.ModelSerializer):
             "snippet",
             "body",
             "received_at",
-            "is_read",
+            "is_unread",
             "labels",
             "created_at",
             "updated_at",

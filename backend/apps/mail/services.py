@@ -173,3 +173,39 @@ class GmailService:
             "threadId": result.get("threadId"),
             "labelIds": result.get("labelIds", []),
         }
+
+    def mark_as_read(self, message_id: str):
+        """
+        Mark a message as read by removing UNREAD label
+
+        Args:
+            message_id: Gmail message ID
+
+        Returns:
+            dict: Modified message info
+        """
+        result = (
+            self.service.users()
+            .messages()
+            .modify(userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]})
+            .execute()
+        )
+        return result
+
+    def mark_as_unread(self, message_id: str):
+        """
+        Mark a message as unread by adding UNREAD label
+
+        Args:
+            message_id: Gmail message ID
+
+        Returns:
+            dict: Modified message info
+        """
+        result = (
+            self.service.users()
+            .messages()
+            .modify(userId="me", id=message_id, body={"addLabelIds": ["UNREAD"]})
+            .execute()
+        )
+        return result
