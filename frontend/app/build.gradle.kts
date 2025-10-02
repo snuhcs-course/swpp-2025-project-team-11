@@ -66,5 +66,10 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0") // Play 서비스와 Credential Manager 연동
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
 
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+
+    implementation("androidx.activity:activity-compose:1.10.1")
 }

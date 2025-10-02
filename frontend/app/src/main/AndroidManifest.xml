@@ -13,6 +13,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Xend">
+
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -33,6 +35,10 @@
                     android:host="oauth2callback" />
             </intent-filter>
         </activity>
+        <activity android:name=".MailSendActivity" />
+
+
+
     </application>
 
 </manifest>
