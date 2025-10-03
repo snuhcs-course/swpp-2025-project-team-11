@@ -50,12 +50,10 @@ import org.json.JSONObject
 
 private const val TAG = "GmailAPI"
 
-// ✅ 서버 베이스 URL과 엔드포인트(필요시 변경)
-private const val SERVER_BASE_URL = "http://ec2-15-164-93-45.ap-northeast-2.compute.amazonaws.com"
+private const val SERVER_BASE_URL = "http://10.0.2.2:8008"
 private const val REFRESH_ENDPOINT = "/user/refresh/"
-
-// ⛳️ 메일 전송 엔드포인트는 확인 필요 — 임시 경로
 private const val SEND_MAIL_ENDPOINT = "/mail/emails/send/"
+// private const val LOGIN_CALLBACK_ENDPOINT = "/user/google/callback/"
 
 class MailSendActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
