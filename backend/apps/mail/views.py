@@ -1,3 +1,5 @@
+import logging
+
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.utils import timezone
@@ -10,6 +12,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.user.models import GoogleAccount, User
 from apps.user.services import google_refresh
+from apps.user.utils import google_token_required
 
 from .serializers import (
     EmailDetailSerializer,
@@ -18,6 +21,30 @@ from .serializers import (
     EmailSendSerializer,
 )
 from .services import GmailService
+
+logger = logging.getLogger(__name__)
+
+
+@google_token_required
+def _list_emails_logic(access_token, max_results, page_token, label_ids):
+    """Helper function to list emails using Google access token"""
+    gmail_service = GmailService(access_token)
+    result = gmail_service.list_messages(
+        max_results=max_results, page_token=page_token, label_ids=label_ids
+    )
+
+    # Fetch detailed info for each message
+    messages = []
+    for msg in result.get("messages", []):
+        try:
+            message_detail = gmail_service.get_message(msg["id"])
+            messages.append(message_detail)
+        except Exception as e:
+            # Skip individual message fetch failures
+            logger.warning(f"Failed to fetch message {msg['id']}: {str(e)}")
+            continue
+
+    return result, messages
 
 
 class EmailListView(APIView):
@@ -38,17 +65,6 @@ class EmailListView(APIView):
         """
         user = request.user
 
-        # Get Google access token (refresh using refresh token)
-        try:
-            google_account = user.google_accounts.get()
-            access_token = google_refresh(google_account)
-        except GoogleAccount.DoesNotExist:
-            return Response(
-                {"detail": "Google account not linked"}, status=status.HTTP_401_UNAUTHORIZED
-            )
-        except (ValueError, TimeoutError) as e:
-            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-
         # Parse parameters
         try:
             max_results = min(int(request.query_params.get("max_results", 20)), 100)
@@ -59,12 +75,11 @@ class EmailListView(APIView):
         labels = request.query_params.get("labels", "INBOX")
         label_ids = [label.strip() for label in labels.split(",")] if labels else ["INBOX"]
 
-        # Call Gmail API
-        gmail_service = GmailService(access_token)
+        # Call Gmail API with decorator
         try:
-            result = gmail_service.list_messages(
-                max_results=max_results, page_token=page_token, label_ids=label_ids
-            )
+            result, messages = _list_emails_logic(user, max_results, page_token, label_ids)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
             if e.resp.status == 404:
                 return Response({"detail": "Messages not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -87,16 +102,6 @@ class EmailListView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Fetch detailed info for each message
-        messages = []
-        for msg in result.get("messages", []):
-            try:
-                message_detail = gmail_service.get_message(msg["id"])
-                messages.append(message_detail)
-            except Exception:
-                # Skip individual message fetch failures
-                continue
-
         serializer = EmailListSerializer(messages, many=True)
 
         return Response(
@@ -107,6 +112,13 @@ class EmailListView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+@google_token_required
+def _get_email_detail_logic(access_token, message_id):
+    """Helper function to get email detail using Google access token"""
+    gmail_service = GmailService(access_token)
+    return gmail_service.get_message(message_id)
 
 
 class EmailDetailView(APIView):
@@ -121,21 +133,11 @@ class EmailDetailView(APIView):
     def get(self, request, message_id):
         user = request.user
 
-        # Get Google access token
+        # Call Gmail API with decorator
         try:
-            google_account = user.google_accounts.get()
-            access_token = google_refresh(google_account)
-        except GoogleAccount.DoesNotExist:
-            return Response(
-                {"detail": "Google account not linked"}, status=status.HTTP_401_UNAUTHORIZED
-            )
-        except (ValueError, TimeoutError) as e:
+            message = _get_email_detail_logic(user, message_id)
+        except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Call Gmail API
-        gmail_service = GmailService(access_token)
-        try:
-            message = gmail_service.get_message(message_id)
         except HttpError as e:
             if e.resp.status == 404:
                 return Response({"detail": "Message not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -162,6 +164,13 @@ class EmailDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@google_token_required
+def _send_email_logic(access_token, to, subject, body):
+    """Helper function to send email using Google access token"""
+    gmail_service = GmailService(access_token)
+    return gmail_service.send_message(to=to, subject=subject, body=body)
+
+
 class EmailSendView(APIView):
     """
     POST /api/mail/emails/send/
@@ -179,25 +188,16 @@ class EmailSendView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get Google access token
+        # Send email via Gmail API with decorator
         try:
-            google_account = user.google_accounts.get()
-            access_token = google_refresh(google_account)
-        except GoogleAccount.DoesNotExist:
-            return Response(
-                {"detail": "Google account not linked"}, status=status.HTTP_401_UNAUTHORIZED
-            )
-        except (ValueError, TimeoutError) as e:
-            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Send email via Gmail API
-        gmail_service = GmailService(access_token)
-        try:
-            result = gmail_service.send_message(
+            result = _send_email_logic(
+                user,
                 to=serializer.validated_data["to"],
                 subject=serializer.validated_data["subject"],
                 body=serializer.validated_data["body"],
             )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
             if e.resp.status == 403:
                 return Response(
@@ -233,6 +233,13 @@ class MailTestView(APIView):
     """
 
     def get(self, request):
+        # Security check: only available in DEBUG mode
+        if not settings.DEBUG:
+            return Response(
+                {"detail": "This endpoint is only available in DEBUG mode"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         # Mock user for testing
         test_email = request.query_params.get("email", "test@example.com")
 
@@ -282,6 +289,16 @@ class MailTestView(APIView):
             )
 
 
+@google_token_required
+def _mark_read_logic(access_token, message_id, is_read):
+    """Helper function to mark email as read/unread using Google access token"""
+    gmail_service = GmailService(access_token)
+    if is_read:
+        return gmail_service.mark_as_read(message_id)
+    else:
+        return gmail_service.mark_as_unread(message_id)
+
+
 class EmailMarkReadView(APIView):
     """
     PATCH /api/mail/emails/<message_id>/read/
@@ -295,29 +312,15 @@ class EmailMarkReadView(APIView):
         user = request.user
         is_read = request.data.get("is_read", True)
 
-        # Get Google access token
+        # Mark as read or unread with decorator
         try:
-            google_account = user.google_accounts.get()
-            access_token = google_refresh(google_account)
-        except GoogleAccount.DoesNotExist:
-            return Response(
-                {"detail": "Google account not linked"}, status=status.HTTP_401_UNAUTHORIZED
-            )
-        except (ValueError, TimeoutError) as e:
-            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Mark as read or unread
-        gmail_service = GmailService(access_token)
-        try:
-            if is_read:
-                result = gmail_service.mark_as_read(message_id)
-            else:
-                result = gmail_service.mark_as_unread(message_id)
-
+            result = _mark_read_logic(user, message_id, is_read)
             return Response(
                 {"id": result.get("id"), "labelIds": result.get("labelIds", [])},
                 status=status.HTTP_200_OK,
             )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
             if e.resp.status == 404:
                 return Response({"detail": "Message not found"}, status=status.HTTP_404_NOT_FOUND)
