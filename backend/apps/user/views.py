@@ -40,7 +40,7 @@ class GoogleCallbackView(APIView):
             token_res = requests.post(token_url, data=data, timeout=10)
             token_res.raise_for_status()
             token_json = token_res.json()
-            print(token_json)
+
         except requests.RequestException as e:
             return Response(
                 {"detail": f"Failed to get token from Google: {str(e)}"},
