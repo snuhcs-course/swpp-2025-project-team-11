@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,11 +51,11 @@ import org.json.JSONObject
 private const val TAG = "GmailAPI"
 
 // ✅ 서버 베이스 URL과 엔드포인트(필요시 변경)
-private const val SERVER_BASE_URL = "http://xend-database-dev.cl8w6sywqkyo.ap-northeast-2.rds.amazonaws.com"
+private const val SERVER_BASE_URL = "http://ec2-15-164-93-45.ap-northeast-2.compute.amazonaws.com"
 private const val REFRESH_ENDPOINT = "/user/refresh/"
 
 // ⛳️ 메일 전송 엔드포인트는 확인 필요 — 임시 경로
-private const val SEND_MAIL_ENDPOINT = "/mail/send"
+private const val SEND_MAIL_ENDPOINT = "/mail/emails/send/"
 
 class MailSendActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -307,10 +309,11 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
             } finally {
                 conn.disconnect()
             }
-            Log.d(TAG, "Send resp ($code): $text")
+
+            Log.d(TAG, "Send resp ($code): $text") // ✅ 정상 응답 로그
             HttpResp(code, text)
         } catch (e: Exception) {
-            Log.e(TAG, "Send exception", e)
+            Log.e(TAG, "Send exception: ${e.localizedMessage}", e) // ✅ 상세 예외 로그
             HttpResp(500, "{\"error\":\"${e.localizedMessage ?: e.javaClass.simpleName}\"}")
         }
     }
@@ -347,7 +350,6 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
             }
 
-            // ✅ 명세에 맞춰 {"refresh": "<refresh_token>"} 로 전송
             val body = JSONObject().put("refresh", refreshToken).toString()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
@@ -362,8 +364,9 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
                 conn.disconnect()
             }
 
+            Log.d(TAG, "Refresh response ($code): $text") // ✅ 응답 로그
+
             if (code !in 200..299) {
-                Log.e(TAG, "Refresh failed ($code): $text")
                 return@withContext false
             }
 
@@ -375,10 +378,10 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
             }
 
             TokenStore.saveAccessToken(context, newAccess)
-            Log.d(TAG, "Access token refreshed")
+            Log.d(TAG, "Access token refreshed ✅")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during token refresh", e)
+            Log.e(TAG, "Exception during token refresh: ${e.localizedMessage}", e) // ✅ 상세 예외 로그
             false
         }
     }
