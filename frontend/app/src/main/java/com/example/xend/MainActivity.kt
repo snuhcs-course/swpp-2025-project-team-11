@@ -1,6 +1,6 @@
 package com.fiveis.xend
 
-import android.content.Intent // ✅ 추가: MailSendActivity로 이동
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -47,10 +47,14 @@ class MainActivity : ComponentActivity() {
     private var isLoggedIn by mutableStateOf(false)
     private var userEmail by mutableStateOf("")
 
-    // 에뮬레이터용 로컬 엔드포인트
-    private val authCallbackEndpoint = "http://10.0.2.2/user/google/callback/"
+    // ✅ 서버 베이스 URL과 엔드포인트(필요시 변경)
+    companion object {
+        private const val SERVER_BASE_URL = "http://10.0.2.2:8008"
+        private const val AUTH_CALLBACK = "/user/google/callback/"
+        private const val LOGOUT_ENDPOINT = "/user/logout/"
+    }
 
-    // EncryptedSharedPreferences
+    // ✅ EncryptedSharedPreferences (다른 곳과 파일명/키 통일: "secure_prefs")
     private val encryptedPrefs by lazy {
         val masterKey = MasterKey.Builder(applicationContext)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -65,12 +69,10 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    // Google Sign-In 런처
     private val signInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val data = result.data
-        if (data == null) {
+        val data = result.data ?: run {
             Log.w("GoogleAuth", "Sign-in canceled or no data.")
             Toast.makeText(this, "로그인이 취소되었습니다", Toast.LENGTH_LONG).show()
             messages = "로그인 취소됨"
@@ -91,12 +93,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         serverClientId = getString(R.string.server_client_id)
 
-        // 저장된 토큰이 있는지 확인
         checkSavedTokens()
 
-        // ✅ 이미 로그인된 세션이면 바로 MailSendActivity로 이동
+        // ✅ 이미 로그인되어 있으면 받은편지함으로
         if (isLoggedIn) {
-            goToMailSend()
+            goToInbox()
             return
         }
 
@@ -127,16 +128,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun saveTokens(accessToken: String?, refreshToken: String?, email: String) {
+    private fun saveTokens(access: String?, refresh: String?, email: String) {
         encryptedPrefs.edit().apply {
-            if (!accessToken.isNullOrEmpty()) putString("access_token", accessToken)
-            if (!refreshToken.isNullOrEmpty()) putString("refresh_token", refreshToken)
+            if (!access.isNullOrEmpty()) putString("access_token", access)
+            if (!refresh.isNullOrEmpty()) putString("refresh_token", refresh)
             putString("user_email", email)
             apply()
         }
         Log.d("TokenStorage", "✅ 토큰 저장 완료")
-        Log.d("TokenStorage", "Access Token: ${accessToken?.take(20) ?: "(없음)"}...")
-        Log.d("TokenStorage", "Refresh Token: ${refreshToken?.take(20) ?: "(없음)"}...")
+        Log.d("TokenStorage", "Access Token: ${access?.take(20) ?: "(없음)"}...")
+        Log.d("TokenStorage", "Refresh Token: ${refresh?.take(20) ?: "(없음)"}...")
     }
 
     private fun clearTokens() {
@@ -176,11 +177,9 @@ class MainActivity : ComponentActivity() {
         Log.d("GoogleAuth", "=== 로그인 성공 ===")
         Log.d("GoogleAuth", "Email: ${account.email}")
         Log.d("GoogleAuth", "Display Name: ${account.displayName}")
-        Log.d("GoogleAuth", "ID Token: ${account.idToken?.take(30)}...")
         Log.d("GoogleAuth", "Server Auth Code: ${authCode?.take(30)}...")
         Log.d("GoogleAuth", "Granted Scopes: ${account.grantedScopes.joinToString { it.scopeUri }}")
 
-        // UI 상태 업데이트 (바로 화면 전환은 하지 않음 — 서버 교환 성공시 이동)
         isLoggedIn = true
         userEmail = email
 
@@ -195,10 +194,10 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // Authorization Code를 서버로 전송
-        sendAuthCodeToServer(authCode, email)
+        // 서버로 Code 전달 → 백 JWT(access/refresh) 수령
+        sendAuthCodeToServer("$SERVER_BASE_URL$AUTH_CALLBACK", authCode, email)
         Toast.makeText(this, "Auth Code 수신 성공!", Toast.LENGTH_SHORT).show()
-        messages = "✅ Auth Code 받음\n(Gmail 스코프 포함)\n${authCode.take(30)}..."
+        messages = "✅ Auth Code 받음\n${authCode.take(30)}..."
     }
 
     private fun signOutFromGoogle() {
@@ -208,9 +207,29 @@ class MainActivity : ComponentActivity() {
             .build()
 
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
-
         googleSignInClient.signOut().addOnCompleteListener(this) { task ->
             if (task.isSuccessful) {
+                // (선택) 서버 로그아웃도 호출 가능
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val access = encryptedPrefs.getString("access_token", null) ?: return@launch
+                        val refresh = encryptedPrefs.getString("refresh_token", null) ?: ""
+                        val url = URL("$SERVER_BASE_URL$LOGOUT_ENDPOINT")
+                        val conn = (url.openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            connectTimeout = 10_000
+                            readTimeout = 10_000
+                            doOutput = true
+                            setRequestProperty("Authorization", "Bearer $access")
+                            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                        }
+                        val body = JSONObject().put("refresh", refresh).toString()
+                        conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                        conn.inputStream?.close()
+                        conn.disconnect()
+                    } catch (_: Exception) { /* ignore */ }
+                }
+
                 clearTokens()
                 isLoggedIn = false
                 userEmail = ""
@@ -224,9 +243,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sendAuthCodeToServer(authCode: String, email: String) {
+    private fun sendAuthCodeToServer(endpoint: String, authCode: String, email: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val endpoint = authCallbackEndpoint
             try {
                 val url = URL(endpoint)
                 val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -239,18 +257,14 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val body = JSONObject().put("auth_code", authCode).toString()
-                conn.outputStream.use { os ->
-                    os.write(body.toByteArray(Charsets.UTF_8))
-                    os.flush()
-                }
+                conn.outputStream.use { os -> os.write(body.toByteArray(Charsets.UTF_8)) }
 
                 val code = conn.responseCode
-                val text: String = try {
+                val text = try {
                     if (code in 200..299) {
                         conn.inputStream?.bufferedReader()?.readText().orEmpty()
                     } else {
-                        conn.errorStream?.bufferedReader()?.readText().takeUnless { it.isNullOrBlank() }
-                            ?: """{"result":"error","message":"HTTP $code"}"""
+                        conn.errorStream?.bufferedReader()?.readText().orEmpty()
                     }
                 } finally {
                     conn.disconnect()
@@ -261,47 +275,41 @@ class MainActivity : ComponentActivity() {
                         try {
                             val json = JSONObject(text)
 
-                            val accessToken = json.optString("access_token", "")
-                            val refreshToken = json.optString("refresh_token", "")
-                            val result = json.optString("result", "")
-                            val message = json.optString("message", "")
+                            // ✅ 명세에 맞춘 파싱: { user:{}, jwt:{ access:"", refresh:"" } }
+                            val jwt = json.optJSONObject("jwt")
+                            val access = jwt?.optString("access").orEmpty()
+                            val refresh = jwt?.optString("refresh").orEmpty()
 
-                            when {
-                                // ✅ 토큰을 받았으면 저장하고 바로 MailSendActivity로 이동
-                                accessToken.isNotEmpty() || refreshToken.isNotEmpty() -> {
+                            if (access.isNotEmpty() || refresh.isNotEmpty()) {
+                                saveTokens(
+                                    access.ifEmpty { null },
+                                    refresh.ifEmpty { null },
+                                    email
+                                )
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "✅ 서버 통신 성공 & 토큰 저장 완료",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                messages = "✅ 서버 응답 (HTTP $code): 토큰 저장 완료"
+                                goToInbox()
+                            } else {
+                                // (호환) 혹시 과거 키명을 쓰는 응답도 수용
+                                val access2 = json.optString("access_token", "")
+                                val refresh2 = json.optString("refresh_token", "")
+                                if (access2.isNotEmpty() || refresh2.isNotEmpty()) {
                                     saveTokens(
-                                        accessToken.ifEmpty { null },
-                                        refreshToken.ifEmpty { null },
+                                        access2.ifEmpty { null },
+                                        refresh2.ifEmpty { null },
                                         email
                                     )
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "✅ 서버 통신 성공 & 토큰 저장 완료",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    messages = "✅ 서버 응답 (HTTP $code): 토큰 저장 완료"
-                                    goToMailSend() // ✅ 이동
-                                }
-                                // ✅ 토큰 없이 { "result": "success" }만 오는 경우도 지원
-                                result.equals("success", ignoreCase = true) -> {
-                                    messages = if (message.isNotEmpty()) {
-                                        "✅ 서버 응답 (HTTP $code): $message"
-                                    } else {
-                                        "✅ 서버 응답 (HTTP $code): success"
-                                    }
-                                    goToMailSend() // ✅ 이동
-                                }
-                                else -> {
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "⚠️ 토큰/결과 키 없음",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    messages = "⚠️ 서버 응답 (HTTP $code):\n$text"
+                                    goToInbox()
+                                } else {
+                                    messages = "⚠️ 예상치 못한 응답 형식:\n$text"
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e("TokenStorage", "토큰/결과 파싱 실패", e)
+                            Log.e("TokenStorage", "토큰 파싱 실패", e)
                             Toast.makeText(this@MainActivity, "⚠️ 파싱 실패", Toast.LENGTH_LONG).show()
                             messages = "⚠️ 서버 응답 파싱 실패:\n$text"
                         }
@@ -320,13 +328,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ✅ 추가: MailSendActivity로 이동하는 헬퍼
-    private fun goToMailSend() {
+    // ✅ 받은편지함(더미 리스트) 화면으로 이동
+    private fun goToInbox() {
         try {
-            startActivity(Intent(this, MailSendActivity::class.java))
-            finish() // 로그인 화면을 백스택에서 제거(원치 않으면 지워도 됨)
+            startActivity(Intent(this, InboxActivity::class.java))
+            finish()
         } catch (e: Exception) {
-            Log.e("Nav", "MailSendActivity 이동 실패", e)
+            Log.e("Nav", "InboxActivity 이동 실패", e)
             Toast.makeText(this, "화면 이동 실패: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -340,14 +348,9 @@ fun LoginScreen(
     isLoggedIn: Boolean,
     userEmail: String
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
@@ -357,16 +360,11 @@ fun LoginScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(16.dp)
                 )
-
                 Button(
                     onClick = onLogoutClick,
                     modifier = Modifier.padding(8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("로그아웃")
-                }
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("로그아웃") }
             } else {
                 Button(onClick = onLoginClick, modifier = Modifier.padding(16.dp)) {
                     Text("Gmail API 인증")
@@ -374,7 +372,6 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
             Text(text = if (messages.isEmpty()) "아직 응답 없음" else messages)
         }
     }

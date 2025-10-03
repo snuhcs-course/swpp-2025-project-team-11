@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -12,15 +11,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,23 +45,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+
 private const val TAG = "GmailAPI"
-private const val SERVER_BASE_URL = "https://myserver.com"
-private const val REFRESH_ENDPOINT = "/user/refresh"
+
+// ✅ 서버 베이스 URL과 엔드포인트(필요시 변경)
+private const val SERVER_BASE_URL = "http://xend-database-dev.cl8w6sywqkyo.ap-northeast-2.rds.amazonaws.com"
+private const val REFRESH_ENDPOINT = "/user/refresh/"
+
+// ⛳️ 메일 전송 엔드포인트는 확인 필요 — 임시 경로
+private const val SEND_MAIL_ENDPOINT = "/mail/send"
 
 class MailSendActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MailSendScreen(accessToken = "")
-        }
+        setContent { MailSendScreen(accessToken = "") }
     }
 }
 
 // --------------------------- TokenStore ---------------------------
 
 object TokenStore {
-    private const val PREF_NAME = "secure_tokens"
+    private const val PREF_NAME = "secure_prefs" // ✅ MainActivity와 통일
     private const val KEY_ACCESS_TOKEN = "access_token"
     private const val KEY_REFRESH_TOKEN = "refresh_token"
 
@@ -78,14 +78,10 @@ object TokenStore {
     )
 
     fun getAccessToken(context: Context): String? = prefs(context).getString(KEY_ACCESS_TOKEN, null)
-
     fun getRefreshToken(context: Context): String? = prefs(context).getString(KEY_REFRESH_TOKEN, null)
 
-    fun saveTokens(context: Context, accessToken: String, refreshToken: String?) {
-        prefs(context).edit().apply {
-            putString(KEY_ACCESS_TOKEN, accessToken)
-            if (!refreshToken.isNullOrBlank()) putString(KEY_REFRESH_TOKEN, refreshToken)
-        }.apply()
+    fun saveAccessToken(context: Context, accessToken: String) {
+        prefs(context).edit().putString(KEY_ACCESS_TOKEN, accessToken).apply()
     }
 
     fun clear(context: Context) {
@@ -97,11 +93,7 @@ object TokenStore {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MailSendScreen(
-    // 기존 파라미터는 유지하지만, 저장소 우선 사용. 비어 있으면 fallback.
-    accessToken: String,
-    viewModel: MailSendViewModel = viewModel()
-) {
+fun MailSendScreen(accessToken: String, viewModel: MailSendViewModel = viewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -118,8 +110,15 @@ fun MailSendScreen(
                 navigationIcon = {
                     TextButton(
                         onClick = {
+                            // (선택) 단순 로컬 로그아웃만 수행. 서버 로그아웃은 MainActivity 쪽 구현 참고.
                             TokenStore.clear(context)
                             Toast.makeText(context, "로그아웃되었습니다", Toast.LENGTH_SHORT).show()
+                            context.startActivity(
+                                Intent(context, MainActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                            )
+                            (context as? Activity)?.finish()
                         }
                     ) { Text("로그아웃") }
                 },
@@ -131,12 +130,9 @@ fun MailSendScreen(
                                 return@IconButton
                             }
 
-                            // 1) 토큰 확인 (저장소 우선, 없으면 파라미터 사용)
                             val tokenInStore = TokenStore.getAccessToken(context)
                             val token = tokenInStore ?: accessToken
-
                             if (token.isBlank()) {
-                                // 3) 토큰 자체가 없으면 메인으로 이동 + 토스트
                                 Toast.makeText(context, "로그인 필요", Toast.LENGTH_SHORT).show()
                                 context.startActivity(
                                     Intent(context, MainActivity::class.java).apply {
@@ -152,7 +148,7 @@ fun MailSendScreen(
 
                             scope.launch {
                                 when (
-                                    val result = viewModel.sendEmail(
+                                    val result = viewModel.sendEmailViaBackend(
                                         context = context,
                                         accessToken = token,
                                         to = recipientEmail,
@@ -166,9 +162,11 @@ fun MailSendScreen(
                                     }
                                     is SendResult.TokenRefreshed -> {
                                         isSending = false
-                                        // 재전송은 요구사항상 하지 않음
-                                        Toast.makeText(context, "토큰 재발급 완료", Toast.LENGTH_SHORT).show()
-                                        statusMessage = "ℹ️ 토큰이 만료되어 재발급했습니다. 다시 전송을 눌러주세요."
+                                        statusMessage = "✅ 토큰 갱신 후 재시도 성공"
+                                    }
+                                    is SendResult.RequiresLogin -> {
+                                        isSending = false
+                                        statusMessage = "❌ 인증 만료. 다시 로그인해주세요."
                                     }
                                     is SendResult.Failure -> {
                                         isSending = false
@@ -178,12 +176,7 @@ fun MailSendScreen(
                             }
                         },
                         enabled = !isSending
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "전송"
-                        )
-                    }
+                    ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "전송") }
                 }
             )
         }
@@ -205,7 +198,6 @@ fun MailSendScreen(
                 enabled = !isSending,
                 singleLine = true
             )
-
             OutlinedTextField(
                 value = subject,
                 onValueChange = { subject = it },
@@ -215,30 +207,18 @@ fun MailSendScreen(
                 enabled = !isSending,
                 singleLine = true
             )
-
             OutlinedTextField(
                 value = body,
                 onValueChange = { body = it },
                 label = { Text("내용") },
                 placeholder = { Text("메일 내용을 입력하세요") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp),
+                modifier = Modifier.fillMaxWidth().height(300.dp),
                 enabled = !isSending,
                 maxLines = 15
             )
 
             if (statusMessage.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = when {
-                            statusMessage.contains("성공") -> MaterialTheme.colorScheme.primaryContainer
-                            statusMessage.contains("실패") -> MaterialTheme.colorScheme.errorContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    )
-                ) {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = statusMessage,
                         modifier = Modifier.padding(16.dp),
@@ -258,39 +238,47 @@ fun MailSendScreen(
 
 sealed class SendResult {
     data object Success : SendResult()
-    data object TokenRefreshed : SendResult()
+    data object TokenRefreshed : SendResult() // 리프레시 후 재시도까지 성공
+    data object RequiresLogin : SendResult() // 리프레시 실패
     data class Failure(val message: String) : SendResult()
 }
 
 class MailSendViewModel : androidx.lifecycle.ViewModel() {
 
-    suspend fun sendEmail(
+    suspend fun sendEmailViaBackend(
         context: Context,
         accessToken: String,
         to: String,
         subject: String,
         body: String
     ): SendResult = withContext(Dispatchers.IO) {
-        try {
-            // RFC 2822 메시지 생성 (간단 텍스트)
-            val emailContent = buildString {
-                appendLine("To: $to")
-                appendLine("Subject: $subject")
-                appendLine("Content-Type: text/plain; charset=utf-8")
-                appendLine()
-                append(body)
+        // 1) 1차 전송
+        val first = postSend(accessToken, to, subject, body)
+        when {
+            first.code in 200..299 || first.code == 201 -> return@withContext SendResult.Success
+            first.code == 401 -> {
+                // 2) 리프레시
+                val refreshed = refreshAccessToken(context)
+                if (!refreshed) return@withContext SendResult.RequiresLogin
+
+                // 3) 새로운 토큰으로 1회 자동 재시도
+                val newAccess = TokenStore.getAccessToken(context) ?: return@withContext SendResult.RequiresLogin
+                val second = postSend(newAccess, to, subject, body)
+                return@withContext when {
+                    second.code in 200..299 || second.code == 201 -> SendResult.TokenRefreshed
+                    second.code == 401 -> SendResult.RequiresLogin
+                    else -> SendResult.Failure(parseErrorMessage(second.body))
+                }
             }
+            else -> return@withContext SendResult.Failure(parseErrorMessage(first.body))
+        }
+    }
 
-            // Gmail은 base64url 인코딩(패딩 제거)을 기대함
-            val encodedEmail = Base64.encodeToString(
-                emailContent.toByteArray(Charsets.UTF_8),
-                Base64.URL_SAFE or Base64.NO_WRAP
-            ).replace("=", "") // 패딩 제거
+    private data class HttpResp(val code: Int, val body: String)
 
-            Log.d(TAG, "Sending email to: $to")
-            Log.d(TAG, "Subject: $subject")
-
-            val url = URL("https://gmail.googleapis.com/gmail/v1/users/me/messages/send")
+    private fun postSend(accessToken: String, to: String, subject: String, body: String): HttpResp {
+        return try {
+            val url = URL("$SERVER_BASE_URL$SEND_MAIL_ENDPOINT")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 15_000
@@ -298,54 +286,32 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
                 doOutput = true
                 setRequestProperty("Authorization", "Bearer $accessToken")
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("Accept", "application/json")
             }
 
-            val requestBody = JSONObject().put("raw", encodedEmail).toString()
-            conn.outputStream.use { os ->
-                os.write(requestBody.toByteArray(Charsets.UTF_8))
-                os.flush()
-            }
+            val payload = JSONObject()
+                .put("to", to)
+                .put("subject", subject)
+                .put("body", body)
+                .toString()
 
-            val responseCode = conn.responseCode
-            val responseText = try {
-                if (responseCode in 200..299) {
+            conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+
+            val code = conn.responseCode
+            val text = try {
+                if (code in 200..299) {
                     conn.inputStream.bufferedReader().readText()
                 } else {
-                    conn.errorStream?.bufferedReader()?.readText() ?: ""
+                    conn.errorStream?.bufferedReader()?.readText().orEmpty()
                 }
             } finally {
                 conn.disconnect()
             }
-
-            Log.d(TAG, "Response code: $responseCode")
-            Log.d(TAG, "Response: $responseText")
-
-            when {
-                responseCode in 200..299 -> {
-                    Log.d(TAG, "✅ Email sent successfully")
-                    SendResult.Success
-                }
-
-                responseCode == 401 -> {
-                    // 토큰 만료/유효하지 않음 → 서버로 리프레시 요청
-                    val refreshed = refreshAccessToken(context)
-                    if (refreshed) {
-                        // 재전송은 요구사항상 하지 않음
-                        SendResult.TokenRefreshed
-                    } else {
-                        SendResult.Failure("인증 실패 (토큰 재발급 실패)")
-                    }
-                }
-
-                else -> {
-                    Log.e(TAG, "❌ Failed to send email: $responseText")
-                    val msg = parseErrorMessage(responseText)
-                    SendResult.Failure(msg)
-                }
-            }
+            Log.d(TAG, "Send resp ($code): $text")
+            HttpResp(code, text)
         } catch (e: Exception) {
-            Log.e(TAG, "Exception while sending email", e)
-            SendResult.Failure("예외 발생: ${e.localizedMessage ?: e.javaClass.simpleName}")
+            Log.e(TAG, "Send exception", e)
+            HttpResp(500, "{\"error\":\"${e.localizedMessage ?: e.javaClass.simpleName}\"}")
         }
     }
 
@@ -353,13 +319,15 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
         return try {
             if (body.isNullOrBlank()) return "알 수 없는 오류"
             val root = JSONObject(body)
-            if (root.has("error")) {
-                val err = root.getJSONObject("error")
-                val code = err.optInt("code", -1)
-                val msg = err.optString("message", "오류")
-                "code=$code, $msg"
-            } else {
-                body.take(200)
+            when {
+                root.has("error") -> {
+                    val err = root.getJSONObject("error")
+                    val code = err.optInt("code", -1)
+                    val msg = err.optString("message", "오류")
+                    "code=$code, $msg"
+                }
+                root.has("detail") -> root.optString("detail")
+                else -> body.take(200)
             }
         } catch (_: Exception) {
             body?.take(200) ?: "알 수 없는 오류"
@@ -379,38 +347,34 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
             }
 
-            val body = JSONObject().put("refresh_token", refreshToken).toString()
-            conn.outputStream.use { os ->
-                os.write(body.toByteArray(Charsets.UTF_8))
-                os.flush()
-            }
+            // ✅ 명세에 맞춰 {"refresh": "<refresh_token>"} 로 전송
+            val body = JSONObject().put("refresh", refreshToken).toString()
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
             val code = conn.responseCode
             val text = try {
                 if (code in 200..299) {
                     conn.inputStream.bufferedReader().readText()
                 } else {
-                    conn.errorStream?.bufferedReader()?.readText() ?: ""
+                    conn.errorStream?.bufferedReader()?.readText().orEmpty()
                 }
             } finally {
                 conn.disconnect()
             }
 
             if (code !in 200..299) {
-                Log.e(TAG, "Refresh failed: $text")
+                Log.e(TAG, "Refresh failed ($code): $text")
                 return@withContext false
             }
 
             val json = JSONObject(text)
-            val newAccess = json.optString("access_token", "")
-            val newRefresh = json.optString("refresh_token", refreshToken) // 서버가 안 주면 기존 유지
-
+            val newAccess = json.optString("access", "")
             if (newAccess.isBlank()) {
-                Log.e(TAG, "Refresh response missing access_token")
+                Log.e(TAG, "Refresh response missing 'access'")
                 return@withContext false
             }
 
-            TokenStore.saveTokens(context, newAccess, newRefresh)
+            TokenStore.saveAccessToken(context, newAccess)
             Log.d(TAG, "Access token refreshed")
             true
         } catch (e: Exception) {

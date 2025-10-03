@@ -35,6 +35,7 @@
                     android:host="oauth2callback" />
             </intent-filter>
         </activity>
+        <activity android:name=".InboxActivity" />
         <activity android:name=".MailSendActivity" />
 
 
