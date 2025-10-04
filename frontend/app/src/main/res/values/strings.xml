@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Xend</string>
+
+
+    <string name="google_auth_callback_endpoint">https://ec2-15-164-93-45.ap-northeast-2.compute.amazonaws.com</string>
+    <string name="server_client_id">246728635021-hte9gcv140id1s73gsp3pa1mdlj3pe0r.apps.googleusercontent.com</string>
+
 </resources>
