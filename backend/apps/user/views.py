@@ -31,7 +31,7 @@ class GoogleCallbackView(APIView):
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": "http://localhost/user/google/callback/",
+            "redirect_uri": settings.SERVER_ENDPOINT + "user/google/callback/",
             # 로컬 테스트용, 추후 환경변수 처리 필요함
             "grant_type": "authorization_code",
         }
