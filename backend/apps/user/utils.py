@@ -13,7 +13,7 @@ def google_token_required(func):
     @wraps(func)
     def wrapper(user, *args, **kwargs):
         try:
-            google_account = user.google_accounts.get()
+            google_account = user.google_accounts
         except GoogleAccount.DoesNotExist as e:
             raise ValueError("Google account not linked") from e
 

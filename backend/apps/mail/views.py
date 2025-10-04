@@ -245,7 +245,7 @@ class MailTestView(APIView):
 
         try:
             user = User.objects.get(email=test_email)
-            google_account = user.google_accounts.get()
+            google_account = user.google_accounts
 
             # Check if token is expired
             if google_account.expires_at <= timezone.now():
