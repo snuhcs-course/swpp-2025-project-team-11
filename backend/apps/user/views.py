@@ -26,12 +26,13 @@ class GoogleCallbackView(APIView):
             )
 
         token_url = "https://oauth2.googleapis.com/token"
+        # 웹 클라이언트 설정값을 사용해야 함
         data = {
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID,
-            # "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            # 안드로이드 클라이언트의 경우 SECRET이 존재하지 않음.
-            "redirect_uri": settings.GOOGLE_OAUTH_REDIRECT_URI,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": "http://localhost/user/google/callback/",
+            # 로컬 테스트용, 추후 환경변수 처리 필요함
             "grant_type": "authorization_code",
         }
 
@@ -92,6 +93,7 @@ class GoogleCallbackView(APIView):
         expires_at = timezone.now() + timedelta(seconds=expires_in)
 
         try:
+            # ISSUE: ValueError: cannot assign User:<> OutstandingToken.user must be User instance
             google_account, _ = GoogleAccount.objects.update_or_create(
                 user=user,
                 defaults={
