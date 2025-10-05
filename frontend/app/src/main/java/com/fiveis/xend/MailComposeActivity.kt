@@ -4,8 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +68,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -136,44 +136,49 @@ class MailSendRepository(
 ) {
     private val jsonMT = "application/json".toMediaType()
 
-    suspend fun sendEmail(endpointUrl: String, to: String, subject: String, body: String, accessToken: String?): SendResponse =
-        withContext(Dispatchers.IO) {
-            val payload = JSONObject().apply {
-                put("to", to)
-                put("subject", subject)
-                put("body", body)
+    suspend fun sendEmail(
+        endpointUrl: String,
+        to: String,
+        subject: String,
+        body: String,
+        accessToken: String?
+    ): SendResponse = withContext(Dispatchers.IO) {
+        val payload = JSONObject().apply {
+            put("to", to)
+            put("subject", subject)
+            put("body", body)
+        }
+        val json = payload.toString()
+
+        val req = Request.Builder()
+            .url(endpointUrl)
+            .post(json.toRequestBody(jsonMT))
+            .apply {
+                if (!accessToken.isNullOrEmpty()) {
+                    header("Authorization", "Bearer $accessToken")
+                }
             }
-            val json = payload.toString()
+            .build()
 
-            val req = Request.Builder()
-                .url(endpointUrl)
-                .post(json.toRequestBody(jsonMT))
-                .apply {
-                    if (!accessToken.isNullOrEmpty()) {
-                        header("Authorization", "Bearer $accessToken")
-                    }
-                }
-                .build()
-
-            client.newCall(req).execute().use { resp ->
-                val respText = resp.body?.string().orEmpty()
-                if (resp.code == 201 && resp.isSuccessful) {
-                    val obj = JSONObject(respText)
-                    val ids = obj.optJSONArray("labelIds")?.let { arr ->
-                        List(arr.length()) { i -> arr.getString(i) }
-                    } ?: emptyList()
-                    return@use SendResponse(
-                        id = obj.getString("id"),
-                        threadId = obj.optString("threadId"),
-                        labelIds = ids
-                    )
-                } else {
-                    throw IllegalStateException(
-                        "Send failed: HTTP ${resp.code} ${resp.message} | body=${respText.take(500)}"
-                    )
-                }
+        client.newCall(req).execute().use { resp ->
+            val respText = resp.body?.string().orEmpty()
+            if (resp.code == 201 && resp.isSuccessful) {
+                val obj = JSONObject(respText)
+                val ids = obj.optJSONArray("labelIds")?.let { arr ->
+                    List(arr.length()) { i -> arr.getString(i) }
+                } ?: emptyList()
+                return@use SendResponse(
+                    id = obj.getString("id"),
+                    threadId = obj.optString("threadId"),
+                    labelIds = ids
+                )
+            } else {
+                throw IllegalStateException(
+                    "Send failed: HTTP ${resp.code} ${resp.message} | body=${respText.take(500)}"
+                )
             }
         }
+    }
 }
 
 // ========================================================
