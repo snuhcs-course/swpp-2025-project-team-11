@@ -1,4 +1,4 @@
-package com.example.xend.ui.theme
+package com.fiveis.xend.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
