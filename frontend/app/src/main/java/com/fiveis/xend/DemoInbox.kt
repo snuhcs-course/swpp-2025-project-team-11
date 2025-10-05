@@ -229,30 +229,54 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
 // ---------- 샘플 데이터 ----------
 private fun sampleEmailsFor(tab: InboxTab): List<EmailItem> = when (tab) {
     InboxTab.All -> listOf(
-        EmailItem("1", "김대표 (대표이사)",
+        EmailItem(
+            "1",
+            "김대표 (대표이사)",
             "Q4 실적 보고서 검토 부탁드립니다",
             "첨부된 실적 보고서를 검토해 주시고, 내일 오전 회의 전...",
-            "방금 전", true),
-        EmailItem("2", "박팀장 (개발팀)",
+            "방금 전",
+            true
+        ),
+        EmailItem(
+            "2",
+            "박팀장 (개발팀)",
             "앱 출시 일정 관련 긴급 논의",
             "출시 일정에 변경사항이 생겨서 오늘 오후에 회의를...",
-            "1시간 전", true),
-        EmailItem("3", "이부장 (마케팅)",
+            "1시간 전",
+            true
+        ),
+        EmailItem(
+            "3",
+            "이부장 (마케팅)",
             "신제품 마케팅 전략 피드백",
             "지난주에 공유드린 마케팅 전략안에 대한 의견을 듣고...",
-            "3시간 전", false),
-        EmailItem("4", "최고객 (VIP 고객)",
+            "3시간 전",
+            false
+        ),
+        EmailItem(
+            "4",
+            "최고객 (VIP 고객)",
             "계약 조건 재협상 요청",
             "기존 계약 조건에 대한 몇 가지 수정 사항을 논의하고...",
-            "어제", false),
-        EmailItem("5", "정동료 (같은팀)",
+            "어제",
+            false
+        ),
+        EmailItem(
+            "5",
+            "정동료 (같은팀)",
             "회식 장소 추천 좀 부탁해요",
             "다음주 회식 장소를 정해야 하는데 좋은 곳 있으면...",
-            "2일 전", false),
-        EmailItem("6", "홍보님 (인사팀)",
+            "2일 전",
+            false
+        ),
+        EmailItem(
+            "6",
+            "홍보님 (인사팀)",
             "연차 신청서 승인 완료",
             "신청하신 12월 연차가 승인되었습니다. 업무 인수인계...",
-            "3일 전", false)
+            "3일 전",
+            false
+        )
     )
     InboxTab.Sent -> emptyList()
 }

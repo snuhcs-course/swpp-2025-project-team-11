@@ -1,6 +1,8 @@
 package com.fiveis.xend
 
 import android.util.Log
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,13 +15,11 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 class MailComposeSseClient(
     private val endpointUrl: String,
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.SECONDS)     // SSE는 무한 읽기
+        .readTimeout(0, TimeUnit.SECONDS) // SSE는 무한 읽기
         .connectTimeout(15, TimeUnit.SECONDS)
         .build()
 ) {
@@ -74,16 +74,17 @@ class MailComposeSseClient(
                 // 백그라운드에서 SSE 라인 파서 가동
                 readerJob = CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        parseSseStream(source,
+                        parseSseStream(
+                            source,
                             onEvent = { event, data ->
                                 try {
                                     val obj = JSONObject(data)
                                     when (event) {
-                                        "ready"      -> {} // 필요시 사용
-                                        "subject"    -> onSubject(obj.optString("title", obj.optString("text")))
+                                        "ready" -> {} // 필요시 사용
+                                        "subject" -> onSubject(obj.optString("title", obj.optString("text")))
                                         "body.delta" -> onBodyDelta(obj.optInt("seq"), obj.optString("text"))
-                                        "done"       -> onDone()
-                                        "error"      -> onError(obj.optString("message", "server error"))
+                                        "done" -> onDone()
+                                        "error" -> onError(obj.optString("message", "server error"))
                                     }
                                 } catch (e: Exception) {
                                     onError("Parse error: ${e.message}. raw=${data.take(200)}")
@@ -113,10 +114,7 @@ class MailComposeSseClient(
      * - 'event: xxx' / 'data: yyy' 라인들을 모아 빈 줄 만나면 1 프레임으로 처리
      * - CRLF/LF 모두 처리
      */
-    private fun parseSseStream(
-        source: okio.BufferedSource,
-        onEvent: (event: String, data: String) -> Unit
-    ) {
+    private fun parseSseStream(source: okio.BufferedSource, onEvent: (event: String, data: String) -> Unit) {
         var curEvent = "message"
         val dataLines = mutableListOf<String>()
 

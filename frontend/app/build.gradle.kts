@@ -63,9 +63,7 @@ android {
         compose = true
         buildConfig = true // Ensure BuildConfig is generated
     }
-
 }
-
 
 dependencies {
 
@@ -85,7 +83,6 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
 
     // Credential Manager + Google Sign-In (최신 방식)
     implementation("androidx.credentials:credentials:1.3.0")

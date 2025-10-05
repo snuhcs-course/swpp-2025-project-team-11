@@ -160,7 +160,9 @@ class MailSendRepository(
                         labelIds = ids
                     )
                 } else {
-                    throw IllegalStateException("Send failed: HTTP ${resp.code} ${resp.message} | body=${respText.take(500)}")
+                    throw IllegalStateException(
+                        "Send failed: HTTP ${resp.code} ${resp.message} | body=${respText.take(500)}"
+                    )
                 }
             }
         }
@@ -363,10 +365,7 @@ private fun SectionHeader(text: String) {
 }
 
 @Composable
-fun ContactChip(
-    contact: Contact,
-    onRemove: () -> Unit
-) {
+fun ContactChip(contact: Contact, onRemove: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -452,14 +451,15 @@ class MailComposeActivity : ComponentActivity() {
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
 
-
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
 
                 // Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
-                LaunchedEffect(composeUi.bodyRendered) { if (composeUi.bodyRendered.isNotEmpty()) body = composeUi.bodyRendered }
+                LaunchedEffect(
+                    composeUi.bodyRendered
+                ) { if (composeUi.bodyRendered.isNotEmpty()) body = composeUi.bodyRendered }
 
                 // Show snackbar for send results
                 val snackHost = remember { SnackbarHostState() }
