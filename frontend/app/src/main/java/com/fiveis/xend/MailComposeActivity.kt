@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +97,7 @@ data class SendResponse(val id: String, val threadId: String, val labelIds: List
 // ========================================================
 class SendMailViewModel(
     private val endpointUrl: String,
+    private val accessToken: String?,
     private val repo: MailSendRepository = MailSendRepository()
 ) : ViewModel() {
 
@@ -109,7 +112,7 @@ class SendMailViewModel(
         _ui.value = SendUiState(isSending = true)
         viewModelScope.launch {
             try {
-                val res = repo.sendEmail(endpointUrl, to, subject, body)
+                val res = repo.sendEmail(endpointUrl, to, subject, body, accessToken)
                 _ui.value = SendUiState(
                     isSending = false,
                     lastSuccessMsg = "전송 완료: ${res.id}",
@@ -133,7 +136,7 @@ class MailSendRepository(
 ) {
     private val jsonMT = "application/json".toMediaType()
 
-    suspend fun sendEmail(endpointUrl: String, to: String, subject: String, body: String): SendResponse =
+    suspend fun sendEmail(endpointUrl: String, to: String, subject: String, body: String, accessToken: String?): SendResponse =
         withContext(Dispatchers.IO) {
             val payload = JSONObject().apply {
                 put("to", to)
@@ -145,6 +148,11 @@ class MailSendRepository(
             val req = Request.Builder()
                 .url(endpointUrl)
                 .post(json.toRequestBody(jsonMT))
+                .apply {
+                    if (!accessToken.isNullOrEmpty()) {
+                        header("Authorization", "Bearer $accessToken")
+                    }
+                }
                 .build()
 
             client.newCall(req).execute().use { resp ->
@@ -423,6 +431,19 @@ class MailComposeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Read access token from EncryptedSharedPreferences
+        val masterKey = MasterKey.Builder(applicationContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        val encryptedPrefs = EncryptedSharedPreferences.create(
+            applicationContext,
+            "secure_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+        val accessToken = encryptedPrefs.getString("access_token", null)
+
         setContent {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 // 1) AI Compose VM
@@ -436,7 +457,7 @@ class MailComposeActivity : ComponentActivity() {
                     factory = object : ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return SendMailViewModel(BuildConfig.SEND_URL) as T
+                            return SendMailViewModel(BuildConfig.SEND_URL, accessToken) as T
                         }
                     }
                 )
