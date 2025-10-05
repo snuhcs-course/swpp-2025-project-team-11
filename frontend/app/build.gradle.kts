@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,13 @@ plugins {
 
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
+}
+
+// Read local.properties
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
 }
 
 android {
@@ -19,6 +28,19 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Add build config fields for API URLs from local.properties
+        // Note: The default empty value is just a placeholder.
+        buildConfigField(
+            "String",
+            "SSE_URL",
+            "\"${localProperties.getProperty("sse.url", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "SEND_URL",
+            "\"${localProperties.getProperty("send.url", "")}\""
+        )
     }
 
     buildTypes {
@@ -39,11 +61,9 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // Ensure BuildConfig is generated
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.kotlin.get()
-    }
 }
 
 
@@ -57,6 +77,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.material3)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -13,7 +13,7 @@ class InboxActivity : ComponentActivity() {
             MaterialTheme {
                 InboxScreen(
                     onFabClick = {
-                        startActivity(Intent(this, MailSendActivity::class.java))
+                        startActivity(Intent(this, MailComposeActivity::class.java))
                     }
                 )
             }
