@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("user", "0003_alter_googleaccount_access_token_and_more"),
+        ("user", "0001_initial"),
     ]
 
     operations = [
