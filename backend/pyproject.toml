@@ -15,16 +15,10 @@ google-auth-oauthlib = "^1.2.1"
 google-auth-httplib2 = "^0.2.0"
 google-api-python-client = "^2.161.0"
 requests = "^2.32.5"
-
-
-[tool.poetry.group.django.dependencies]
 django = "^5.2.6"
 django-environ = "^0.12.0"
 djangorestframework = "^3.16.1"
 djangorestframework-simplejwt = "^5.5.1"
-
-
-[tool.poetry.group.langchain.dependencies]
 langchain-core = "^0.3.77"
 langchain-openai = "^0.3.33"
 
