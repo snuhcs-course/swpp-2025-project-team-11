@@ -1,4 +1,4 @@
-package com.fiveis.xend
+package com.fiveis.xend.data.model
 
 import androidx.compose.ui.graphics.Color
 

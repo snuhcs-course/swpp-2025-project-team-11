@@ -1,4 +1,4 @@
-package com.fiveis.xend
+package com.fiveis.xend.ui.inbox
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -34,12 +34,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,24 +43,21 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.fiveis.xend.data.model.EmailItem
-
-enum class InboxTab(val label: String) { All("전체"), Sent("보낸 메일") }
+import com.fiveis.xend.data.repository.InboxTab
 
 @Composable
 fun InboxScreen(
-    modifier: Modifier = Modifier,
+    uiState: InboxUiState,
+    onTabSelected: (InboxTab) -> Unit,
+    onEmailClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onFabClick: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
-    onEmailClick: (EmailItem) -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableStateOf(InboxTab.All) }
-    val emails by remember(selectedTab) { mutableStateOf(sampleEmailsFor(selectedTab)) }
-
     Scaffold(
         topBar = { InboxTopBar(onSearch = onOpenSearch, onProfile = onOpenProfile) },
         bottomBar = { BottomBar(selected = "inbox", onSelect = onBottomNavChange) },
@@ -73,9 +65,9 @@ fun InboxScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
-                InboxTabRow(selectedTab = selectedTab, onSelect = { selectedTab = it })
+                InboxTabRow(selectedTab = uiState.selectedTab, onSelect = onTabSelected)
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
-                EmailList(emails = emails, onEmailClick = onEmailClick)
+                EmailList(emails = uiState.emails, onEmailClick = onEmailClick)
                 Spacer(Modifier.height(72.dp))
             }
 
@@ -118,7 +110,7 @@ private fun InboxTabRow(selectedTab: InboxTab, onSelect: (InboxTab) -> Unit) {
                 onClick = { onSelect(tab) },
                 text = {
                     Text(
-                        tab.label,
+                        getTabLabel(tab),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
@@ -126,6 +118,11 @@ private fun InboxTabRow(selectedTab: InboxTab, onSelect: (InboxTab) -> Unit) {
             )
         }
     }
+}
+
+private fun getTabLabel(tab: InboxTab): String = when (tab) {
+    InboxTab.All -> "전체"
+    InboxTab.Sent -> "보낸 메일"
 }
 
 @Composable
@@ -214,68 +211,5 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
             icon = { Icon(Icons.Outlined.Person, contentDescription = null) },
             label = { Text("연락처") }
         )
-    }
-}
-
-// ---------- 샘플 데이터 ----------
-private fun sampleEmailsFor(tab: InboxTab): List<EmailItem> = when (tab) {
-    InboxTab.All -> listOf(
-        EmailItem(
-            "1",
-            "김대표 (대표이사)",
-            "Q4 실적 보고서 검토 부탁드립니다",
-            "첨부된 실적 보고서를 검토해 주시고, 내일 오전 회의 전...",
-            "방금 전",
-            true
-        ),
-        EmailItem(
-            "2",
-            "박팀장 (개발팀)",
-            "앱 출시 일정 관련 긴급 논의",
-            "출시 일정에 변경사항이 생겨서 오늘 오후에 회의를...",
-            "1시간 전",
-            true
-        ),
-        EmailItem(
-            "3",
-            "이부장 (마케팅)",
-            "신제품 마케팅 전략 피드백",
-            "지난주에 공유드린 마케팅 전략안에 대한 의견을 듣고...",
-            "3시간 전",
-            false
-        ),
-        EmailItem(
-            "4",
-            "최고객 (VIP 고객)",
-            "계약 조건 재협상 요청",
-            "기존 계약 조건에 대한 몇 가지 수정 사항을 논의하고...",
-            "어제",
-            false
-        ),
-        EmailItem(
-            "5",
-            "정동료 (같은팀)",
-            "회식 장소 추천 좀 부탁해요",
-            "다음주 회식 장소를 정해야 하는데 좋은 곳 있으면...",
-            "2일 전",
-            false
-        ),
-        EmailItem(
-            "6",
-            "홍보님 (인사팀)",
-            "연차 신청서 승인 완료",
-            "신청하신 12월 연차가 승인되었습니다. 업무 인수인계...",
-            "3일 전",
-            false
-        )
-    )
-    InboxTab.Sent -> emptyList()
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFFFFFFFF, widthDp = 360, heightDp = 800)
-@Composable
-private fun InboxScreenPreview() {
-    MaterialTheme(colorScheme = lightColorScheme()) {
-        InboxScreen()
     }
 }
