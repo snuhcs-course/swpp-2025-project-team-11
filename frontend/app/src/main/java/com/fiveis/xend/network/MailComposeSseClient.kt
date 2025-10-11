@@ -1,4 +1,4 @@
-package com.fiveis.xend
+package com.fiveis.xend.network
 
 import android.util.Log
 import java.util.concurrent.TimeUnit

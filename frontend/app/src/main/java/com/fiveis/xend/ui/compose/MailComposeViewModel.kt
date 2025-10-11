@@ -1,7 +1,8 @@
-package com.fiveis.xend
+package com.fiveis.xend.ui.compose
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fiveis.xend.network.MailComposeSseClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
