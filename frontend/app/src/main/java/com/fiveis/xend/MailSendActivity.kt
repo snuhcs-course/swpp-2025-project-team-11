@@ -1,7 +1,6 @@
 package com.fiveis.xend
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -39,8 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import com.fiveis.xend.data.source.TokenManager
 import com.fiveis.xend.ui.login.MainActivity
 import java.net.HttpURLConnection
 import java.net.URL
@@ -63,33 +61,6 @@ class MailSendActivity : ComponentActivity() {
     }
 }
 
-// --------------------------- TokenStore ---------------------------
-
-object TokenStore {
-    private const val PREF_NAME = "secure_prefs" // ✅ MainActivity와 통일
-    private const val KEY_ACCESS_TOKEN = "access_token"
-    private const val KEY_REFRESH_TOKEN = "refresh_token"
-
-    private fun prefs(context: Context) = EncryptedSharedPreferences.create(
-        context,
-        PREF_NAME,
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
-
-    fun getAccessToken(context: Context): String? = prefs(context).getString(KEY_ACCESS_TOKEN, null)
-    fun getRefreshToken(context: Context): String? = prefs(context).getString(KEY_REFRESH_TOKEN, null)
-
-    fun saveAccessToken(context: Context, accessToken: String) {
-        prefs(context).edit().putString(KEY_ACCESS_TOKEN, accessToken).apply()
-    }
-
-    fun clear(context: Context) {
-        prefs(context).edit().clear().apply()
-    }
-}
-
 // --------------------------- UI ---------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,6 +68,7 @@ object TokenStore {
 fun MailSendScreen(accessToken: String, viewModel: MailSendViewModel = viewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val tokenManager = remember { TokenManager(context) }
 
     var recipientEmail by remember { mutableStateOf("") }
     var subject by remember { mutableStateOf("") }
@@ -112,7 +84,7 @@ fun MailSendScreen(accessToken: String, viewModel: MailSendViewModel = viewModel
                     TextButton(
                         onClick = {
                             // (선택) 단순 로컬 로그아웃만 수행. 서버 로그아웃은 MainActivity 쪽 구현 참고.
-                            TokenStore.clear(context)
+                            tokenManager.clearTokens()
                             Toast.makeText(context, "로그아웃되었습니다", Toast.LENGTH_SHORT).show()
                             context.startActivity(
                                 Intent(context, MainActivity::class.java).apply {
@@ -131,7 +103,7 @@ fun MailSendScreen(accessToken: String, viewModel: MailSendViewModel = viewModel
                                 return@IconButton
                             }
 
-                            val tokenInStore = TokenStore.getAccessToken(context)
+                            val tokenInStore = tokenManager.getAccessToken()
                             val token = tokenInStore ?: accessToken
                             if (token.isBlank()) {
                                 Toast.makeText(context, "로그인 필요", Toast.LENGTH_SHORT).show()
@@ -150,7 +122,7 @@ fun MailSendScreen(accessToken: String, viewModel: MailSendViewModel = viewModel
                             scope.launch {
                                 when (
                                     val result = viewModel.sendEmailViaBackend(
-                                        context = context,
+                                        tokenManager = tokenManager,
                                         accessToken = token,
                                         to = recipientEmail,
                                         subject = subject,
@@ -247,7 +219,7 @@ sealed class SendResult {
 class MailSendViewModel : androidx.lifecycle.ViewModel() {
 
     suspend fun sendEmailViaBackend(
-        context: Context,
+        tokenManager: TokenManager,
         accessToken: String,
         to: String,
         subject: String,
@@ -259,11 +231,11 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
             first.code in 200..299 || first.code == 201 -> return@withContext SendResult.Success
             first.code == 401 -> {
                 // 2) 리프레시
-                val refreshed = refreshAccessToken(context)
+                val refreshed = refreshAccessToken(tokenManager)
                 if (!refreshed) return@withContext SendResult.RequiresLogin
 
                 // 3) 새로운 토큰으로 1회 자동 재시도
-                val newAccess = TokenStore.getAccessToken(context) ?: return@withContext SendResult.RequiresLogin
+                val newAccess = tokenManager.getAccessToken() ?: return@withContext SendResult.RequiresLogin
                 val second = postSend(newAccess, to, subject, body)
                 return@withContext when {
                     second.code in 200..299 || second.code == 201 -> SendResult.TokenRefreshed
@@ -336,9 +308,9 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
         }
     }
 
-    private suspend fun refreshAccessToken(context: Context): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun refreshAccessToken(tokenManager: TokenManager): Boolean = withContext(Dispatchers.IO) {
         try {
-            val refreshToken = TokenStore.getRefreshToken(context) ?: return@withContext false
+            val refreshToken = tokenManager.getRefreshToken() ?: return@withContext false
 
             val url = URL("$SERVER_BASE_URL$REFRESH_ENDPOINT")
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -376,7 +348,7 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
                 return@withContext false
             }
 
-            TokenStore.saveAccessToken(context, newAccess)
+            tokenManager.saveAccessToken(newAccess)
             Log.d(TAG, "Access token refreshed ✅")
             true
         } catch (e: Exception) {

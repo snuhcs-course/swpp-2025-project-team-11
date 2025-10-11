@@ -55,6 +55,17 @@ class TokenManager(context: Context) {
     }
 
     /**
+     * Access Token만 갱신 (refresh 시나리오용)
+     */
+    fun saveAccessToken(accessToken: String) {
+        encryptedPrefs.edit().apply {
+            putString("access_token", accessToken)
+            apply()
+        }
+        Log.d("TokenManager", "✅ Access Token 갱신 완료: ${accessToken.take(20)}...")
+    }
+
+    /**
      * 모든 토큰 삭제
      */
     fun clearTokens() {
