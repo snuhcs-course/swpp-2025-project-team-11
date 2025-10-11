@@ -349,6 +349,10 @@ class MailSendViewModel : androidx.lifecycle.ViewModel() {
             }
 
             tokenManager.saveAccessToken(newAccess)
+            val newRefresh = json.optString("refresh", "")
+            if (newRefresh.isNotBlank()) {
+                tokenManager.saveRefreshToken(newRefresh)
+            }
             Log.d(TAG, "Access token refreshed ✅")
             true
         } catch (e: Exception) {

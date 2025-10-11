@@ -66,6 +66,17 @@ class TokenManager(context: Context) {
     }
 
     /**
+     * Refresh Token만 갱신 (token rotation 시나리오용)
+     */
+    fun saveRefreshToken(refreshToken: String) {
+        encryptedPrefs.edit().apply {
+            putString("refresh_token", refreshToken)
+            apply()
+        }
+        Log.d("TokenManager", "✅ Refresh Token 갱신 완료: ${refreshToken.take(20)}...")
+    }
+
+    /**
      * 모든 토큰 삭제
      */
     fun clearTokens() {
