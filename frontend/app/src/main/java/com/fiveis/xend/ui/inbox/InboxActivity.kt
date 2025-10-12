@@ -1,4 +1,4 @@
-package com.fiveis.xend
+package com.fiveis.xend.ui.inbox
 
 import android.content.Intent
 import android.os.Bundle
@@ -8,8 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.fiveis.xend.ui.inbox.InboxScreen
-import com.fiveis.xend.ui.inbox.InboxViewModel
+import com.fiveis.xend.ui.compose.MailComposeActivity
 
 class InboxActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

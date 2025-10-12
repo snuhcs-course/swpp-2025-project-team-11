@@ -1,4 +1,4 @@
-package com.fiveis.xend
+package com.fiveis.xend.ui.compose
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -69,11 +69,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.ui.compose.MailComposeViewModel
-import com.fiveis.xend.ui.compose.SendMailViewModel
-import com.fiveis.xend.ui.compose.SendUiState
 import org.json.JSONObject
 
 // ========================================================

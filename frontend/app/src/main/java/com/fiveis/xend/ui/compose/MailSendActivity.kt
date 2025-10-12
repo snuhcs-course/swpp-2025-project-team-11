@@ -1,4 +1,4 @@
-package com.fiveis.xend
+package com.fiveis.xend.ui.compose
 
 import android.app.Activity
 import android.content.Intent

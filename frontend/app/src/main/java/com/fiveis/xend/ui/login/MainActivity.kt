@@ -13,9 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.fiveis.xend.InboxActivity
 import com.fiveis.xend.R
 import com.fiveis.xend.data.source.TokenManager
+import com.fiveis.xend.ui.inbox.InboxActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
