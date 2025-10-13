@@ -1,61 +1,88 @@
-import logging
-
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.utils import timezone
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiTypes,
+    inline_serializer,
+)
 from googleapiclient.errors import HttpError
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.user.models import GoogleAccount, User
 from apps.user.services import google_refresh
-from apps.user.utils import google_token_required
 
+from ..core.mixins import AuthRequiredMixin
+from ..core.utils.docs import extend_schema_with_common_errors
 from .serializers import (
     EmailDetailSerializer,
+    EmailListQuerySerializer,
     EmailListSerializer,
+    EmailMarkReadRequestSerializer,
+    EmailMarkReadResponseSerializer,
     EmailSendResponseSerializer,
     EmailSendSerializer,
 )
 from .services import GmailService
-
-logger = logging.getLogger(__name__)
-
-
-@google_token_required
-def _list_emails_logic(access_token, max_results, page_token, label_ids):
-    """Helper function to list emails using Google access token"""
-    gmail_service = GmailService(access_token)
-    result = gmail_service.list_messages(
-        max_results=max_results, page_token=page_token, label_ids=label_ids
-    )
-
-    # Fetch detailed info for each message
-    messages = []
-    for msg in result.get("messages", []):
-        try:
-            message_detail = gmail_service.get_message(msg["id"])
-            messages.append(message_detail)
-        except Exception as e:
-            # Skip individual message fetch failures
-            logger.warning(f"Failed to fetch message {msg['id']}: {str(e)}")
-            continue
-
-    return result, messages
+from .utils import get_email_detail_logic, list_emails_logic, mark_read_logic, send_email_logic
 
 
-class EmailListView(APIView):
+class EmailListView(generics.GenericAPIView, AuthRequiredMixin):
     """
     GET /api/mail/emails/
     Fetch list of received emails
     """
 
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    query_serializer_class = EmailListQuerySerializer
 
+    @extend_schema_with_common_errors(
+        summary="List emails",
+        description="List Gmail messages for the authenticated user.",
+        request=None,
+        parameters=[
+            OpenApiParameter(
+                name="max_results",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Max results (1~100). Default: 20",
+            ),
+            OpenApiParameter(
+                name="page_token",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Pagination token from previous response",
+            ),
+            OpenApiParameter(
+                name="labels",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description='Comma-separated labels (e.g., "INBOX,UNREAD"). Default: "INBOX"',
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response=inline_serializer(
+                    name="EmailListWrappedResponse",
+                    fields={
+                        "messages": EmailListSerializer(many=True),
+                        "next_page_token": serializers.CharField(allow_null=True, required=False),
+                        "result_size_estimate": serializers.IntegerField(required=False),
+                    },
+                ),
+                description="messages + next_page_token + result_size_estimate",
+            ),
+            # 401: OpenApiResponse(description="Unauthorized"),
+            # 404: OpenApiResponse(description="Messages not found"),
+            # 429: OpenApiResponse(description="Rate limit exceeded"),
+            # 500: OpenApiResponse(description="Server error"),
+        },
+    )
     def get(self, request):
         """
         Query Parameters:
@@ -66,18 +93,16 @@ class EmailListView(APIView):
         user = request.user
 
         # Parse parameters
-        try:
-            max_results = min(int(request.query_params.get("max_results", 20)), 100)
-        except (ValueError, TypeError):
-            max_results = 20
-
-        page_token = request.query_params.get("page_token")
-        labels = request.query_params.get("labels", "INBOX")
-        label_ids = [label.strip() for label in labels.split(",")] if labels else ["INBOX"]
+        qs = self.query_serializer_class(data=request.query_params)
+        qs.is_valid(raise_exception=True)
+        max_results = qs.validated_data.get("max_results", 20)
+        page_token = qs.validated_data.get("page_token")
+        labels = qs.validated_data.get("labels") or "INBOX"
+        label_ids = [s.strip() for s in labels.split(",")] if labels else ["INBOX"]
 
         # Call Gmail API with decorator
         try:
-            result, messages = _list_emails_logic(user, max_results, page_token, label_ids)
+            result, messages = list_emails_logic(user, max_results, page_token, label_ids)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
@@ -114,28 +139,25 @@ class EmailListView(APIView):
         )
 
 
-@google_token_required
-def _get_email_detail_logic(access_token, message_id):
-    """Helper function to get email detail using Google access token"""
-    gmail_service = GmailService(access_token)
-    return gmail_service.get_message(message_id)
-
-
-class EmailDetailView(APIView):
+class EmailDetailView(generics.GenericAPIView, AuthRequiredMixin):
     """
     GET /api/mail/emails/<message_id>/
     Fetch specific email details
     """
 
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
+    @extend_schema_with_common_errors(
+        summary="Get email detail",
+        request=None,
+        responses={
+            200: EmailDetailSerializer,
+        },
+    )
     def get(self, request, message_id):
         user = request.user
 
         # Call Gmail API with decorator
         try:
-            message = _get_email_detail_logic(user, message_id)
+            message = get_email_detail_logic(user, message_id)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
@@ -164,33 +186,31 @@ class EmailDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@google_token_required
-def _send_email_logic(access_token, to, subject, body):
-    """Helper function to send email using Google access token"""
-    gmail_service = GmailService(access_token)
-    return gmail_service.send_message(to=to, subject=subject, body=body)
-
-
-class EmailSendView(APIView):
+class EmailSendView(generics.GenericAPIView, AuthRequiredMixin):
     """
     POST /api/mail/emails/send/
     Send an email via Gmail
     """
 
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    serializer_class = EmailSendSerializer
 
+    @extend_schema_with_common_errors(
+        summary="Send email",
+        responses={
+            201: EmailSendResponseSerializer,
+        },
+    )
     def post(self, request):
         user = request.user
 
         # Validate request data
-        serializer = EmailSendSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Send email via Gmail API with decorator
         try:
-            result = _send_email_logic(
+            result = send_email_logic(
                 user,
                 to=serializer.validated_data["to"],
                 subject=serializer.validated_data["subject"],
@@ -289,32 +309,25 @@ class MailTestView(APIView):
             )
 
 
-@google_token_required
-def _mark_read_logic(access_token, message_id, is_read):
-    """Helper function to mark email as read/unread using Google access token"""
-    gmail_service = GmailService(access_token)
-    if is_read:
-        return gmail_service.mark_as_read(message_id)
-    else:
-        return gmail_service.mark_as_unread(message_id)
-
-
-class EmailMarkReadView(APIView):
+class EmailMarkReadView(generics.GenericAPIView, AuthRequiredMixin):
     """
     PATCH /api/mail/emails/<message_id>/read/
     Mark email as read or unread
     """
 
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    serializer_class = EmailMarkReadRequestSerializer
 
+    @extend_schema_with_common_errors(
+        summary="Mark email read/unread",
+        responses={200: EmailMarkReadResponseSerializer},
+    )
     def patch(self, request, message_id):
         user = request.user
         is_read = request.data.get("is_read", True)
 
         # Mark as read or unread with decorator
         try:
-            result = _mark_read_logic(user, message_id, is_read)
+            result = mark_read_logic(user, message_id, is_read)
             return Response(
                 {"id": result.get("id"), "labelIds": result.get("labelIds", [])},
                 status=status.HTTP_200_OK,
