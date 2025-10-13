@@ -1,18 +1,13 @@
 package com.fiveis.xend.data.repository
 
+import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
+import com.fiveis.xend.network.MailApiService
+import com.fiveis.xend.network.RetrofitClient
 
 class MailSendRepository(
-    private val client: OkHttpClient = OkHttpClient()
+    private val mailApiService: MailApiService = RetrofitClient.mailApiService
 ) {
-    private val jsonMT = "application/json".toMediaType()
 
     suspend fun sendEmail(
         endpointUrl: String,
@@ -20,41 +15,26 @@ class MailSendRepository(
         subject: String,
         body: String,
         accessToken: String?
-    ): SendResponse = withContext(Dispatchers.IO) {
-        val payload = JSONObject().apply {
-            put("to", to)
-            put("subject", subject)
-            put("body", body)
-        }
-        val json = payload.toString()
+    ): SendResponse {
+        val request = MailSendRequest(to = to, subject = subject, body = body)
+        val authHeader = if (!accessToken.isNullOrEmpty()) "Bearer $accessToken" else null
 
-        val req = Request.Builder()
-            .url(endpointUrl)
-            .post(json.toRequestBody(jsonMT))
-            .apply {
-                if (!accessToken.isNullOrEmpty()) {
-                    header("Authorization", "Bearer $accessToken")
-                }
-            }
-            .build()
+        val response = mailApiService.sendEmail(
+            endpointUrl = endpointUrl,
+            authorization = authHeader,
+            payload = request
+        )
 
-        client.newCall(req).execute().use { resp ->
-            val respText = resp.body?.string().orEmpty()
-            if (resp.code == 201 && resp.isSuccessful) {
-                val obj = JSONObject(respText)
-                val ids = obj.optJSONArray("labelIds")?.let { arr ->
-                    List(arr.length()) { i -> arr.getString(i) }
-                } ?: emptyList()
-                return@use SendResponse(
-                    id = obj.getString("id"),
-                    threadId = obj.optString("threadId"),
-                    labelIds = ids
-                )
-            } else {
-                throw IllegalStateException(
-                    "Send failed: HTTP ${resp.code} ${resp.message} | body=${respText.take(500)}"
-                )
-            }
+        // 응답 코드가 201이고, 요청이 성공했는지 확인
+        if (response.isSuccessful && response.code() == 201) {
+            return response.body()
+                ?: throw IllegalStateException("Success response but body is null")
+        } else {
+            // 요청 실패 시 예외 발생
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Send failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
         }
     }
 }
