@@ -39,7 +39,12 @@ DJANGO_APPS = [
     # "django.contrib.staticfiles",
 ]
 
-PROJECT_APPS = ["apps.user", "apps.mail", "apps.ai"]
+PROJECT_APPS = [
+    "apps.user",
+    "apps.mail",
+    "apps.ai",
+    "apps.contacts",
+]
 
 THIRD_PARTY_APPS = [
     "rest_framework",
