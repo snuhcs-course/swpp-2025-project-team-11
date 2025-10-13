@@ -30,20 +30,25 @@ SECRET_KEY = env("SECRET_KEY")
 
 
 # Application definition
-
-INSTALLED_APPS = [
+DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
-    # 'django.contrib.staticfiles',
-    "apps.user",
-    "apps.mail",
+    # "django.contrib.staticfiles",
+]
+
+PROJECT_APPS = ["apps.user", "apps.mail", "apps.ai"]
+
+THIRD_PARTY_APPS = [
     "rest_framework",
+    "drf_spectacular",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
 ]
+
+INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
 
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
@@ -54,6 +59,14 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Xend API",
+    "DESCRIPTION": "Xend Service provided by Five I's",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 MIDDLEWARE = [
@@ -150,4 +163,4 @@ GOOGLE_OAUTH_REDIRECT_URI = env("GOOGLE_OAUTH_REDIRECT_URI")
 ENCRYPTION_KEY = env("ENCRYPTION_KEY")
 
 AUTH_USER_MODEL = "user.User"
-SERVER_ENDPOINT = env("SERVER_ENDPOINT")
+SERVER_BASEURL = env("SERVER_BASEURL")

@@ -5,25 +5,34 @@ from cryptography.fernet import Fernet
 from django.conf import settings
 from django.contrib.auth import logout as django_logout
 from django.utils import timezone
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, OpenApiTypes, extend_schema
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from ..core.mixins import AuthRequiredMixin
 from .models import GoogleAccount, User
-from .serializers import UserSerializer
+from .serializers import (
+    GoogleCallbackRequestSerializer,
+    GoogleCallbackResponseSerializer,
+    LogoutRequestSerializer,
+)
 
 
-class GoogleCallbackView(APIView):
+class GoogleCallbackView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = GoogleCallbackRequestSerializer
+
+    @extend_schema(
+        summary="Google OAuth callback",
+        request=GoogleCallbackRequestSerializer,
+        responses={200: GoogleCallbackResponseSerializer},
+    )
     def post(self, request):
-        user = request.user
-        code = request.data.get("auth_code")
-
-        if not code:
-            return Response(
-                {"detail": "Authorization code is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
+        body = self.get_serializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        code = body.validated_data["auth_code"]
 
         token_url = "https://oauth2.googleapis.com/token"
         # 웹 클라이언트 설정값을 사용해야 함
@@ -31,7 +40,7 @@ class GoogleCallbackView(APIView):
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": settings.SERVER_ENDPOINT + "user/google/callback/",
+            "redirect_uri": settings.SERVER_BASEURL + "user/google/callback/",
             # 로컬 테스트용, 추후 환경변수 처리 필요함
             "grant_type": "authorization_code",
         }
@@ -116,20 +125,36 @@ class GoogleCallbackView(APIView):
         }
 
         return Response(
-            {
-                "user": UserSerializer(user).data,
-                "jwt": jwt_tokens,
-            },
+            GoogleCallbackResponseSerializer(
+                {"user": user, "jwt": jwt_tokens},
+            ).data,
             status=status.HTTP_200_OK,
         )
 
 
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+class LogoutView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = LogoutRequestSerializer
 
+    @extend_schema(
+        summary="Logout",
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={"detail": "Successfully logged out"},
+                        response_only=True,
+                    )
+                ],
+            ),
+        },
+    )
     def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        refresh_token = serializer.validated_data.get("refresh_token")
         try:
-            refresh_token = request.data.get("refresh_token")
             if refresh_token:
                 # SimpleJWT의 블랙리스트 기능으로 JWT 리프레시 토큰 무효화
                 token = RefreshToken(refresh_token)

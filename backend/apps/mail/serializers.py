@@ -70,3 +70,22 @@ class EmailSendResponseSerializer(serializers.Serializer):
     id = serializers.CharField(help_text="Sent message ID")
     threadId = serializers.CharField(help_text="Thread ID")
     labelIds = serializers.ListField(child=serializers.CharField(), help_text="Label IDs")
+
+
+class EmailListQuerySerializer(serializers.Serializer):
+    max_results = serializers.IntegerField(required=False, default=20, min_value=1, max_value=100)
+    page_token = serializers.CharField(required=False, allow_blank=True)
+    labels = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text='Comma-separated labels (e.g., "INBOX,UNREAD"). Default: "INBOX"',
+    )
+
+
+class EmailMarkReadRequestSerializer(serializers.Serializer):
+    is_read = serializers.BooleanField(required=False, default=True)
+
+
+class EmailMarkReadResponseSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    labelIds = serializers.ListField(child=serializers.CharField())
