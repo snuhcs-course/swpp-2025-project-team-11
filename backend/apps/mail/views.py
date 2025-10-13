@@ -30,7 +30,7 @@ from .services import GmailService
 from .utils import get_email_detail_logic, list_emails_logic, mark_read_logic, send_email_logic
 
 
-class EmailListView(generics.GenericAPIView, AuthRequiredMixin):
+class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
     """
     GET /api/mail/emails/
     Fetch list of received emails
@@ -139,7 +139,7 @@ class EmailListView(generics.GenericAPIView, AuthRequiredMixin):
         )
 
 
-class EmailDetailView(generics.GenericAPIView, AuthRequiredMixin):
+class EmailDetailView(AuthRequiredMixin, generics.GenericAPIView):
     """
     GET /api/mail/emails/<message_id>/
     Fetch specific email details
@@ -186,7 +186,7 @@ class EmailDetailView(generics.GenericAPIView, AuthRequiredMixin):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class EmailSendView(generics.GenericAPIView, AuthRequiredMixin):
+class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
     """
     POST /api/mail/emails/send/
     Send an email via Gmail
@@ -309,7 +309,7 @@ class MailTestView(APIView):
             )
 
 
-class EmailMarkReadView(generics.GenericAPIView, AuthRequiredMixin):
+class EmailMarkReadView(AuthRequiredMixin, generics.GenericAPIView):
     """
     PATCH /api/mail/emails/<message_id>/read/
     Mark email as read or unread

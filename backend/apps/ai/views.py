@@ -13,7 +13,7 @@ from .serializers import MailGenerateRequest
 from .services.langchain import stream_mail_generation
 
 
-class MailGenerateStreamView(generics.GenericAPIView, AuthRequiredMixin):
+class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = MailGenerateRequest
 
     @extend_schema(

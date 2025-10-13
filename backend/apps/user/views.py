@@ -132,7 +132,7 @@ class GoogleCallbackView(generics.GenericAPIView):
         )
 
 
-class LogoutView(generics.GenericAPIView, AuthRequiredMixin):
+class LogoutView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = LogoutRequestSerializer
 
     @extend_schema(
