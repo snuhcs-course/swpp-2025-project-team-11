@@ -323,7 +323,9 @@ class EmailMarkReadView(generics.GenericAPIView, AuthRequiredMixin):
     )
     def patch(self, request, message_id):
         user = request.user
-        is_read = request.data.get("is_read", True)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        is_read = serializer.validated_data.get("is_read", True)
 
         # Mark as read or unread with decorator
         try:

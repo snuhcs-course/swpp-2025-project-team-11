@@ -151,8 +151,10 @@ class LogoutView(generics.GenericAPIView, AuthRequiredMixin):
         },
     )
     def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        refresh_token = serializer.validated_data.get("refresh_token")
         try:
-            refresh_token = request.data.get("refresh_token")
             if refresh_token:
                 # SimpleJWT의 블랙리스트 기능으로 JWT 리프레시 토큰 무효화
                 token = RefreshToken(refresh_token)
