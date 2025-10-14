@@ -1,16 +1,18 @@
-from django.conf import settings
 from django.db import models
+
+from apps.contact.models import Contact
+from apps.user.models import User
 
 
 class SentMail(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="sent_mails",
         db_index=True,
     )
     contact = models.ForeignKey(
-        "contacts.Contact",
+        Contact,
         on_delete=models.SET_NULL,
         null=True,
         related_name="sent_mails",

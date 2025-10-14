@@ -2,7 +2,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 
-from apps.contacts.models import (
+from apps.contact.models import (
     Contact,
     ContactContext,
     Group,
@@ -10,7 +10,7 @@ from apps.contacts.models import (
     PromptOption,
     Template,
 )
-from apps.contacts.serializers import (
+from apps.contact.serializers import (
     ContactContextSerializer,
     ContactSerializer,
     GroupOptionMapSerializer,
@@ -76,7 +76,7 @@ class ContactContextDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroy
         return ContactContext.objects.filter(contact__user=self.request.user)
 
 
-# ===== Nested endpoint: /contacts/{contact_id}/context/ =====
+# ===== Nested endpoint: /contact/{contact_id}/context/ =====
 class ContactContextByContactView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PUT/PATCH/DELETE context bound to a contact the user owns.

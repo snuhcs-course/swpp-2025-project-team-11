@@ -1,7 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 
-from apps.contacts.models import (
+from apps.contact.models import (
     Contact,
     ContactContext,
     Group,

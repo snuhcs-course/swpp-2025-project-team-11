@@ -30,14 +30,14 @@ class Contact(TimeStampedModel):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="contacts",
+        related_name="contact",
     )
     group = models.ForeignKey(
         Group,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="contacts",
+        related_name="contact",
     )
     name = models.CharField(max_length=120)
     email = models.EmailField()

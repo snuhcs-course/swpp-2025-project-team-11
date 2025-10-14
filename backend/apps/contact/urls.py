@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.contacts.views import (
+from apps.contact.views import (
     ContactContextByContactView,
     ContactDetailView,
     ContactListCreateView,
@@ -17,10 +17,10 @@ from apps.contacts.views import (
 urlpatterns = [
     path("groups/", GroupListCreateView.as_view(), name="group-list"),
     path("groups/<int:pk>/", GroupDetailView.as_view(), name="group-detail"),
-    path("contacts/", ContactListCreateView.as_view(), name="contact-list"),
-    path("contacts/<int:pk>/", ContactDetailView.as_view(), name="contact-detail"),
+    path("contact/", ContactListCreateView.as_view(), name="contact-list"),
+    path("contact/<int:pk>/", ContactDetailView.as_view(), name="contact-detail"),
     path(
-        "contacts/<int:contact_id>/context/",
+        "contact/<int:contact_id>/context/",
         ContactContextByContactView.as_view(),
         name="contact-context-by-contact",
     ),

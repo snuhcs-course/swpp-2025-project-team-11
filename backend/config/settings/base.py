@@ -43,7 +43,7 @@ PROJECT_APPS = [
     "apps.user",
     "apps.mail",
     "apps.ai",
-    "apps.contacts",
+    "apps.contact",
 ]
 
 THIRD_PARTY_APPS = [
