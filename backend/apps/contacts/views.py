@@ -99,12 +99,9 @@ class PromptOptionListCreateView(AuthRequiredMixin, generics.ListCreateAPIView):
 
     serializer_class = PromptOptionSerializer
 
-    @property
     def get_queryset(self):
         user = self.request.user
-        return PromptOption.objects.filter(created_by=user) | PromptOption.objects.filter(
-            created_by__isnull=True
-        )
+        return PromptOption.objects.filter(created_by__in=[user, None])
 
     def perform_create(self, serializer):
         # If a system seed is needed, create via management command rather than API.
