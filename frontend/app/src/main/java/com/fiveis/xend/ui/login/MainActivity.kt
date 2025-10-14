@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
@@ -16,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.source.TokenManager
 import com.fiveis.xend.ui.inbox.InboxActivity
+import com.fiveis.xend.ui.theme.XendTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         tokenManager = TokenManager(applicationContext)
 
         setContent {
-            MaterialTheme {
+            XendTheme {
                 val viewModel: LoginViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
                 // 이미 로그인되어 있으면 받은편지함으로
                 if (uiState.isLoggedIn) {
                     goToInbox()
-                    return@MaterialTheme
+                    return@XendTheme
                 }
 
                 LoginScreen(
