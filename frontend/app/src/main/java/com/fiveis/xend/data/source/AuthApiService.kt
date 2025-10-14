@@ -21,6 +21,6 @@ interface AuthApiService {
     /**
      * 로그아웃
      */
-    @POST("/user/logout/")
+    @POST("api/user/logout/")
     suspend fun logout(@Header("Authorization") accessToken: String, @Body request: LogoutRequest): Response<Unit>
 }
