@@ -23,11 +23,27 @@ services:
     container_name: xend-nginx
     depends_on: [server]
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/default.dev.conf:/etc/nginx/conf.d/default.conf:ro
 #      - static_volume:/static:ro
       - media_volume:/media:ro
+      - ./webroot:/var/www/certbot
+      - ./certs:/etc/letsencrypt
     ports:
       - "80:80"
+      - "443:443"
+    restart: always
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    container_name: xend-certbot
+    depends_on:
+      - nginx
+    volumes:
+      - ./webroot:/var/www/certbot
+      - ./certs:/etc/letsencrypt
+    entrypoint: /bin/sh
+    command: -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew --deploy-hook 'nginx -s reload'; done"
+
 
 volumes:
   pgdata:
