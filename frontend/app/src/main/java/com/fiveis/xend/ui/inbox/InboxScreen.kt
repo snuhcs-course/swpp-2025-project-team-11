@@ -1,7 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,15 +15,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -45,16 +46,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
-import com.fiveis.xend.data.repository.InboxTab
 
 @Composable
 fun InboxScreen(
     uiState: InboxUiState,
-    onTabSelected: (InboxTab) -> Unit,
     onEmailClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onFabClick: () -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -64,15 +65,24 @@ fun InboxScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
-                FixedHeader(
-                    selectedTab = uiState.selectedTab,
-                    onTabSelected = onTabSelected,
-                    onSearch = onOpenSearch,
-                    onProfile = onOpenProfile
-                )
-                SyncStatus()
-                EmailList(emails = uiState.emails, onEmailClick = onEmailClick)
-                Spacer(Modifier.height(72.dp))
+                ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
+                if (uiState.isLoading && uiState.emails.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (uiState.error != null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = "Error: ${uiState.error}")
+                    }
+                } else {
+                    EmailList(
+                        emails = uiState.emails,
+                        onEmailClick = onEmailClick,
+                        onRefresh = onRefresh,
+                        onLoadMore = onLoadMore,
+                        isLoading = uiState.isLoading
+                    )
+                }
             }
 
             FloatingActionButton(
@@ -95,19 +105,13 @@ fun InboxScreen(
 }
 
 @Composable
-private fun FixedHeader(
-    selectedTab: InboxTab,
-    onTabSelected: (InboxTab) -> Unit,
-    onSearch: () -> Unit,
-    onProfile: () -> Unit
-) {
+private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(88.dp)
+            .height(44.dp)
             .background(Color.White)
     ) {
-        // 상단 섹션 (44dp): 프로필 + 검색
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -116,7 +120,6 @@ private fun FixedHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 프로필 아바타 (그라디언트)
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -140,7 +143,6 @@ private fun FixedHeader(
                 )
             }
 
-            // 검색 아이콘
             IconButton(onClick = onSearch) {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -150,33 +152,8 @@ private fun FixedHeader(
                 )
             }
         }
-
-        // 필터 섹션 (44dp): 전체 / 보낸메일
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterTab(
-                    text = "전체",
-                    isSelected = selectedTab == InboxTab.All,
-                    onClick = { onTabSelected(InboxTab.All) }
-                )
-                FilterTab(
-                    text = "보낸메일",
-                    isSelected = selectedTab == InboxTab.Sent,
-                    onClick = { onTabSelected(InboxTab.Sent) }
-                )
-            }
-        }
-
-        // 하단 구분선
         HorizontalDivider(
+            modifier = Modifier,
             color = Color(0xFFE8EAED),
             thickness = 1.dp
         )
@@ -184,38 +161,34 @@ private fun FixedHeader(
 }
 
 @Composable
-private fun FilterTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .height(32.dp)
-            .background(
-                Color(0xFFF8F9FA),
-                RoundedCornerShape(16.dp)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = Color(0xFF5F6368),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
+private fun EmailList(
+    emails: List<EmailItem>,
+    onEmailClick: (EmailItem) -> Unit,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+    isLoading: Boolean
+) {
+    val listState = rememberLazyListState()
 
-@Composable
-private fun EmailList(emails: List<EmailItem>, onEmailClick: (EmailItem) -> Unit) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        items(count = emails.size, key = { idx -> emails[idx].id }) { idx ->
-            val item = emails[idx]
-            EmailRow(item = item, onClick = { onEmailClick(item) })
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+        item {
+            SyncStatus(message = "새로고침", onClick = onRefresh)
         }
+        items(items = emails, key = { it.id }) { item ->
+            EmailRow(item = item, onClick = { onEmailClick(item) })
+            HorizontalDivider(modifier = Modifier, thickness = DividerDefaults.Thickness, color = DividerDefaults.color)
+        }
+    }
+
+    // Check if the user has scrolled to the end of the list
+    val layoutInfo = listState.layoutInfo
+    val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
+    if (!isLoading && lastVisibleItemIndex != null && lastVisibleItemIndex >= emails.size - 1) {
+        onLoadMore()
     }
 }
 
@@ -224,7 +197,8 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (item.unread) Color.White else Color(0xFFF8F9FA))
+            .clickable(onClick = onClick)
+            .background(if (item.isUnread) Color.White else Color(0xFFF8F9FA))
     ) {
         Row(
             modifier = Modifier
@@ -233,7 +207,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                 .semantics { contentDescription = "메일 항목: ${item.subject}" },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (item.unread) {
+            if (item.isUnread) {
                 Box(
                     modifier = Modifier
                         .padding(top = 3.dp, end = 8.dp)
@@ -244,16 +218,16 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = item.sender,
-                        color = if (item.unread) Color(0xFF202124) else Color(0xFF5F6368),
+                        text = item.fromEmail,
+                        color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f, fill = false),
@@ -262,9 +236,9 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     )
 
                     Spacer(Modifier.width(8.dp))
-
+// 날짜 포매팅 해야함
                     Text(
-                        text = item.timestamp,
+                        text = item.date,
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -272,7 +246,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
 
                 Text(
                     text = item.subject,
-                    color = if (item.unread) Color(0xFF202124) else Color(0xFF5F6368),
+                    color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -280,8 +254,8 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                 )
 
                 Text(
-                    text = item.content,
-                    color = if (item.unread) Color(0xFF5F6368) else Color(0xFF80868B),
+                    text = item.snippet,
+                    color = if (item.isUnread) Color(0xFF5F6368) else Color(0xFF80868B),
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -300,6 +274,7 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
             .background(Color.White)
     ) {
         HorizontalDivider(
+            modifier = Modifier,
             color = Color(0xFFE8EAED),
             thickness = 1.dp
         )
@@ -309,13 +284,12 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 8.dp),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 받은메일 탭
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Email,
@@ -331,10 +305,9 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
                 )
             }
 
-            // 연락처 탭
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Person,
@@ -354,32 +327,19 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun SyncStatus(message: String = "연락처가 추가되었습니다.") {
+private fun SyncStatus(message: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .background(
                 Color(0xFFF0F9FF),
                 RoundedCornerShape(16.dp)
             )
-            .border(
-                1.dp,
-                Color(0xFF0EA5E9),
-                RoundedCornerShape(16.dp)
-            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = "Sync",
-            tint = Color(0xFF0284C7),
-            modifier = Modifier.size(16.dp)
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
         Text(
             text = message,
             color = Color(0xFF0284C7),

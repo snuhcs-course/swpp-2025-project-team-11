@@ -1,11 +1,32 @@
 package com.fiveis.xend.data.model
 
-// 메일 데이터 모델
+import com.google.gson.annotations.SerializedName
+
 data class EmailItem(
+    @SerializedName("id")
     val id: String,
-    val sender: String,
+
+    @SerializedName("thread_id")
+    val threadId: String,
+
+    @SerializedName("subject")
     val subject: String,
-    val content: String,
-    val timestamp: String,
-    val unread: Boolean
+
+    @SerializedName("from_email")
+    val fromEmail: String,
+
+    @SerializedName("snippet")
+    val snippet: String,
+
+    @SerializedName("date")
+    val date: String,
+
+    @SerializedName("date_raw")
+    val dateRaw: String,
+
+    @SerializedName("is_unread")
+    val isUnread: Boolean,
+
+    @SerializedName("label_ids")
+    val labelIds: List<String>
 )
