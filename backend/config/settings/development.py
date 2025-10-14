@@ -3,3 +3,5 @@ from ..enums import ServerEnvironmentType
 from .base import *
 
 ENVIRONMENT = ServerEnvironmentType.DEV
+
+ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org"]
