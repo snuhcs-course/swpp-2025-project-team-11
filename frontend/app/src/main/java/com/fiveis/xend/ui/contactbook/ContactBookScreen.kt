@@ -25,14 +25,8 @@ import androidx.compose.foundation.border
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.data.model.Group
 
-
-data class Group(
-    val name: String,
-    val description: String,
-    val members: List<Contact>,
-    val color: Color
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
