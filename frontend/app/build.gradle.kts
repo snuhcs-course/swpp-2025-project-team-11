@@ -41,6 +41,11 @@ android {
             "SEND_URL",
             "\"${localProperties.getProperty("send.url", "")}\""
         )
+        buildConfigField(
+            "String",
+            "BASE_URL",
+            "\"${localProperties.getProperty("base_url", "")}\""
+        )
     }
 
     buildTypes {
