@@ -196,7 +196,6 @@ fun ContactBookScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(12.dp))
-                        QuickActions()
                     }
                 }
             }
@@ -277,20 +276,12 @@ fun MemberCircle(label: String, color: Color) {
 @Composable
 fun QuickActions() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("빠른 작업", fontWeight = FontWeight.Bold, color = Color.DarkGray)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(
                 onClick = { /* 새 그룹 추가 */ },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("+ 새 그룹") }
-
-            Button(
-                onClick = { /* 연락처 가져오기 */ },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9F5E1))
-            ) { Text("연락처 가져오기", color = Color(0xFF008000)) }
         }
     }
 }
