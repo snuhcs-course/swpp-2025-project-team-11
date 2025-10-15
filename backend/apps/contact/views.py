@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
+from rest_framework.exceptions import PermissionDenied
 
 from apps.contact.models import (
     Contact,
@@ -116,6 +117,19 @@ class PromptOptionDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAP
         return PromptOption.objects.filter(created_by=user) | PromptOption.objects.filter(
             created_by__isnull=True
         )
+
+    def perform_update(self, serializer):
+        # System-defined options are read-only
+
+        if self.get_object().created_by is None:
+            raise PermissionDenied("System-defined options are read-only.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # System-defined options cannot be deleted
+        if instance.created_by is None:
+            raise PermissionDenied("System-defined options cannot be deleted.")
+        instance.delete()
 
 
 # ===== Group-Option Map =====

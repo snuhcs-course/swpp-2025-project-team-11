@@ -50,6 +50,19 @@ class ContactSerializer(serializers.ModelSerializer):
         fields = ("id", "group", "name", "email", "context", "created_at", "updated_at")
         read_only_fields = ("id", "created_at", "updated_at")
 
+    def validate(self, attrs):
+        email = attrs.get("email")
+        if email:
+            user = self.context["request"].user
+            qs = Contact.objects.filter(user=user, email=email)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {"email": "The contact information for that email already exists."}
+                )
+        return attrs
+
     def validate_group(self, group):
         # Allow null group; otherwise enforce same owner
         if group and group.user_id != self.context["request"].user.id:
@@ -91,13 +104,8 @@ class ContactSerializer(serializers.ModelSerializer):
         if ctx is None:
             return contact
 
-        # If context payload is provided (dict): upsert behavior
-        if hasattr(contact, "context"):
-            for k, v in ctx.items():
-                setattr(contact.context, k, v)
-            contact.context.save()
-        else:
-            ContactContext.objects.create(contact=contact, **ctx)
+        ContactContext.objects.update_or_create(contact=contact, defaults=ctx)
+
         return contact
 
 
@@ -118,7 +126,6 @@ class PromptOptionSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-# ===== Group-Option Map =====
 class GroupOptionMapSerializer(serializers.ModelSerializer):
     class Meta:
         model = GroupOptionMap
@@ -127,9 +134,11 @@ class GroupOptionMapSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         user = self.context["request"].user
-        group = attrs.get("group")
-        option = attrs.get("option")
+        group = attrs.get("group") or getattr(self.instance, "group", None)
+        option = attrs.get("option") or getattr(self.instance, "option", None)
 
+        if group is None or option is None:
+            return attrs
         if group.user_id != user.id:
             raise serializers.ValidationError("You can only map prompt options to groups you own.")
 

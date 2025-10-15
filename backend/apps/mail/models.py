@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 from apps.contact.models import Contact
 from apps.user.models import User
@@ -37,10 +38,16 @@ class SentMail(models.Model):
     sent_at = models.DateTimeField(db_index=True)
 
     class Meta:
-        unique_together = (("provider", "external_message_id"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "external_message_id"],
+                name="uniq_sentmail_provider_external_message_id_nonblank",
+                condition=~Q(external_message_id=""),
+            ),
+        ]
+
         indexes = [
             models.Index(fields=["user", "sent_at"]),
-            models.Index(fields=["provider", "external_message_id"]),
             models.Index(fields=["provider", "thread_id"]),
         ]
         ordering = ["-sent_at", "-id"]
