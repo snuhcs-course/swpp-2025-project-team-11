@@ -17,10 +17,10 @@ from apps.contact.views import (
 urlpatterns = [
     path("groups/", GroupListCreateView.as_view(), name="group-list"),
     path("groups/<int:pk>/", GroupDetailView.as_view(), name="group-detail"),
-    path("contact/", ContactListCreateView.as_view(), name="contact-list"),
-    path("contact/<int:pk>/", ContactDetailView.as_view(), name="contact-detail"),
+    path("", ContactListCreateView.as_view(), name="contact-list"),
+    path("<int:pk>/", ContactDetailView.as_view(), name="contact-detail"),
     path(
-        "contact/<int:contact_id>/context/",
+        "<int:contact_id>/context/",
         ContactContextByContactView.as_view(),
         name="contact-context-by-contact",
     ),
