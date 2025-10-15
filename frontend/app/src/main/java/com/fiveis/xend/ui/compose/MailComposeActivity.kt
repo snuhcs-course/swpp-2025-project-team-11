@@ -4,35 +4,52 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Attachment
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,9 +58,13 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -57,9 +78,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -72,6 +97,21 @@ import androidx.security.crypto.MasterKey
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.network.MailComposeSseClient
+import com.fiveis.xend.ui.theme.BannerBackground
+import com.fiveis.xend.ui.theme.BannerBorder
+import com.fiveis.xend.ui.theme.BannerText
+import com.fiveis.xend.ui.theme.Blue60
+import com.fiveis.xend.ui.theme.ChipBackground
+import com.fiveis.xend.ui.theme.ComposeBackground
+import com.fiveis.xend.ui.theme.ComposeOutline
+import com.fiveis.xend.ui.theme.ComposeSurface
+import com.fiveis.xend.ui.theme.KeyboardPlaceholderColor
+import com.fiveis.xend.ui.theme.Purple60
+import com.fiveis.xend.ui.theme.SuccessBorder
+import com.fiveis.xend.ui.theme.SuccessSurface
+import com.fiveis.xend.ui.theme.TextPrimary
+import com.fiveis.xend.ui.theme.TextSecondary
+import com.fiveis.xend.ui.theme.ToolbarIconBackground
 import org.json.JSONObject
 
 // ========================================================
@@ -98,162 +138,272 @@ fun EmailComposeScreen(
     sendUiState: SendUiState,
     onSend: () -> Unit
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val scrollState = rememberScrollState()
+    var showBanner by rememberSaveable { mutableStateOf(true) }
+    var aiRealtime by rememberSaveable { mutableStateOf(true) }
 
     Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = ComposeBackground,
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        "메일 작성",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* 템플릿 */ }) {
-                        Icon(Icons.Default.GridView, contentDescription = "템플릿")
-                    }
-                    IconButton(onClick = { /* 첨부파일 */ }) {
-                        Icon(Icons.Default.Attachment, contentDescription = "첨부파일")
-                    }
-                    IconButton(
-                        onClick = onSend,
-                        enabled = !sendUiState.isSending && contacts.isNotEmpty()
-                    ) {
-                        if (sendUiState.isSending) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "전송")
-                        }
-                    }
-                },
-                scrollBehavior = scrollBehavior
+            ComposeTopBar(
+                scrollBehavior = scrollBehavior,
+                onBack = onBack,
+                onTemplateClick = { /* 템플릿 진입 예정 */ },
+                onAttachmentClick = { /* 첨부파일 선택 예정 */ },
+                onSend = onSend,
+                sendUiState = sendUiState,
+                canSend = contacts.isNotEmpty()
             )
         }
-    ) { inner ->
+    ) { innerPadding ->
         Column(
-            Modifier
-                .padding(inner)
+            modifier = Modifier
+                .padding(innerPadding)
                 .fillMaxSize()
+                .background(ComposeBackground)
+                .verticalScroll(scrollState)
+                .imePadding()
         ) {
-            // 상단 액션: 실행취소 / AI완성 (Stop 버튼 표시)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = onUndo,
-                    shape = RoundedCornerShape(20.dp)
-                ) { Text("실행취소") }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isStreaming) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                        TextButton(onClick = onStopStreaming) { Text("Stop") }
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    FilledTonalButton(
-                        onClick = onAiComplete,
-                        shape = RoundedCornerShape(20.dp),
-                        enabled = !isStreaming
-                    ) { Text("AI 완성") }
-                }
-            }
-
-            // 섹션: 받는 사람
-            SectionHeader(text = "받는 사람")
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                LazyRow(contentPadding = PaddingValues(end = 8.dp)) {
-                    items(contacts, key = { it.email }) { r ->
-                        ContactChip(contact = r, onRemove = {
-                            onContactsChange(contacts.filterNot { it.email == r.email })
-                        })
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    item {
-                        AssistChip(
-                            onClick = {
-                                val t = newContact.text.trim()
-                                if (t.isNotEmpty()) {
-                                    onContactsChange(contacts + Contact(t, t))
-                                    onNewContactChange(TextFieldValue(""))
-                                }
-                            },
-                            label = { Text("+") }
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = newContact,
-                    onValueChange = onNewContactChange,
-                    placeholder = { Text("이메일 입력 후 Enter") },
-                    singleLine = true,
+            if (showBanner) {
+                ComposeInfoBanner(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
+                        .fillMaxWidth(0.9f)
+                        .align(Alignment.CenterHorizontally),
+                    onDismiss = { showBanner = false }
                 )
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // 섹션: 제목
-            SectionHeader(text = "제목")
-            OutlinedTextField(
-                value = subject,
-                onValueChange = onSubjectChange,
-                placeholder = { Text("제목") },
-                singleLine = true,
-                enabled = !isStreaming,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+            ComposeActionRow(
+                isStreaming = isStreaming,
+                onUndo = onUndo,
+                onAiComplete = onAiComplete,
+                onStopStreaming = onStopStreaming
             )
 
-            // 섹션: 본문 + 실시간 AI 토글
-            var aiRealtime by rememberSaveable { mutableStateOf(false) }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            SectionHeader("받는 사람")
+            RecipientSection(
+                contacts = contacts,
+                onContactsChange = onContactsChange,
+                newContact = newContact,
+                onNewContactChange = onNewContactChange
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            SectionHeader("제목")
+            SubjectField(
+                value = subject,
+                enabled = !isStreaming,
+                onValueChange = onSubjectChange
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            BodyHeader(
+                isRealtimeOn = aiRealtime,
+                onToggle = { aiRealtime = it }
+            )
+            MailBodyCard(
+                body = body,
+                onBodyChange = onBodyChange,
+                isStreaming = isStreaming,
+                onTapComplete = onAiComplete
+            )
+
+            error?.let { ErrorMessage(it) }
+
+            KeyboardPlaceholder(
+                modifier = Modifier
+                    .padding(top = 24.dp, bottom = 32.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ComposeTopBar(
+    scrollBehavior: TopAppBarScrollBehavior,
+    onBack: () -> Unit,
+    onTemplateClick: () -> Unit,
+    onAttachmentClick: () -> Unit,
+    onSend: () -> Unit,
+    sendUiState: SendUiState,
+    canSend: Boolean
+) {
+    TopAppBar(
+        modifier = Modifier
+            .height(72.dp)
+            .padding(horizontal = 12.dp),
+        title = {
+            Text(
+                "메일 작성",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary),
+                modifier = Modifier.padding(start = 15.dp)
+            )
+        },
+        navigationIcon = {
+            ToolbarIconButton(
+                onClick = onBack,
+                modifier = Modifier.padding(start = 4.dp)
             ) {
-                Text("본문", style = MaterialTheme.typography.titleSmall)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("실시간 AI", style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.width(6.dp))
-                    Switch(checked = aiRealtime, onCheckedChange = { aiRealtime = it })
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "뒤로가기",
+                    tint = TextSecondary
+                )
+            }
+        },
+        actions = {
+            ToolbarIconButton(
+                onClick = onTemplateClick,
+                modifier = Modifier.padding(end = 2.dp)
+            ) {
+                Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = TextSecondary)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            ToolbarIconButton(
+                onClick = onAttachmentClick,
+                modifier = Modifier.padding(end = 2.dp)
+            ) {
+                Icon(Icons.Default.Attachment, contentDescription = "첨부파일", tint = TextSecondary)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            ToolbarIconButton(
+                onClick = onSend,
+                enabled = canSend && !sendUiState.isSending,
+                containerColor = Blue60,
+                modifier = Modifier.padding(start = 2.dp)
+            ) {
+                if (sendUiState.isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "전송", tint = Color.White)
                 }
             }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = ComposeSurface,
+            scrolledContainerColor = ComposeSurface
+        ),
+        scrollBehavior = scrollBehavior
+    )
+}
 
-            OutlinedTextField(
-                value = body,
-                onValueChange = onBodyChange,
-                placeholder = { Text("내용을 입력하세요") },
-                enabled = !isStreaming,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 16.dp),
-                minLines = 10
+@Composable
+private fun ToolbarIconButton(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    containerColor: Color = ToolbarIconBackground,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (enabled) containerColor else containerColor.copy(alpha = 0.5f))
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun ComposeInfoBanner(modifier: Modifier = Modifier, onDismiss: () -> Unit) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, BannerBorder),
+        color = BannerBackground
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp, vertical = 0.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = null,
+                tint = BannerText,
+                modifier = Modifier.size(20.dp)
             )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.",
+                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "닫기", tint = TextSecondary)
+            }
+        }
+    }
+}
 
-            // Error (if any)
-            error?.let {
-                Text(
-                    text = "Error: $it",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+@Composable
+private fun ComposeActionRow(
+    isStreaming: Boolean,
+    onUndo: () -> Unit,
+    onAiComplete: () -> Unit,
+    onStopStreaming: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedButton(
+            onClick = onUndo,
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, ComposeOutline),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+        ) {
+            Text("실행취소")
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedVisibility(visible = isStreaming) {
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, BannerBorder),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BannerText)
+                ) {
+                    Icon(Icons.Default.Stop, contentDescription = "중지", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("중지")
+                }
+            }
+            Button(
+                onClick = onAiComplete,
+                enabled = !isStreaming,
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Purple60,
+                    contentColor = Color.White
                 )
+            ) {
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("AI 완성")
             }
         }
     }
@@ -263,27 +413,303 @@ fun EmailComposeScreen(
 private fun SectionHeader(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+        style = MaterialTheme.typography.titleSmall.copy(
+            color = TextPrimary,
+            fontWeight = FontWeight.SemiBold
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     )
+}
+
+@Composable
+private fun BodyHeader(isRealtimeOn: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "본문",
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = TextPrimary,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+        RealtimeToggleChip(
+            isChecked = isRealtimeOn,
+            onToggle = onToggle
+        )
+    }
+}
+
+@Composable
+private fun RecipientSection(
+    contacts: List<Contact>,
+    onContactsChange: (List<Contact>) -> Unit,
+    newContact: TextFieldValue,
+    onNewContactChange: (TextFieldValue) -> Unit
+) {
+    val addContact = {
+        val trimmed = newContact.text.trim()
+        if (trimmed.isNotEmpty()) {
+            onContactsChange(contacts + Contact(trimmed, trimmed))
+            onNewContactChange(TextFieldValue(""))
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, ComposeOutline),
+        color = ComposeSurface
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(end = 4.dp)
+            ) {
+                items(contacts, key = { it.email }) { contact ->
+                    ContactChip(contact = contact) {
+                        onContactsChange(contacts.filterNot { it.email == contact.email })
+                    }
+                }
+                item {
+                    AddRecipientChip(
+                        enabled = newContact.text.isNotBlank(),
+                        onClick = addContact
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = newContact,
+                onValueChange = onNewContactChange,
+                placeholder = { Text("이메일 주소 입력", color = TextSecondary) },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = composeOutlinedTextFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { addContact() }
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddRecipientChip(enabled: Boolean, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        enabled = enabled,
+        label = { Text("추가") },
+        leadingIcon = {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+        },
+        border = AssistChipDefaults.assistChipBorder(
+            enabled = enabled,
+            borderColor = ComposeOutline
+        ),
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = ComposeSurface,
+            labelColor = if (enabled) Blue60 else TextSecondary,
+            leadingIconContentColor = if (enabled) Blue60 else TextSecondary
+        )
+    )
+}
+
+@Composable
+private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text("제목을 입력하세요", color = TextSecondary) },
+        singleLine = true,
+        enabled = enabled,
+        shape = RoundedCornerShape(18.dp),
+        colors = composeOutlinedTextFieldColors(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+    )
+}
+
+@Composable
+private fun composeOutlinedTextFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = ComposeSurface,
+    unfocusedContainerColor = ComposeSurface,
+    disabledContainerColor = ComposeSurface,
+    errorContainerColor = ComposeSurface,
+    focusedIndicatorColor = Blue60,
+    unfocusedIndicatorColor = ComposeOutline,
+    disabledIndicatorColor = ComposeOutline,
+    errorIndicatorColor = MaterialTheme.colorScheme.error,
+    cursorColor = Blue60,
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    disabledTextColor = TextPrimary.copy(alpha = 0.4f),
+    focusedPlaceholderColor = TextSecondary,
+    unfocusedPlaceholderColor = TextSecondary,
+    disabledPlaceholderColor = TextSecondary.copy(alpha = 0.4f),
+    focusedSupportingTextColor = TextSecondary,
+    unfocusedSupportingTextColor = TextSecondary,
+    disabledSupportingTextColor = TextSecondary.copy(alpha = 0.4f)
+)
+
+@Composable
+private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = SuccessSurface,
+        border = BorderStroke(1.dp, SuccessBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 1.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "실시간 AI",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    color = SuccessBorder,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+            Switch(
+                checked = isChecked,
+                onCheckedChange = onToggle,
+                modifier = Modifier.scale(0.8f),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = SuccessBorder,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = ComposeOutline
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun MailBodyCard(
+    body: String,
+    onBodyChange: (String) -> Unit,
+    isStreaming: Boolean,
+    onTapComplete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(1.dp, ComposeOutline),
+        color = ComposeSurface
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 240.dp)
+        ) {
+            BasicTextField(
+                value = body,
+                onValueChange = onBodyChange,
+                enabled = !isStreaming,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 68.dp),
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (body.isEmpty()) {
+                            Text(
+                                text = "내용을 입력하세요",
+                                style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+
+            TextButton(
+                onClick = onTapComplete,
+                enabled = !isStreaming,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+            ) {
+                Icon(Icons.Default.FlashOn, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("탭 완성")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorMessage(message: String) {
+    Text(
+        text = message,
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+    )
+}
+
+@Composable
+private fun KeyboardPlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .padding(horizontal = 20.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(KeyboardPlaceholderColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Keyboard, contentDescription = null, tint = TextSecondary)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "가상 키보드 영역",
+                style = MaterialTheme.typography.labelLarge.copy(color = TextSecondary)
+            )
+        }
+    }
 }
 
 @Composable
 fun ContactChip(contact: Contact, onRemove: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 1.dp
+        shape = RoundedCornerShape(22.dp),
+        color = ChipBackground,
+        border = BorderStroke(1.dp, ComposeOutline)
     ) {
         Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                Modifier
-                    .size(24.dp)
+                modifier = Modifier
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(contact.color),
                 contentAlignment = Alignment.Center
@@ -294,22 +720,26 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
                     style = MaterialTheme.typography.labelMedium
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "${contact.name} (${contact.email})",
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "×",
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable { onRemove() }
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelLarge
-            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = contact.name,
+                    style = MaterialTheme.typography.labelLarge.copy(color = TextPrimary)
+                )
+                Text(
+                    text = contact.email,
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "삭제", tint = TextSecondary)
+            }
         }
     }
 }
