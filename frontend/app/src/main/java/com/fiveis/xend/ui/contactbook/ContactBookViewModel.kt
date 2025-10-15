@@ -18,7 +18,7 @@ data class ContactBookUiState(
     val error: String? = null
 )
 
-class ContactBookViewModel (
+class ContactBookViewModel(
     private val repository: ContactBookRepository = ContactBookRepository()
 ) : ViewModel() {
 
@@ -35,7 +35,7 @@ class ContactBookViewModel (
 
     private fun loadContactInfo(tab: ContactBookTab) {
         _uiState.update {
-            if(tab == ContactBookTab.Groups) {
+            if (tab == ContactBookTab.Groups) {
                 it.copy(
                     selectedTab = tab,
                     groups = repository.getContactInfo(tab) as List<Group>,
@@ -43,8 +43,7 @@ class ContactBookViewModel (
                     isLoading = false,
                     error = null
                 )
-            }
-            else {
+            } else {
                 it.copy(
                     selectedTab = tab,
                     groups = emptyList(),

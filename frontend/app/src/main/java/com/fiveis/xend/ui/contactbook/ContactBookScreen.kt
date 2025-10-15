@@ -23,8 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,9 +51,6 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookTab
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Divider
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,11 +60,11 @@ fun ContactBookScreen(
     onTabSelected: (ContactBookTab) -> Unit,
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
-    onBottomNavChange: (String) -> Unit = {},
+    onBottomNavChange: (String) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf("그룹별") }
 
-    if(selectedTab == "그룹별") {
+    if (selectedTab == "그룹별") {
         Scaffold(
             bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
         ) { padding ->
@@ -126,8 +122,7 @@ fun ContactBookScreen(
                 }
             }
         }
-    }
-    else {
+    } else {
         Scaffold(
             bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
         ) { padding ->
@@ -240,7 +235,13 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(group.name, fontWeight = FontWeight.Bold, color = group.color, fontSize = 18.sp)
-                    Text(group.description, color = Color.Gray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        group.description,
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 Spacer(Modifier.weight(1f))
                 Text("${group.members.size}명", color = group.color, fontWeight = FontWeight.Bold)
@@ -305,12 +306,7 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun ContactRow(
-    contact: Contact,
-    subtitle: String,
-    color: Color,
-    onClick: (Contact) -> Unit
-) {
+private fun ContactRow(contact: Contact, subtitle: String, color: Color, onClick: (Contact) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -359,13 +355,30 @@ private fun MonogramAvatar(letter: String, bg: Color) {
     }
 }
 
-
 @Preview(showBackground = true)
 @Composable
 fun ContactScreenPreview() {
     val sampleGroups = listOf(
-        Group("1", "VIP", "중요한 고객과 상급자들", listOf(Contact(id="1", name="김철수", email="john.c.calhoun@examplepetstore.com", groupId="1"), Contact(id="2", name="최철수", email="choi@snu.ac.kr", groupId="1")), Color(0xFFFF5C5C)),
-        Group("2", "업무 동료", "같은 회사 팀원들과 협업 파트너", listOf(Contact(id="1", name="김철수", email="john.c.calhoun@examplepetstore.com", groupId="2"), Contact(id="2", name="최철수", email="choi@snu.ac.kr", groupId="2")), Color(0xFFFFA500))
+        Group(
+            "1",
+            "VIP",
+            "중요한 고객과 상급자들",
+            listOf(
+                Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "1"),
+                Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "1")
+            ),
+            Color(0xFFFF5C5C)
+        ),
+        Group(
+            "2",
+            "업무 동료",
+            "같은 회사 팀원들과 협업 파트너",
+            listOf(
+                Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "2"),
+                Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "2")
+            ),
+            Color(0xFFFFA500)
+        )
     )
     ContactBookScreen(
         uiState = ContactBookUiState(groups = sampleGroups),
@@ -374,4 +387,3 @@ fun ContactScreenPreview() {
         onContactClick = {}
     )
 }
-

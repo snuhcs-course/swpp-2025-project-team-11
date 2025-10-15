@@ -56,7 +56,7 @@ fun InboxScreen(
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onFabClick: () -> Unit = {},
-    onBottomNavChange: (String) -> Unit = {},
+    onBottomNavChange: (String) -> Unit = {}
 ) {
     Scaffold(
         topBar = { InboxTopBar(onSearch = onOpenSearch, onProfile = onOpenProfile) },
