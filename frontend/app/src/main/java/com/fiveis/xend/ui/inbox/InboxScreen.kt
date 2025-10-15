@@ -60,7 +60,7 @@ fun InboxScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
-        bottomBar = { BottomBar(selected = "inbox", onSelect = onBottomNavChange) },
+        bottomBar = { BottomNavBar(selected = "inbox", onSelect = onBottomNavChange) },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -266,7 +266,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
+private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -289,7 +289,8 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("inbox") }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Email,
@@ -307,7 +308,8 @@ private fun BottomBar(selected: String, onSelect: (String) -> Unit) {
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("contacts") }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Person,
