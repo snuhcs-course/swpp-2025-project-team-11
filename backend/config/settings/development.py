@@ -4,4 +4,4 @@ from .base import *
 
 ENVIRONMENT = ServerEnvironmentType.DEV
 
-ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org"]
+ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org", "15.164.93.45"]
