@@ -39,7 +39,12 @@ DJANGO_APPS = [
     # "django.contrib.staticfiles",
 ]
 
-PROJECT_APPS = ["apps.user", "apps.mail", "apps.ai"]
+PROJECT_APPS = [
+    "apps.user",
+    "apps.mail",
+    "apps.ai",
+    "apps.contact",
+]
 
 THIRD_PARTY_APPS = [
     "rest_framework",
@@ -158,7 +163,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
-GOOGLE_OAUTH_REDIRECT_URI = env("GOOGLE_OAUTH_REDIRECT_URI")
 
 ENCRYPTION_KEY = env("ENCRYPTION_KEY")
 
