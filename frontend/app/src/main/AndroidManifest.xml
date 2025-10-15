@@ -36,8 +36,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.inbox.InboxActivity" />
-        <activity android:name=".ui.compose.MailSendActivity" />
         <activity android:name=".ui.compose.MailComposeActivity" />
+        <activity android:name=".ui.contactbook.ContactBookActivity" />"
 
 
 
