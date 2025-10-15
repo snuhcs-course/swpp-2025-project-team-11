@@ -18,7 +18,7 @@ class ContactBookRepository {
     }
 
     // 그룹 목록 화면용
-    private fun getGroups(): List<Group> {
+    fun getGroups(): List<Group> {
         return listOf(
             Group(
                 id = "1",
@@ -57,7 +57,7 @@ class ContactBookRepository {
     }
 
     // 전체 연락처 화면용
-    private fun getContacts(): List<Contact> {
+    fun getContacts(): List<Contact> {
         return listOf(
             Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "1"),
             Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "1"),

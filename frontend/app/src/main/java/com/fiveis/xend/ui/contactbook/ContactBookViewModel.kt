@@ -38,7 +38,7 @@ class ContactBookViewModel(
             if (tab == ContactBookTab.Groups) {
                 it.copy(
                     selectedTab = tab,
-                    groups = repository.getContactInfo(tab) as List<Group>,
+                    groups = repository.getGroups(),
                     contacts = emptyList(),
                     isLoading = false,
                     error = null
@@ -47,7 +47,7 @@ class ContactBookViewModel(
                 it.copy(
                     selectedTab = tab,
                     groups = emptyList(),
-                    contacts = repository.getContactInfo(tab) as List<Contact>,
+                    contacts = repository.getContacts(),
                     isLoading = false,
                     error = null
                 )
