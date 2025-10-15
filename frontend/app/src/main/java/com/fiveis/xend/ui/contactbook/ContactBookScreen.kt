@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -288,20 +289,65 @@ fun QuickActions() {
 }
 
 @Composable
-fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
-    NavigationBar {
-        NavigationBarItem(
-            selected = selected == "inbox",
-            onClick = { onSelect("inbox") },
-            icon = { Icon(Icons.Outlined.Email, contentDescription = null) },
-            label = { Text("받은 메일") }
+private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(67.dp)
+            .background(Color.White)
+    ) {
+        HorizontalDivider(
+            modifier = Modifier,
+            color = Color(0xFFE8EAED),
+            thickness = 1.dp
         )
-        NavigationBarItem(
-            selected = selected == "contacts",
-            onClick = { onSelect("contacts") },
-            icon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-            label = { Text("연락처") }
-        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("inbox") }
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Email,
+                    contentDescription = "받은메일함",
+                    tint = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "받은메일",
+                    color = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("contacts") }
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = "연락처",
+                    tint = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "연락처",
+                    color = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
     }
 }
 
