@@ -62,9 +62,9 @@ fun ContactBookScreen(
     onContactClick: (Contact) -> Unit = {},
     onBottomNavChange: (String) -> Unit = {}
 ) {
-    var selectedTab by remember { mutableStateOf("그룹별") }
+    var selectedTab by remember { mutableStateOf(ContactBookTab.Groups) }
 
-    if (selectedTab == "그룹별") {
+    if (selectedTab == ContactBookTab.Groups) {
         Scaffold(
             bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
         ) { padding ->
@@ -94,12 +94,12 @@ fun ContactBookScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TabChip("그룹별", selectedTab == "그룹별") {
-                        selectedTab = "그룹별"
+                    TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
+                        selectedTab = ContactBookTab.Groups
                         onTabSelected(ContactBookTab.Groups)
                     }
-                    TabChip("전체", selectedTab == "전체") {
-                        selectedTab = "전체"
+                    TabChip("전체", selectedTab == ContactBookTab.Contacts) {
+                        selectedTab = ContactBookTab.Contacts
                         onTabSelected(ContactBookTab.Contacts)
                     }
                 }
@@ -152,12 +152,12 @@ fun ContactBookScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TabChip("그룹별", selectedTab == "그룹별") {
-                        selectedTab = "그룹별"
+                    TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
+                        selectedTab = ContactBookTab.Groups
                         onTabSelected(ContactBookTab.Groups)
                     }
-                    TabChip("전체", selectedTab == "전체") {
-                        selectedTab = "전체"
+                    TabChip("전체", selectedTab == ContactBookTab.Contacts) {
+                        selectedTab = ContactBookTab.Contacts
                         onTabSelected(ContactBookTab.Contacts)
                     }
                 }

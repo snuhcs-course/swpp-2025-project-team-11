@@ -6,11 +6,15 @@ import com.fiveis.xend.data.model.Group
 
 enum class ContactBookTab { Groups, Contacts }
 
+sealed interface ContactBookData
+data class GroupData(val groups: List<Group>) : ContactBookData
+data class ContactData(val contacts: List<Contact>) : ContactBookData
+
 class ContactBookRepository {
     // call either getGroups() or getContacts()
-    fun getContactInfo(tab: ContactBookTab): List<Any> = when (tab) {
-        ContactBookTab.Groups -> getGroups()
-        ContactBookTab.Contacts -> getContacts()
+    fun getContactInfo(tab: ContactBookTab): ContactBookData = when (tab) {
+        ContactBookTab.Groups -> GroupData(getGroups())
+        ContactBookTab.Contacts -> ContactData(getContacts())
     }
 
     // 그룹 목록 화면용
@@ -43,9 +47,9 @@ class ContactBookRepository {
                 members = listOf(
                     Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "3"),
                     Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "3"),
-                    Contact(id = "3", name = "김철수", email = "kim@snu.ac.kr", groupId = "3"),
-                    Contact(id = "4", name = "최철수", email = "choi@snu.ac.kr", groupId = "3"),
-                    Contact(id = "5", name = "김철수", email = "kim@snu.ac.kr", groupId = "3")
+                    Contact(id = "3", name = "이영희", email = "lee@snu.ac.kr", groupId = "2"),
+                    Contact(id = "4", name = "박민수", email = "park@snu.ac.kr", groupId = "3"),
+                    Contact(id = "5", name = "정수진", email = "jung@snu.ac.kr", groupId = "3")
                 ),
                 color = Color(0xFF8A2BE2)
             )
@@ -56,7 +60,10 @@ class ContactBookRepository {
     private fun getContacts(): List<Contact> {
         return listOf(
             Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "1"),
-            Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "2")
+            Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "1"),
+            Contact(id = "3", name = "이영희", email = "lee@snu.ac.kr", groupId = "2"),
+            Contact(id = "4", name = "박민수", email = "park@snu.ac.kr", groupId = "3"),
+            Contact(id = "5", name = "정수진", email = "jung@snu.ac.kr", groupId = "3")
         )
     }
 }
