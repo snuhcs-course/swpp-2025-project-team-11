@@ -186,7 +186,7 @@ fun EmailComposeScreen(
                             onClick = {
                                 val t = newContact.text.trim()
                                 if (t.isNotEmpty()) {
-                                    onContactsChange(contacts + Contact(t, t))
+                                    onContactsChange(contacts + Contact("Id here", t, t, groupId = "GroupId here"))
                                     onNewContactChange(TextFieldValue(""))
                                 }
                             },
@@ -443,7 +443,7 @@ private fun EmailComposePreview() {
             onSubjectChange = {},
             body = "초안 본문...",
             onBodyChange = {},
-            contacts = listOf(Contact("홍길동", "test@example.com")),
+            contacts = listOf(Contact("Id here", "홍길동", "test@example.com", groupId = "GroupId here")),
             onContactsChange = {},
             newContact = TextFieldValue(""),
             onNewContactChange = {},

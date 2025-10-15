@@ -1,4 +1,4 @@
-package com.fiveis.xend.ui.inbox
+package com.fiveis.xend.ui.contactbook
 
 import android.content.Intent
 import android.os.Bundle
@@ -10,10 +10,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
-import com.fiveis.xend.ui.compose.MailComposeActivity
-import com.fiveis.xend.ui.contactbook.ContactBookActivity
+import com.fiveis.xend.ui.inbox.InboxActivity
 
-class InboxActivity : ComponentActivity() {
+class ContactBookActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -22,27 +21,25 @@ class InboxActivity : ComponentActivity() {
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
                     finish()
-                    overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                 }
             }
         )
 
         setContent {
             MaterialTheme {
-                val viewModel: InboxViewModel = viewModel()
+                val viewModel: ContactBookViewModel = viewModel()
                 val uiState by viewModel.uiState.collectAsState()
 
-                InboxScreen(
+                ContactBookScreen(
                     uiState = uiState,
                     onTabSelected = viewModel::onTabSelected,
-                    onEmailClick = viewModel::onEmailClick,
-                    onFabClick = {
-                        startActivity(Intent(this, MailComposeActivity::class.java))
-                    },
+                    onGroupClick = viewModel::onGroupClick,
+                    onContactClick = viewModel::onContactClick,
                     onBottomNavChange = {
-                        if (it == "contacts") {
-                            startActivity(Intent(this, ContactBookActivity::class.java))
-                            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                        if (it == "inbox") {
+                            startActivity(Intent(this, InboxActivity::class.java))
+                            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
                     }
                 )

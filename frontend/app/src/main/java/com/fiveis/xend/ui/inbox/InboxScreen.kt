@@ -49,14 +49,14 @@ import com.fiveis.xend.data.repository.InboxTab
 
 @Composable
 fun InboxScreen(
+    modifier: Modifier = Modifier,
     uiState: InboxUiState,
     onTabSelected: (InboxTab) -> Unit,
     onEmailClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onFabClick: () -> Unit = {},
-    onBottomNavChange: (String) -> Unit = {},
-    modifier: Modifier = Modifier
+    onBottomNavChange: (String) -> Unit = {}
 ) {
     Scaffold(
         topBar = { InboxTopBar(onSearch = onOpenSearch, onProfile = onOpenProfile) },
