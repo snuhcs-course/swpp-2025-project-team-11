@@ -7,22 +7,26 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,23 +37,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -60,7 +61,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -89,6 +89,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -97,21 +98,20 @@ import androidx.security.crypto.MasterKey
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.network.MailComposeSseClient
+import com.fiveis.xend.ui.theme.AddButtonBackground
+import com.fiveis.xend.ui.theme.AddButtonText
 import com.fiveis.xend.ui.theme.BannerBackground
 import com.fiveis.xend.ui.theme.BannerBorder
 import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
-import com.fiveis.xend.ui.theme.ChipBackground
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
-import com.fiveis.xend.ui.theme.KeyboardPlaceholderColor
-import com.fiveis.xend.ui.theme.Purple60
-import com.fiveis.xend.ui.theme.SuccessBorder
 import com.fiveis.xend.ui.theme.SuccessSurface
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
-import com.fiveis.xend.ui.theme.ToolbarIconBackground
+import com.fiveis.xend.ui.theme.ToolbarIconTint
+import com.fiveis.xend.ui.theme.UndoBorder
 import org.json.JSONObject
 
 // ========================================================
@@ -216,11 +216,6 @@ fun EmailComposeScreen(
             )
 
             error?.let { ErrorMessage(it) }
-
-            KeyboardPlaceholder(
-                modifier = Modifier
-                    .padding(top = 24.dp, bottom = 32.dp)
-            )
         }
     }
 }
@@ -238,65 +233,75 @@ private fun ComposeTopBar(
 ) {
     TopAppBar(
         modifier = Modifier
-            .height(72.dp)
-            .padding(horizontal = 12.dp),
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 16.dp),
         title = {
             Text(
                 "메일 작성",
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary),
-                modifier = Modifier.padding(start = 15.dp)
+                modifier = Modifier.padding(start = 8.dp)
             )
         },
         navigationIcon = {
             ToolbarIconButton(
                 onClick = onBack,
+                border = null,
                 modifier = Modifier.padding(start = 4.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "뒤로가기",
-                    tint = TextSecondary
+                    tint = ToolbarIconTint
                 )
             }
         },
         actions = {
             ToolbarIconButton(
                 onClick = onTemplateClick,
+                border = null,
                 modifier = Modifier.padding(end = 2.dp)
             ) {
-                Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = TextSecondary)
+                Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
             }
             Spacer(modifier = Modifier.width(8.dp))
             ToolbarIconButton(
                 onClick = onAttachmentClick,
+                border = null,
                 modifier = Modifier.padding(end = 2.dp)
             ) {
-                Icon(Icons.Default.Attachment, contentDescription = "첨부파일", tint = TextSecondary)
+                Icon(Icons.Default.Attachment, contentDescription = "첨부파일", tint = ToolbarIconTint)
             }
             Spacer(modifier = Modifier.width(8.dp))
             ToolbarIconButton(
                 onClick = onSend,
-                enabled = canSend && !sendUiState.isSending,
-                containerColor = Blue60,
+                border = null,
+                enabled = !sendUiState.isSending,
+                containerColor = Color.Transparent,
+                contentTint = if (canSend) Blue60 else ToolbarIconTint.copy(alpha = 0.4f),
                 modifier = Modifier.padding(start = 2.dp)
             ) {
                 if (sendUiState.isSending) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
+                        color = Blue60
                     )
                 } else {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "전송", tint = Color.White)
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "전송",
+                        tint = if (canSend) Blue60 else ToolbarIconTint.copy(alpha = 0.4f)
+                    )
                 }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = ComposeSurface,
-            scrolledContainerColor = ComposeSurface
+            containerColor = ComposeBackground,
+            scrolledContainerColor = ComposeBackground
         ),
+        windowInsets = WindowInsets(0, 0, 0, 0),
         scrollBehavior = scrollBehavior
     )
 }
@@ -305,19 +310,27 @@ private fun ComposeTopBar(
 private fun ToolbarIconButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
-    containerColor: Color = ToolbarIconBackground,
+    containerColor: Color = Color.Transparent,
+    border: BorderStroke? = BorderStroke(1.dp, ComposeOutline),
+    contentTint: Color = TextSecondary,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (enabled) containerColor else containerColor.copy(alpha = 0.5f))
+    Surface(
+        modifier = modifier.size(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (enabled) containerColor else containerColor.copy(alpha = 0.5f),
+        border = border
     ) {
-        content()
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            colors = IconButtonDefaults.iconButtonColors(
+                contentColor = contentTint
+            )
+        ) {
+            content()
+        }
     }
 }
 
@@ -332,14 +345,14 @@ private fun ComposeInfoBanner(modifier: Modifier = Modifier, onDismiss: () -> Un
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 2.dp, vertical = 0.dp),
+                .padding(horizontal = 6.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = null,
                 tint = BannerText,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -347,8 +360,18 @@ private fun ComposeInfoBanner(modifier: Modifier = Modifier, onDismiss: () -> Un
                 style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "닫기", tint = TextSecondary)
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(28.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = TextSecondary
+                )
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "닫기",
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
@@ -364,17 +387,39 @@ private fun ComposeActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 15.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedButton(
             onClick = onUndo,
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, ComposeOutline),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+            modifier = Modifier.size(width = 94.dp, height = 35.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, UndoBorder),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.Transparent,
+                contentColor = UndoBorder,
+                disabledContentColor = UndoBorder.copy(alpha = 0.2f)
+            )
         ) {
-            Text("실행취소")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Undo,
+                    contentDescription = "실행취소",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "실행취소",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B)
+                    )
+                )
+            }
         }
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -383,27 +428,50 @@ private fun ComposeActionRow(
             AnimatedVisibility(visible = isStreaming) {
                 OutlinedButton(
                     onClick = onStopStreaming,
+
                     shape = RoundedCornerShape(24.dp),
                     border = BorderStroke(1.dp, BannerBorder),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BannerText)
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    modifier = Modifier.size(width = 104.dp, height = 35.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = BannerText,
+                        disabledContentColor = BannerText.copy(alpha = 0.3f)
+                    )
                 ) {
                     Icon(Icons.Default.Stop, contentDescription = "중지", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("중지")
+                    Text(
+                        "중지",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
                 }
             }
-            Button(
+            OutlinedButton(
                 onClick = onAiComplete,
+                modifier = Modifier.size(width = 96.dp, height = 35.dp),
                 enabled = !isStreaming,
+                contentPadding = PaddingValues(horizontal = 15.dp),
                 shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Purple60,
-                    contentColor = Color.White
+                border = BorderStroke(1.dp, Blue60),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Blue60,
+                    disabledContentColor = Blue60.copy(alpha = 0.4f)
                 )
             ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("AI 완성")
+                Text(
+                    "AI 완성",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
             }
         }
     }
@@ -414,7 +482,7 @@ private fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall.copy(
-            color = TextPrimary,
+            color = ToolbarIconTint,
             fontWeight = FontWeight.SemiBold
         ),
         modifier = Modifier
@@ -435,7 +503,7 @@ private fun BodyHeader(isRealtimeOn: Boolean, onToggle: (Boolean) -> Unit) {
         Text(
             text = "본문",
             style = MaterialTheme.typography.titleSmall.copy(
-                color = TextPrimary,
+                color = ToolbarIconTint,
                 fontWeight = FontWeight.SemiBold
             )
         )
@@ -461,74 +529,93 @@ private fun RecipientSection(
         }
     }
 
+    val scrollState = rememberScrollState()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, AddButtonText.copy(alpha = 0.15f)),
         color = ComposeSurface
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 36.dp)
+                .padding(horizontal = 12.dp)
+                .horizontalScroll(scrollState),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(end = 4.dp)
-            ) {
-                items(contacts, key = { it.email }) { contact ->
-                    ContactChip(contact = contact) {
+            contacts.forEachIndexed { index, contact ->
+                ContactChip(
+                    contact = contact,
+                    onRemove = {
                         onContactsChange(contacts.filterNot { it.email == contact.email })
                     }
-                }
-                item {
-                    AddRecipientChip(
-                        enabled = newContact.text.isNotBlank(),
-                        onClick = addContact
-                    )
+                )
+                if (index != contacts.lastIndex) {
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
             }
-
-            OutlinedTextField(
+            if (contacts.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            RecipientInputField(
                 value = newContact,
                 onValueChange = onNewContactChange,
-                placeholder = { Text("이메일 주소 입력", color = TextSecondary) },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = composeOutlinedTextFieldColors(),
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { addContact() }
-                )
+                onAdd = addContact
             )
+            Spacer(modifier = Modifier.width(8.dp))
         }
     }
 }
 
 @Composable
-private fun AddRecipientChip(enabled: Boolean, onClick: () -> Unit) {
-    AssistChip(
-        onClick = onClick,
-        enabled = enabled,
-        label = { Text("추가") },
-        leadingIcon = {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-        },
-        border = AssistChipDefaults.assistChipBorder(
-            enabled = enabled,
-            borderColor = ComposeOutline
-        ),
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = ComposeSurface,
-            labelColor = if (enabled) Blue60 else TextSecondary,
-            leadingIconContentColor = if (enabled) Blue60 else TextSecondary
-        )
-    )
+private fun RecipientInputField(value: TextFieldValue, onValueChange: (TextFieldValue) -> Unit, onAdd: () -> Unit) {
+    val borderModifier = if (value.text.isNotEmpty()) {
+        Modifier.border(BorderStroke(1.dp, AddButtonText), RoundedCornerShape(6.dp))
+    } else {
+        Modifier
+    }
+    Box(
+        modifier = Modifier
+            .height(24.dp)
+            .widthIn(min = 80.dp, max = 200.dp)
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.White)
+            .then(borderModifier),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall.copy(color = AddButtonText),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onDone = { onAdd() })
+        ) { inner ->
+            Box(
+                contentAlignment = Alignment.CenterStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp)
+            ) {
+                if (value.text.isEmpty()) {
+                    Text(
+                        text = "이메일 입력",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = AddButtonText.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+                inner()
+            }
+        }
+    }
 }
 
 @Composable
@@ -572,30 +659,29 @@ private fun composeOutlinedTextFieldColors() = TextFieldDefaults.colors(
 @Composable
 private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) {
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = SuccessSurface,
-        border = BorderStroke(1.dp, SuccessBorder)
+        shape = RoundedCornerShape(18.dp),
+        color = SuccessSurface
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 1.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "실시간 AI",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    color = SuccessBorder,
-                    fontWeight = FontWeight.Medium
+                style = MaterialTheme.typography.labelMedium.copy(
+                    color = Color(0xFF166534),
+                    fontWeight = FontWeight.Bold
                 )
             )
             Switch(
                 checked = isChecked,
                 onCheckedChange = onToggle,
-                modifier = Modifier.scale(0.8f),
+                modifier = Modifier.scale(0.6f),
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = SuccessBorder,
+                    checkedTrackColor = Color(0xFF166534),
                     uncheckedThumbColor = Color.White,
                     uncheckedTrackColor = ComposeOutline
                 )
@@ -646,10 +732,16 @@ private fun MailBodyCard(
                 }
             )
 
-            TextButton(
+            OutlinedButton(
                 onClick = onTapComplete,
                 enabled = !isStreaming,
                 shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, Blue60),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Blue60,
+                    disabledContentColor = Blue60.copy(alpha = 0.4f)
+                ),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(12.dp)
@@ -675,71 +767,48 @@ private fun ErrorMessage(message: String) {
 }
 
 @Composable
-private fun KeyboardPlaceholder(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(KeyboardPlaceholderColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Keyboard, contentDescription = null, tint = TextSecondary)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "가상 키보드 영역",
-                style = MaterialTheme.typography.labelLarge.copy(color = TextSecondary)
-            )
-        }
-    }
-}
-
-@Composable
 fun ContactChip(contact: Contact, onRemove: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = ChipBackground,
-        border = BorderStroke(1.dp, ComposeOutline)
+        modifier = Modifier.height(24.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = AddButtonBackground,
+        border = BorderStroke(1.dp, Color(0xFF6366F1))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier
+                .height(24.dp)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(16.dp)
                     .clip(CircleShape)
                     .background(contact.color),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = contact.name.firstOrNull()?.toString() ?: "?",
+                    text = contact.name.firstOrNull()?.uppercase() ?: "?",
                     color = Color.White,
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.labelSmall
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = contact.name,
-                    style = MaterialTheme.typography.labelLarge.copy(color = TextPrimary)
-                )
-                Text(
-                    text = contact.email,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "삭제", tint = TextSecondary)
-            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "${contact.name} (${contact.email})",
+                style = MaterialTheme.typography.labelSmall.copy(color = AddButtonText),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "삭제",
+                tint = AddButtonText,
+                modifier = Modifier
+                    .size(12.dp)
+                    .clickable { onRemove() }
+            )
         }
     }
 }
