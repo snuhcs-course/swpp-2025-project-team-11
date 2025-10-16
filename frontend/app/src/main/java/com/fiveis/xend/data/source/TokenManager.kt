@@ -27,7 +27,11 @@ class TokenManager(context: Context) {
     /**
      * Access Token 조회
      */
-    fun getAccessToken(): String? = encryptedPrefs.getString("access_token", null)
+    fun getAccessToken(): String? {
+        val token = encryptedPrefs.getString("access_token", null)
+        Log.d("TokenManager", "Access Token 조회: ${token?.take(20) ?: "(없음)"}...")
+        return token
+    }
 
     /**
      * Refresh Token 조회

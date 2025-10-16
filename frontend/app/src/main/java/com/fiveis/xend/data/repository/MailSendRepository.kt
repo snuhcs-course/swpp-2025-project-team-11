@@ -1,27 +1,18 @@
 package com.fiveis.xend.data.repository
 
+import android.content.Context
 import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.RetrofitClient
 
-class MailSendRepository(
-    private val mailApiService: MailApiService = RetrofitClient.mailApiService
-) {
+class MailSendRepository(context: Context) {
+    private val mailApiService: MailApiService = RetrofitClient.getMailApiService(context)
 
-    suspend fun sendEmail(
-        endpointUrl: String,
-        to: String,
-        subject: String,
-        body: String,
-        accessToken: String?
-    ): SendResponse {
+    suspend fun sendEmail(to: String, subject: String, body: String): SendResponse {
         val request = MailSendRequest(to = to, subject = subject, body = body)
-        val authHeader = if (!accessToken.isNullOrEmpty()) "Bearer $accessToken" else null
 
         val response = mailApiService.sendEmail(
-            endpointUrl = endpointUrl,
-            authorization = authHeader,
             payload = request
         )
 

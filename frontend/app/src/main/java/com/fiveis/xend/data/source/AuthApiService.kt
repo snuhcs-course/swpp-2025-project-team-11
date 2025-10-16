@@ -3,6 +3,8 @@ package com.fiveis.xend.data.source
 import com.fiveis.xend.data.model.AuthCodeRequest
 import com.fiveis.xend.data.model.AuthResponse
 import com.fiveis.xend.data.model.LogoutRequest
+import com.fiveis.xend.data.model.TokenRefreshRequest
+import com.fiveis.xend.data.model.TokenRefreshResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Header
@@ -17,6 +19,12 @@ interface AuthApiService {
      */
     @POST("api/user/google/callback/")
     suspend fun sendAuthCode(@Body request: AuthCodeRequest): Response<AuthResponse>
+
+    /**
+     * 토큰 리프레시
+     */
+    @POST("api/user/refresh/")
+    suspend fun refreshToken(@Body request: TokenRefreshRequest): Response<TokenRefreshResponse>
 
     /**
      * 로그아웃

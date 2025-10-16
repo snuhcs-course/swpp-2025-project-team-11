@@ -8,6 +8,7 @@ urlpatterns = [
     path("user/", include("apps.user.urls")),
     path("ai/", include("apps.ai.urls")),
     path("mail/", include("apps.mail.urls")),
+    path("contact/", include("apps.contact.urls")),
 ]
 
 if settings.ENVIRONMENT in [ServerEnvironmentType.LOCAL, ServerEnvironmentType.DEV]:

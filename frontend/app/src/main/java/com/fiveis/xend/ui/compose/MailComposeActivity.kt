@@ -93,8 +93,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.network.MailComposeSseClient
@@ -524,7 +522,14 @@ private fun RecipientSection(
     val addContact = {
         val trimmed = newContact.text.trim()
         if (trimmed.isNotEmpty()) {
-            onContactsChange(contacts + Contact(trimmed, trimmed))
+            onContactsChange(
+                contacts + Contact(
+                    id = trimmed,
+                    name = trimmed,
+                    email = trimmed,
+                    groupId = ""
+                )
+            )
             onNewContactChange(TextFieldValue(""))
         }
     }
@@ -828,19 +833,6 @@ class MailComposeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Read access token from EncryptedSharedPreferences
-        val masterKey = MasterKey.Builder(applicationContext)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        val encryptedPrefs = EncryptedSharedPreferences.create(
-            applicationContext,
-            "secure_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-        val accessToken = encryptedPrefs.getString("access_token", null)
-
         setContent {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 // 1) AI Compose VM
@@ -851,12 +843,7 @@ class MailComposeActivity : ComponentActivity() {
                 // 2) Mail Send VM
                 val sendVm: SendMailViewModel = viewModel(
                     key = "sendVm",
-                    factory = object : ViewModelProvider.Factory {
-                        @Suppress("UNCHECKED_CAST")
-                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return SendMailViewModel(BuildConfig.SEND_URL, accessToken) as T
-                        }
-                    }
+                    factory = SendMailViewModel.Factory(application)
                 )
 
                 // Hoisted states
@@ -942,7 +929,7 @@ private fun EmailComposePreview() {
             onSubjectChange = {},
             body = "초안 본문...",
             onBodyChange = {},
-            contacts = listOf(Contact("홍길동", "test@example.com")),
+            contacts = listOf(Contact("Id here", "홍길동", "test@example.com", groupId = "GroupId here")),
             onContactsChange = {},
             newContact = TextFieldValue(""),
             onNewContactChange = {},
