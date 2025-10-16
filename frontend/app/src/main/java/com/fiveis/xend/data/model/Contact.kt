@@ -8,8 +8,8 @@ data class Contact(
     val name: String,
     val email: String,
     val context: ContactContext? = null,
-    val createdAt: String,
-    val updatedAt: String,
+    val createdAt: String = "",
+    val updatedAt: String = "",
     val color: Color = Color(0xFF5A7DFF)
 )
 

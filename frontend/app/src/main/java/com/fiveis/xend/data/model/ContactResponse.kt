@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ContactResponse (
+data class ContactResponse(
     val id: Long,
     @SerialName("group") val groupId: Long,
     val name: String,
@@ -15,7 +15,7 @@ data class ContactResponse (
 )
 
 @Serializable
-data class ContactResponseContext (
+data class ContactResponseContext(
     val id: Long,
     val relationshipRole: String? = null,
     val relationshipDetails: String? = null,

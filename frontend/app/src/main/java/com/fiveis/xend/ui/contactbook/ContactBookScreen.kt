@@ -59,7 +59,8 @@ fun ContactBookScreen(
     onTabSelected: (ContactBookTab) -> Unit,
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
-    onBottomNavChange: (String) -> Unit = {}
+    onBottomNavChange: (String) -> Unit = {},
+    onAddContactClick: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(ContactBookTab.Groups) }
 
@@ -80,7 +81,7 @@ fun ContactBookScreen(
                         IconButton(onClick = { /* 연락처 검색 */ }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { /* 연락처 추가 */ }) {
+                        IconButton(onClick = onAddContactClick) {
                             Icon(Icons.Default.Add, contentDescription = "Add")
                         }
                     }
@@ -138,7 +139,7 @@ fun ContactBookScreen(
                         IconButton(onClick = { /* 연락처 검색 */ }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { /* 연락처 추가 */ }) {
+                        IconButton(onClick = onAddContactClick) {
                             Icon(Icons.Default.Add, contentDescription = "Add")
                         }
                     }
@@ -287,7 +288,7 @@ fun QuickActions() {
 }
 
 @Composable
-private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
+fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -408,8 +409,8 @@ fun ContactScreenPreview() {
             "VIP",
             "중요한 고객과 상급자들",
             listOf(
-                Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "1"),
-                Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "1")
+                Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
+                Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
             ),
             Color(0xFFFF5C5C)
         ),
@@ -418,8 +419,8 @@ fun ContactScreenPreview() {
             "업무 동료",
             "같은 회사 팀원들과 협업 파트너",
             listOf(
-                Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "2"),
-                Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "2")
+                Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
+                Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
             ),
             Color(0xFFFFA500)
         )

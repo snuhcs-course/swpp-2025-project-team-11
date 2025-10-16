@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AddContactRequest(
-    @SerialName("group") val groupId: Long,
+    @SerialName("group") val groupId: Long = 0,
     val name: String,
     val email: String,
     val context: AddContactRequestContext? = null
