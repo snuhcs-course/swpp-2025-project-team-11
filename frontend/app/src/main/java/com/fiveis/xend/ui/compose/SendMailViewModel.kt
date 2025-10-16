@@ -1,6 +1,9 @@
 package com.fiveis.xend.ui.compose
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.repository.MailSendRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,11 +16,8 @@ data class SendUiState(
     val error: String? = null
 )
 
-class SendMailViewModel(
-    private val endpointUrl: String,
-    private val accessToken: String?,
-    private val repo: MailSendRepository = MailSendRepository()
-) : ViewModel() {
+class SendMailViewModel(application: Application) : AndroidViewModel(application) {
+    private val repo: MailSendRepository = MailSendRepository(application.applicationContext)
 
     private val _ui = MutableStateFlow(SendUiState())
     val ui: StateFlow<SendUiState> = _ui
@@ -30,7 +30,7 @@ class SendMailViewModel(
         _ui.value = SendUiState(isSending = true)
         viewModelScope.launch {
             try {
-                val res = repo.sendEmail(endpointUrl, to, subject, body, accessToken)
+                val res = repo.sendEmail(to, subject, body)
                 _ui.value = SendUiState(
                     isSending = false,
                     lastSuccessMsg = "전송 완료: ${res.id}",
@@ -42,6 +42,16 @@ class SendMailViewModel(
                     error = e.message ?: "알 수 없는 오류"
                 )
             }
+        }
+    }
+
+    class Factory(private val application: Application) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(SendMailViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return SendMailViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
 }

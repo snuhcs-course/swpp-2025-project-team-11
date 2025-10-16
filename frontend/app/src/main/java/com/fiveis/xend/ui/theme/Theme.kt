@@ -19,25 +19,37 @@ private val DarkColorScheme =
 
 private val LightColorScheme =
     lightColorScheme(
-        primary = Purple40,
-        secondary = PurpleGrey40,
-        tertiary = Pink40
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-     */
+        // Primary - Google Blue for main actions
+        primary = Blue60,
+        onPrimary = BackgroundWhite,
+        primaryContainer = Blue80,
+        onPrimaryContainer = TextPrimary,
+
+        // Secondary - Purple for FAB
+        secondary = Purple60,
+        onSecondary = BackgroundWhite,
+
+        // Error - Red for unread indicator
+        error = Red60,
+        onError = BackgroundWhite,
+
+        // Background & Surface
+        background = BackgroundWhite,
+        onBackground = TextPrimary,
+        surface = BackgroundWhite,
+        onSurface = TextPrimary,
+        surfaceVariant = BackgroundLight,
+        onSurfaceVariant = TextSecondary,
+
+        // Outline
+        outline = BackgroundGray
     )
 
 @Composable
 fun XendTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme =
