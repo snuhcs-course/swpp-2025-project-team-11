@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.exceptions import PermissionDenied
@@ -102,7 +103,7 @@ class PromptOptionListCreateView(AuthRequiredMixin, generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return PromptOption.objects.filter(created_by__in=[user, None])
+        return PromptOption.objects.filter(Q(created_by=user) | Q(created_by__isnull=True))
 
     def perform_create(self, serializer):
         # If a system seed is needed, create via management command rather than API.
