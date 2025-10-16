@@ -137,6 +137,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material:1.7.7")
 
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
