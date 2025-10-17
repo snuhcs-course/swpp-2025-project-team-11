@@ -75,7 +75,7 @@ class AddContactActivity : ComponentActivity() {
                         )
                     },
                     onGmailContactsSync = {
-                        // TODO: 동기화 플로우 연결
+                        // TODO
                         Toast.makeText(this, "Gmail 동기화 준비중...", Toast.LENGTH_SHORT).show()
                     },
                     onBottomNavChange = { tab ->

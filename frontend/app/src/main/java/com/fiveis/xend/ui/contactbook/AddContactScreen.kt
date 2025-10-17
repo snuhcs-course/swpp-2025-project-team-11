@@ -54,23 +54,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Group
-
-// colors는 전체적으로 수정 필요
-private object XColors {
-    val Bg = Color(0xFFFAFAFA) // 전체 배경
-    val Slate900 = Color(0xFF1E293B) // 진한 제목
-    val Indigo = Color(0xFF6366F1) // 주요 인디고(보더/아이콘/저장 텍스트)
-    val IndigoText = Color(0xFF4338CA) // Gmail 카드 타이틀
-    val IndigoSoftBg = Color(0xFFEFF6FF) // Gmail 카드 배경
-    val Orange = Color(0xFFF59E0B) // 직접 입력 카드 보더/부제
-    val OrangeText = Color(0xFFEA580C) // 직접 입력 카드 타이틀
-    val OrangeSoftBg = Color(0xFFFFF7ED)
-    val Gray600 = Color(0xFF64748B) // 필드 라벨
-    val Gray400 = Color(0xFF94A3B8) // 플레이스홀더
-    val Gray200 = Color(0xFFE2E8F0) // 아웃라인 보더
-    val Gray50 = Color(0xFFF8FAFC) // 셀렉터 필드 배경
-    val DividerTop = Color(0xFFE8EAED) // 바텀네비 상단 경계선
-}
+import com.fiveis.xend.ui.theme.AddButtonBackground
+import com.fiveis.xend.ui.theme.BackgroundGray
+import com.fiveis.xend.ui.theme.BackgroundLight
+import com.fiveis.xend.ui.theme.BorderGray
+import com.fiveis.xend.ui.theme.Gray200
+import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Gray600
+import com.fiveis.xend.ui.theme.IndigoText
+import com.fiveis.xend.ui.theme.Orange
+import com.fiveis.xend.ui.theme.OrangeSoftBg
+import com.fiveis.xend.ui.theme.OrangeText
+import com.fiveis.xend.ui.theme.Purple60
+import com.fiveis.xend.ui.theme.Slate900
+import com.fiveis.xend.ui.theme.TextPrimary
+import com.fiveis.xend.ui.theme.ToolbarIconTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +96,7 @@ fun AddContactScreen(
     val savable = name.isNotBlank() && email.contains("@")
 
     Scaffold(
-        containerColor = XColors.Bg,
+        containerColor = BackgroundLight,
         topBar = {
             TopAppBar(
                 navigationIcon = {
@@ -106,7 +104,7 @@ fun AddContactScreen(
                         Icon(
                             imageVector = Icons.Filled.ArrowBack,
                             contentDescription = "뒤로가기",
-                            tint = XColors.Indigo
+                            tint = Purple60
                         )
                     }
                 },
@@ -115,21 +113,21 @@ fun AddContactScreen(
                         "연락처 추가",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = XColors.Slate900
+                        color = TextPrimary
                     )
                 },
                 actions = {
                     TextButton(
                         onClick = onAdd,
                         enabled = savable,
-                        colors = ButtonDefaults.textButtonColors(contentColor = XColors.Indigo)
+                        colors = ButtonDefaults.textButtonColors(contentColor = Purple60)
                     ) { Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
             )
         },
         bottomBar = {
             Column {
-                Divider(color = XColors.DividerTop, thickness = 1.dp)
+                Divider(color = BackgroundGray, thickness = 1.dp)
                 BottomNavBar(
                     selected = "contacts",
                     onSelect = onBottomNavChange
@@ -142,7 +140,7 @@ fun AddContactScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .background(XColors.Bg)
+                .background(BackgroundLight)
         ) {
             Spacer(Modifier.height(8.dp))
 
@@ -155,20 +153,20 @@ fun AddContactScreen(
                     "연락처 가져오기",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = XColors.Slate900
+                    color = TextPrimary
                 )
                 Spacer(Modifier.height(16.dp))
 
                 // Gmail 동기화 카드
                 ActionCard(
-                    bg = XColors.IndigoSoftBg,
-                    border = XColors.Indigo,
-                    titleColor = XColors.IndigoText,
-                    subtitleColor = XColors.Indigo,
-                    iconBg = XColors.Indigo,
+                    bg = AddButtonBackground,
+                    border = Purple60,
+                    titleColor = IndigoText,
+                    subtitleColor = Purple60,
+                    iconBg = Purple60,
                     title = "Gmail 연락처 동기화",
                     subtitle = "구글 계정의 모든 연락처를 가져옵니다",
-                    trailingTint = XColors.Indigo,
+                    trailingTint = Purple60,
                     onClick = onGmailContactsSync
                 )
 
@@ -176,14 +174,14 @@ fun AddContactScreen(
 
                 // 직접 입력 카드 (토글)
                 ActionCard(
-                    bg = XColors.OrangeSoftBg,
-                    border = XColors.Orange,
-                    titleColor = XColors.OrangeText,
-                    subtitleColor = XColors.Orange,
-                    iconBg = XColors.Orange,
+                    bg = OrangeSoftBg,
+                    border = Orange,
+                    titleColor = OrangeText,
+                    subtitleColor = Orange,
+                    iconBg = Orange,
                     title = "직접 입력",
                     subtitle = "연락처 정보를 직접 입력합니다",
-                    trailingTint = XColors.Orange,
+                    trailingTint = Orange,
                     onClick = { isManualOpen = !isManualOpen },
                     isExpanded = isManualOpen
                 )
@@ -201,13 +199,13 @@ fun AddContactScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        placeholder = { Text("이름을 입력하세요", color = XColors.Gray400) },
+                        placeholder = { Text("이름을 입력하세요", color = Gray400) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
-                            unfocusedBorderColor = XColors.Gray200,
-                            focusedBorderColor = XColors.Indigo
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
                         )
                     )
                 }
@@ -222,13 +220,13 @@ fun AddContactScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        placeholder = { Text("example@gmail.com", color = XColors.Gray400) },
+                        placeholder = { Text("example@gmail.com", color = Gray400) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
-                            unfocusedBorderColor = XColors.Gray200,
-                            focusedBorderColor = XColors.Indigo
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
                         )
                     )
                 }
@@ -246,7 +244,7 @@ fun AddContactScreen(
                                 Icon(
                                     imageVector = Icons.Outlined.PersonAdd,
                                     contentDescription = null,
-                                    tint = XColors.Gray600
+                                    tint = ToolbarIconTint
                                 )
                             },
                             trailingIcon = {
@@ -258,12 +256,12 @@ fun AddContactScreen(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = XColors.Gray50,
-                                unfocusedBorderColor = XColors.Gray200,
-                                focusedBorderColor = XColors.Indigo,
-                                focusedTextColor = XColors.Slate900,
-                                unfocusedTextColor = XColors.Gray600,
-                                cursorColor = XColors.Indigo
+                                focusedContainerColor = BackgroundLight,
+                                unfocusedBorderColor = Gray200,
+                                focusedBorderColor = Purple60,
+                                focusedTextColor = Slate900,
+                                unfocusedTextColor = Gray600,
+                                cursorColor = Purple60
                             )
                         )
                         ExposedDropdownMenu(
@@ -294,12 +292,12 @@ fun AddContactScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(110.dp),
-                        placeholder = { Text("상대방과의 관계를 설명해주세요.", color = XColors.Gray400) },
+                        placeholder = { Text("상대방과의 관계를 설명해주세요.", color = Gray400) },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
-                            unfocusedBorderColor = XColors.Gray200,
-                            focusedBorderColor = XColors.Indigo
+                            unfocusedBorderColor = Gray200,
+                            focusedBorderColor = Purple60
                         ),
                         maxLines = 5
                     )
@@ -318,7 +316,7 @@ fun AddContactScreen(
                                 Icon(
                                     imageVector = Icons.Outlined.Group,
                                     contentDescription = null,
-                                    tint = XColors.Gray600
+                                    tint = Gray600
                                 )
                             },
                             trailingIcon = {
@@ -330,9 +328,9 @@ fun AddContactScreen(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = XColors.Gray50,
-                                unfocusedBorderColor = XColors.Gray200,
-                                focusedBorderColor = XColors.Indigo
+                                focusedContainerColor = BackgroundLight,
+                                unfocusedBorderColor = Gray200,
+                                focusedBorderColor = Purple60
                             )
                         )
                         ExposedDropdownMenu(
@@ -387,7 +385,7 @@ private fun FormBlock(label: String, content: @Composable ColumnScope.() -> Unit
     ) {
         Text(
             label,
-            color = XColors.Gray600,
+            color = Gray600,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
