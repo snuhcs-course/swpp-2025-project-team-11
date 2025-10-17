@@ -410,7 +410,7 @@ private fun ActionCard(
     Surface(
         color = bg,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (isExpanded) 2.dp else 2.dp, border),
+        border = BorderStroke(if (isExpanded) 2.dp else 1.dp, border),
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)

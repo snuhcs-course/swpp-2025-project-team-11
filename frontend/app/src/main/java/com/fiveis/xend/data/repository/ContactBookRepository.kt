@@ -29,7 +29,7 @@ class ContactBookRepository(context: Context) {
     fun getDummyGroups(): List<Group> {
         return listOf(
             Group(
-                id = "1",
+                id = 1,
                 name = "VIP",
                 description = "중요한 고객과 상급자들",
                 members = listOf(
@@ -39,7 +39,7 @@ class ContactBookRepository(context: Context) {
                 color = Color(0xFFFF5C5C)
             ),
             Group(
-                id = "2",
+                id = 2,
                 name = "업무 동료",
                 description = "같은 회사 팀원들과 협업 파트너",
                 members = listOf(
@@ -49,7 +49,7 @@ class ContactBookRepository(context: Context) {
                 color = Color(0xFFFFA500)
             ),
             Group(
-                id = "3",
+                id = 3,
                 name = "학술 관계",
                 description = "교수님, 연구진과의 학문적 소통",
                 members = listOf(
