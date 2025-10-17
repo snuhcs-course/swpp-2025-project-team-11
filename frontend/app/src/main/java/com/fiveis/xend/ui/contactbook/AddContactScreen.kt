@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.ButtonDefaults
@@ -32,6 +33,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -49,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,7 +90,7 @@ fun AddContactScreen(
     var isManualOpen by rememberSaveable { mutableStateOf(true) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
-    val relationRoleOptions = listOf("업무 동료", "개인 관계", "가족", "대학 동기")
+    val relationRoleOptions = listOf("업무 동료", "개인 관계", "대학 동기")
     var isRelationRoleExpanded by remember { mutableStateOf(false) }
     var relationRole by rememberSaveable { mutableStateOf<String?>(null) }
     var personalPrompt by rememberSaveable { mutableStateOf("") }
@@ -163,6 +166,7 @@ fun AddContactScreen(
                     border = Purple60,
                     titleColor = IndigoText,
                     subtitleColor = Purple60,
+                    icon = Icons.Outlined.Email,
                     iconBg = Purple60,
                     title = "Gmail 연락처 동기화",
                     subtitle = "구글 계정의 모든 연락처를 가져옵니다",
@@ -178,6 +182,7 @@ fun AddContactScreen(
                     border = Orange,
                     titleColor = OrangeText,
                     subtitleColor = Orange,
+                    icon = Icons.Outlined.PersonAdd,
                     iconBg = Orange,
                     title = "직접 입력",
                     subtitle = "연락처 정보를 직접 입력합니다",
@@ -199,7 +204,14 @@ fun AddContactScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        placeholder = { Text("이름을 입력하세요", color = Gray400) },
+                        placeholder = {
+                            Text(
+                                text = "이름을 입력하세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -220,7 +232,14 @@ fun AddContactScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        placeholder = { Text("example@gmail.com", color = Gray400) },
+                        placeholder = {
+                            Text(
+                                text = "이메일 주소를 입력하세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -242,7 +261,7 @@ fun AddContactScreen(
                             readOnly = true,
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Outlined.PersonAdd,
+                                    imageVector = Icons.Outlined.Group,
                                     contentDescription = null,
                                     tint = ToolbarIconTint
                                 )
@@ -254,6 +273,7 @@ fun AddContactScreen(
                                 .fillMaxWidth()
                                 .menuAnchor()
                                 .height(48.dp),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = BackgroundLight,
@@ -292,7 +312,14 @@ fun AddContactScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(110.dp),
-                        placeholder = { Text("상대방과의 관계를 설명해주세요.", color = Gray400) },
+                        placeholder = {
+                            Text(
+                                text = "상대방과의 관계를 설명해주세요.",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
@@ -314,7 +341,7 @@ fun AddContactScreen(
                             readOnly = true,
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Outlined.Group,
+                                    imageVector = Icons.Outlined.FolderOpen,
                                     contentDescription = null,
                                     tint = Gray600
                                 )
@@ -326,6 +353,7 @@ fun AddContactScreen(
                                 .fillMaxWidth()
                                 .menuAnchor()
                                 .height(48.dp),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = BackgroundLight,
@@ -400,6 +428,7 @@ private fun ActionCard(
     border: Color,
     titleColor: Color,
     subtitleColor: Color,
+    icon: ImageVector,
     iconBg: Color,
     title: String,
     subtitle: String,
@@ -429,7 +458,7 @@ private fun ActionCard(
                     .background(iconBg),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.Email, contentDescription = null, tint = Color.White)
+                Icon(icon, contentDescription = null, tint = Color.White)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

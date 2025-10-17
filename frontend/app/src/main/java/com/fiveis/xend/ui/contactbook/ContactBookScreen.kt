@@ -405,7 +405,7 @@ private fun MonogramAvatar(letter: String, bg: Color) {
 fun ContactScreenPreview() {
     val sampleGroups = listOf(
         Group(
-            "1",
+            1,
             "VIP",
             "중요한 고객과 상급자들",
             listOf(
@@ -415,7 +415,7 @@ fun ContactScreenPreview() {
             Color(0xFFFF5C5C)
         ),
         Group(
-            "2",
+            2,
             "업무 동료",
             "같은 회사 팀원들과 협업 파트너",
             listOf(
