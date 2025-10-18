@@ -39,6 +39,7 @@
         <activity android:name=".ui.compose.MailComposeActivity" />
         <activity android:name=".ui.view.MailDetailActivity" />
         <activity android:name=".ui.contactbook.ContactBookActivity" />
+        <activity android:name=".ui.search.SearchActivity" />
 
 
 

@@ -17,7 +17,8 @@ data class InboxUiState(
     val emails: List<EmailItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val nextPageToken: String? = null
+    val nextPageToken: String? = null,
+    val isRefreshing: Boolean = false
 )
 
 /**
@@ -31,36 +32,53 @@ class InboxViewModel(
     val uiState: StateFlow<InboxUiState> = _uiState.asStateFlow()
 
     init {
-        loadEmails()
+        loadCachedEmails()
+        refreshEmails()
     }
 
-    /**
-     * 이메일 목록 로드
-     */
-    fun loadEmails() {
+    private fun loadCachedEmails() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, emails = emptyList()) } // 기존 목록을 비웁니다.
+            repository.getCachedEmails().collect { cachedEmails ->
+                _uiState.update { it.copy(emails = cachedEmails) }
+            }
+        }
+    }
+
+    fun refreshEmails() {
+        _uiState.update { it.copy(isRefreshing = true) }
+        viewModelScope.launch {
             try {
-                val response = repository.getMails()
-                if (response.isSuccessful) {
+                val result = repository.refreshEmails()
+                if (result.isFailure) {
                     _uiState.update {
                         it.copy(
-                            emails = response.body()?.messages ?: emptyList(),
-                            nextPageToken = response.body()?.nextPageToken,
-                            isLoading = false
+                            error = result.exceptionOrNull()?.message,
+                            isRefreshing = false
                         )
                     }
                 } else {
-                    _uiState.update { it.copy(error = "Failed to load emails", isLoading = false) }
+                    val initialResponse = repository.getMails()
+                    val nextToken = initialResponse.body()?.nextPageToken
+                    _uiState.update {
+                        it.copy(
+                            isRefreshing = false,
+                            error = null,
+                            nextPageToken = nextToken
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                _uiState.update {
+                    it.copy(
+                        error = e.message,
+                        isRefreshing = false
+                    )
+                }
             }
         }
     }
 
     fun loadMoreEmails() {
-        // 이미 로딩 중이거나 다음 페이지 토큰이 없으면 실행하지 않습니다.
         if (_uiState.value.isLoading || _uiState.value.nextPageToken == null) return
 
         viewModelScope.launch {
@@ -69,11 +87,14 @@ class InboxViewModel(
                 val response = repository.getMails(pageToken = _uiState.value.nextPageToken)
                 if (response.isSuccessful) {
                     val newEmails = response.body()?.messages ?: emptyList()
+                    if (newEmails.isNotEmpty()) {
+                        repository.saveEmailsToCache(newEmails)
+                    }
                     _uiState.update {
                         it.copy(
-                            emails = it.emails + newEmails,
                             nextPageToken = response.body()?.nextPageToken,
-                            isLoading = false
+                            isLoading = false,
+                            error = null
                         )
                     }
                 } else {

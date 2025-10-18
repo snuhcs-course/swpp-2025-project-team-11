@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
@@ -27,13 +26,19 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,11 +71,11 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
-                if (uiState.isLoading && uiState.emails.isEmpty()) {
+                if (uiState.isRefreshing && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (uiState.error != null) {
+                } else if (uiState.error != null && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = "Error: ${uiState.error}")
                     }
@@ -80,7 +85,8 @@ fun InboxScreen(
                         onEmailClick = onEmailClick,
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
-                        isLoading = uiState.isLoading
+                        isRefreshing = uiState.isRefreshing,
+                        isLoadingMore = uiState.isLoading
                     )
                 }
             }
@@ -160,35 +166,69 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EmailList(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
-    isLoading: Boolean
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean
 ) {
     val listState = rememberLazyListState()
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
     ) {
-        item {
-            SyncStatus(message = "새로고침", onClick = onRefresh)
-        }
-        items(items = emails, key = { it.id }) { item ->
-            EmailRow(item = item, onClick = { onEmailClick(item) })
-            HorizontalDivider(modifier = Modifier, thickness = DividerDefaults.Thickness, color = DividerDefaults.color)
-        }
-    }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            items(items = emails, key = { it.id }) { item ->
+                EmailRow(item = item, onClick = { onEmailClick(item) })
+                HorizontalDivider(
+                    modifier = Modifier,
+                    thickness = DividerDefaults.Thickness,
+                    color = DividerDefaults.color
+                )
+            }
 
-    // Check if the user has scrolled to the end of the list
-    val layoutInfo = listState.layoutInfo
-    val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
-    if (!isLoading && lastVisibleItemIndex != null && lastVisibleItemIndex >= emails.size - 1) {
-        onLoadMore()
+            // Loading indicator at the bottom
+            if (isLoadingMore) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = Color(0xFF4285F4),
+                            strokeWidth = 3.dp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Trigger load more when scrolled to bottom
+        val shouldLoadMore by remember {
+            derivedStateOf {
+                val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                lastVisibleItem != null && lastVisibleItem.index >= emails.size - 1
+            }
+        }
+
+        LaunchedEffect(shouldLoadMore) {
+            if (shouldLoadMore && !isRefreshing && !isLoadingMore) {
+                onLoadMore()
+            }
+        }
     }
 }
 
@@ -325,29 +365,5 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SyncStatus(message: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(
-                Color(0xFFF0F9FF),
-                RoundedCornerShape(16.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = message,
-            color = Color(0xFF0284C7),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
