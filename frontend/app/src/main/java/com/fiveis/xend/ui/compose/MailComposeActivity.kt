@@ -129,6 +129,7 @@ fun EmailComposeScreen(
     isStreaming: Boolean,
     error: String?,
     onBack: () -> Unit = {},
+    onTemplateClick: () -> Unit = {},
     onUndo: () -> Unit = {},
     onAiComplete: () -> Unit = {},
     onStopStreaming: () -> Unit = {},
@@ -150,7 +151,7 @@ fun EmailComposeScreen(
             ComposeTopBar(
                 scrollBehavior = scrollBehavior,
                 onBack = onBack,
-                onTemplateClick = { /* 템플릿 진입 예정 */ },
+                onTemplateClick = onTemplateClick,
                 onAttachmentClick = { /* 첨부파일 선택 예정 */ },
                 onSend = onSend,
                 sendUiState = sendUiState,
@@ -855,6 +856,7 @@ class MailComposeActivity : ComponentActivity() {
                 }
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
+                var showTemplateScreen by remember { mutableStateOf(false) }
 
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
@@ -874,43 +876,58 @@ class MailComposeActivity : ComponentActivity() {
                 }
 
                 Scaffold(snackbarHost = { SnackbarHost(snackHost) }) { innerPadding ->
-                    EmailComposeScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        subject = subject,
-                        onSubjectChange = { subject = it },
-                        body = body,
-                        onBodyChange = { body = it },
-                        contacts = contacts,
-                        onContactsChange = { contacts = it },
-                        newContact = newContact,
-                        onNewContactChange = { newContact = it },
-                        isStreaming = composeUi.isStreaming,
-                        error = composeUi.error,
-                        sendUiState = sendUi,
-                        onBack = { finish() },
-                        onUndo = { /* TODO */ },
-                        onAiComplete = {
-                            val payload = JSONObject().apply {
-                                put("subject", subject.ifBlank { "제목 생성" })
-                                put("body", body.ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
-                                put("relationship", "업무 관련")
-                                put("situational_prompt", "정중하고 간결한 결과 보고 메일")
-                                put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
-                                put("format_prompt", "문단 구분, 끝인사 포함")
-                                put("language", "Korean")
+                    if (showTemplateScreen) {
+                        // 템플릿 선택 화면
+                        TemplateSelectionScreen(
+                            onBack = { showTemplateScreen = false },
+                            onTemplateSelected = { template ->
+                                subject = template.subject
+                                body = template.body
+                                showTemplateScreen = false
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    } else {
+                        // 메일 작성 화면
+                        EmailComposeScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            subject = subject,
+                            onSubjectChange = { subject = it },
+                            body = body,
+                            onBodyChange = { body = it },
+                            contacts = contacts,
+                            onContactsChange = { contacts = it },
+                            newContact = newContact,
+                            onNewContactChange = { newContact = it },
+                            isStreaming = composeUi.isStreaming,
+                            error = composeUi.error,
+                            sendUiState = sendUi,
+                            onBack = { finish() },
+                            onTemplateClick = { showTemplateScreen = true },
+                            onUndo = { /* TODO */ },
+                            onAiComplete = {
+                                val payload = JSONObject().apply {
+                                    put("subject", subject.ifBlank { "제목 생성" })
+                                    put("body", body.ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
+                                    put("relationship", "업무 관련")
+                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
+                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
+                                    put("format_prompt", "문단 구분, 끝인사 포함")
+                                    put("language", "Korean")
+                                }
+                                composeVm.startStreaming(payload)
+                            },
+                            onStopStreaming = { composeVm.stopStreaming() },
+                            onSend = {
+                                val recipient = contacts.firstOrNull()?.email
+                                if (recipient == null) {
+                                    // This case is handled by button's enabled state, but as a safeguard:
+                                    return@EmailComposeScreen
+                                }
+                                sendVm.sendEmail(to = recipient, subject = subject, body = body)
                             }
-                            composeVm.startStreaming(payload)
-                        },
-                        onStopStreaming = { composeVm.stopStreaming() },
-                        onSend = {
-                            val recipient = contacts.firstOrNull()?.email
-                            if (recipient == null) {
-                                // This case is handled by button's enabled state, but as a safeguard:
-                                return@EmailComposeScreen
-                            }
-                            sendVm.sendEmail(to = recipient, subject = subject, body = body)
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -936,6 +953,7 @@ private fun EmailComposePreview() {
             isStreaming = false,
             error = null,
             sendUiState = SendUiState(),
+            onTemplateClick = {},
             onSend = {}
         )
     }
