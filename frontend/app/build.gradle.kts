@@ -137,6 +137,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material:1.7.7")
 
     // Compose Rich Editor
     implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")

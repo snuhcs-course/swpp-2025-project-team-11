@@ -18,11 +18,15 @@ val Red60 = Color(0xFFEA4335)
 // Text colors
 val TextPrimary = Color(0xFF202124)
 val TextSecondary = Color(0xFF5F6368)
+val TextTertiary = Color(0xFF9AA0A6)
 
 // Background colors
 val BackgroundWhite = Color(0xFFFFFFFF)
 val BackgroundLight = Color(0xFFF8F9FA)
 val BackgroundGray = Color(0xFFE8EAED)
+
+// Border colors
+val BorderGray = Color(0xFFDADCE0)
 
 // Compose screen specific
 val ComposeBackground = Color(0xFFFFFFFF)
