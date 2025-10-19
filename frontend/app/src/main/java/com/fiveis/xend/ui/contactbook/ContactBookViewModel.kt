@@ -41,7 +41,7 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
                 if (tab == ContactBookTab.Groups) {
                     it.copy(
                         selectedTab = tab,
-                        groups = repository.getDummyGroups(),
+                        groups = repository.getAllGroups(),
                         contacts = emptyList(),
                         isLoading = false,
                         error = null

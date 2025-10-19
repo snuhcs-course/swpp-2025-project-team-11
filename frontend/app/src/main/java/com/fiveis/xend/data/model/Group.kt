@@ -6,6 +6,7 @@ data class Group(
     val id: Int,
     val name: String,
     val description: String,
+    val promptOptions: List<PromptOption> = emptyList(),
     val members: List<Contact> = emptyList(),
     val createdAt: String? = null,
     val updatedAt: String? = null,
