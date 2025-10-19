@@ -1,6 +1,7 @@
 package com.fiveis.xend.ui.contactbook
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
@@ -18,9 +19,8 @@ data class ContactBookUiState(
     val error: String? = null
 )
 
-class ContactBookViewModel(
-    private val repository: ContactBookRepository = ContactBookRepository()
-) : ViewModel() {
+class ContactBookViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
 
     private val _uiState = MutableStateFlow(ContactBookUiState())
     val uiState: StateFlow<ContactBookUiState> = _uiState.asStateFlow()
@@ -38,7 +38,7 @@ class ContactBookViewModel(
             if (tab == ContactBookTab.Groups) {
                 it.copy(
                     selectedTab = tab,
-                    groups = repository.getGroups(),
+                    groups = repository.getDummyGroups(),
                     contacts = emptyList(),
                     isLoading = false,
                     error = null
@@ -47,7 +47,7 @@ class ContactBookViewModel(
                 it.copy(
                     selectedTab = tab,
                     groups = emptyList(),
-                    contacts = repository.getContacts(),
+                    contacts = repository.getDummyContacts(),
                     isLoading = false,
                     error = null
                 )

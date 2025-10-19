@@ -41,6 +41,10 @@ class ContactBookActivity : ComponentActivity() {
                             startActivity(Intent(this, InboxActivity::class.java))
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
+                    },
+                    onAddContactClick = {
+                        startActivity(Intent(this, AddContactActivity::class.java))
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     }
                 )
             }

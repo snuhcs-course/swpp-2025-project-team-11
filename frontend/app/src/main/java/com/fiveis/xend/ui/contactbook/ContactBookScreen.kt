@@ -25,10 +25,9 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -60,7 +59,8 @@ fun ContactBookScreen(
     onTabSelected: (ContactBookTab) -> Unit,
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
-    onBottomNavChange: (String) -> Unit = {}
+    onBottomNavChange: (String) -> Unit = {},
+    onAddContactClick: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(ContactBookTab.Groups) }
 
@@ -81,7 +81,7 @@ fun ContactBookScreen(
                         IconButton(onClick = { /* 연락처 검색 */ }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { /* 연락처 추가 */ }) {
+                        IconButton(onClick = onAddContactClick) {
                             Icon(Icons.Default.Add, contentDescription = "Add")
                         }
                     }
@@ -139,7 +139,7 @@ fun ContactBookScreen(
                         IconButton(onClick = { /* 연락처 검색 */ }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { /* 연락처 추가 */ }) {
+                        IconButton(onClick = onAddContactClick) {
                             Icon(Icons.Default.Add, contentDescription = "Add")
                         }
                     }
@@ -289,19 +289,64 @@ fun QuickActions() {
 
 @Composable
 fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
-    NavigationBar {
-        NavigationBarItem(
-            selected = selected == "inbox",
-            onClick = { onSelect("inbox") },
-            icon = { Icon(Icons.Outlined.Email, contentDescription = null) },
-            label = { Text("받은 메일") }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(67.dp)
+            .background(Color.White)
+    ) {
+        HorizontalDivider(
+            modifier = Modifier,
+            color = Color(0xFFE8EAED),
+            thickness = 1.dp
         )
-        NavigationBarItem(
-            selected = selected == "contacts",
-            onClick = { onSelect("contacts") },
-            icon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-            label = { Text("연락처") }
-        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("inbox") }
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Email,
+                    contentDescription = "받은메일함",
+                    tint = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "받은메일",
+                    color = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("contacts") }
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = "연락처",
+                    tint = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "연락처",
+                    color = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
     }
 }
 
@@ -360,22 +405,22 @@ private fun MonogramAvatar(letter: String, bg: Color) {
 fun ContactScreenPreview() {
     val sampleGroups = listOf(
         Group(
-            "1",
+            1,
             "VIP",
             "중요한 고객과 상급자들",
             listOf(
-                Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "1"),
-                Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "1")
+                Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
+                Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
             ),
             Color(0xFFFF5C5C)
         ),
         Group(
-            "2",
+            2,
             "업무 동료",
             "같은 회사 팀원들과 협업 파트너",
             listOf(
-                Contact(id = "1", name = "김철수", email = "kim@snu.ac.kr", groupId = "2"),
-                Contact(id = "2", name = "최철수", email = "choi@snu.ac.kr", groupId = "2")
+                Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
+                Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
             ),
             Color(0xFFFFA500)
         )

@@ -5,6 +5,7 @@ frontend/.gradle
 frontend/app/build
 
 *.txt
+!requirements.txt
 **/__pycache__
 *.pyc
 .DS_Store
