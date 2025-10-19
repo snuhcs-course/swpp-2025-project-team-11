@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
@@ -27,13 +27,17 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.theme.Blue60
+import com.fiveis.xend.ui.theme.Blue80
 
 @Composable
 fun InboxScreen(
@@ -66,11 +72,11 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
-                if (uiState.isLoading && uiState.emails.isEmpty()) {
+                if (uiState.isRefreshing && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (uiState.error != null) {
+                } else if (uiState.error != null && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = "Error: ${uiState.error}")
                     }
@@ -80,7 +86,8 @@ fun InboxScreen(
                         onEmailClick = onEmailClick,
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
-                        isLoading = uiState.isLoading
+                        isRefreshing = uiState.isRefreshing,
+                        isLoadingMore = uiState.isLoading
                     )
                 }
             }
@@ -91,7 +98,7 @@ fun InboxScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 5.dp)
                     .size(56.dp),
-                containerColor = Color(0xFF4285F4),
+                containerColor = Blue80,
                 contentColor = Color.White
             ) {
                 Icon(
@@ -160,35 +167,81 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EmailList(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
-    isLoading: Boolean
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean
 ) {
     val listState = rememberLazyListState()
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
     ) {
-        item {
-            SyncStatus(message = "새로고침", onClick = onRefresh)
-        }
-        items(items = emails, key = { it.id }) { item ->
-            EmailRow(item = item, onClick = { onEmailClick(item) })
-            HorizontalDivider(modifier = Modifier, thickness = DividerDefaults.Thickness, color = DividerDefaults.color)
-        }
-    }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            items(items = emails, key = { it.id }) { item ->
+                EmailRow(item = item, onClick = { onEmailClick(item) })
+                HorizontalDivider(
+                    modifier = Modifier,
+                    thickness = DividerDefaults.Thickness,
+                    color = DividerDefaults.color
+                )
+            }
 
-    // Check if the user has scrolled to the end of the list
-    val layoutInfo = listState.layoutInfo
-    val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
-    if (!isLoading && lastVisibleItemIndex != null && lastVisibleItemIndex >= emails.size - 1) {
-        onLoadMore()
+            // Loading indicator at the bottom
+            if (isLoadingMore) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Blue80,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Trigger load more when scrolled near bottom
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val layoutInfo = listState.layoutInfo
+                val visibleItems = layoutInfo.visibleItemsInfo
+                val lastVisibleItem = visibleItems.lastOrNull()
+                val totalItems = layoutInfo.totalItemsCount
+
+                if (totalItems == 0 || lastVisibleItem == null) {
+                    false
+                } else {
+                    // Trigger when last visible item is within 3 items from the end
+                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
+                    if (shouldLoad) {
+                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
+                    }
+                    shouldLoad
+                }
+            }.collect { shouldLoadMore ->
+                if (shouldLoadMore && !isRefreshing && !isLoadingMore) {
+                    Log.d("InboxScreen", "Triggering loadMore")
+                    onLoadMore()
+                }
+            }
+        }
     }
 }
 
@@ -295,12 +348,12 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
                 Icon(
                     imageVector = Icons.Outlined.Email,
                     contentDescription = "받은메일함",
-                    tint = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    tint = if (selected == "inbox") Blue60 else Color(0xFF1E293B),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = "받은메일",
-                    color = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    color = if (selected == "inbox") Blue60 else Color(0xFF1E293B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -314,40 +367,16 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
                 Icon(
                     imageVector = Icons.Outlined.Person,
                     contentDescription = "연락처",
-                    tint = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    tint = if (selected == "contacts") Blue60 else Color(0xFF1E293B),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = "연락처",
-                    color = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    color = if (selected == "contacts") Blue60 else Color(0xFF1E293B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SyncStatus(message: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(
-                Color(0xFFF0F9FF),
-                RoundedCornerShape(16.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = message,
-            color = Color(0xFF0284C7),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
     }
 }

@@ -77,9 +77,6 @@ class PromptOption(TimeStampedModel):
     class Key(models.TextChoices):
         TONE = "tone", "tone"
         FORMAT = "format", "format"
-        GUIDELINE = "guideline", "guideline"
-        SIGNATURE = "signature", "signature"
-        STYLE = "style", "style"
         OTHER = "other", "other"
 
     # NULL = 시스템(사전정의)

@@ -1,6 +1,8 @@
 package com.fiveis.xend.network
 
+import android.content.Context
 import android.util.Log
+import com.fiveis.xend.data.source.TokenManager
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -14,13 +16,31 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 
+private val loggingInterceptor = HttpLoggingInterceptor().apply {
+    level = HttpLoggingInterceptor.Level.BODY
+}
+
 class MailComposeSseClient(
+    context: Context,
+    val tokenManager: TokenManager = TokenManager(context),
     private val endpointUrl: String,
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.SECONDS) // SSE는 무한 읽기
+        .readTimeout(0, TimeUnit.SECONDS) // 무한 읽기
         .connectTimeout(15, TimeUnit.SECONDS)
+        .addInterceptor(loggingInterceptor)
+        .addInterceptor { chain ->
+            val accessToken = tokenManager.getAccessToken()
+            val request = if (accessToken != null) {
+                chain.request().newBuilder().addHeader("Authorization", "Bearer $accessToken").build()
+            } else {
+                chain.request()
+            }
+            chain.proceed(request)
+        }
+        .authenticator(TokenRefreshAuthenticator(context, tokenManager))
         .build()
 ) {
     private var call: Call? = null

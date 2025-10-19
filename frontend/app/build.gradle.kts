@@ -137,6 +137,10 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material:1.7.7")
+
+    // Compose Rich Editor
+    implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")
 
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")

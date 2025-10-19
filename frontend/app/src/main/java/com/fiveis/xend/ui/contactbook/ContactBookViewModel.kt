@@ -1,6 +1,8 @@
 package com.fiveis.xend.ui.contactbook
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class ContactBookUiState(
     val selectedTab: ContactBookTab = ContactBookTab.Groups,
@@ -18,9 +21,8 @@ data class ContactBookUiState(
     val error: String? = null
 )
 
-class ContactBookViewModel(
-    private val repository: ContactBookRepository = ContactBookRepository()
-) : ViewModel() {
+class ContactBookViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
 
     private val _uiState = MutableStateFlow(ContactBookUiState())
     val uiState: StateFlow<ContactBookUiState> = _uiState.asStateFlow()
@@ -34,23 +36,25 @@ class ContactBookViewModel(
     }
 
     private fun loadContactInfo(tab: ContactBookTab) {
-        _uiState.update {
-            if (tab == ContactBookTab.Groups) {
-                it.copy(
-                    selectedTab = tab,
-                    groups = repository.getGroups(),
-                    contacts = emptyList(),
-                    isLoading = false,
-                    error = null
-                )
-            } else {
-                it.copy(
-                    selectedTab = tab,
-                    groups = emptyList(),
-                    contacts = repository.getContacts(),
-                    isLoading = false,
-                    error = null
-                )
+        viewModelScope.launch {
+            _uiState.update {
+                if (tab == ContactBookTab.Groups) {
+                    it.copy(
+                        selectedTab = tab,
+                        groups = repository.getAllGroups(),
+                        contacts = emptyList(),
+                        isLoading = false,
+                        error = null
+                    )
+                } else {
+                    it.copy(
+                        selectedTab = tab,
+                        groups = emptyList(),
+                        contacts = repository.getAllContacts(),
+                        isLoading = false,
+                        error = null
+                    )
+                }
             }
         }
     }
