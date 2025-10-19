@@ -129,7 +129,7 @@ fun AddGroupScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item{
+            item {
                 FormBlock(label = "그룹 이름") {
                     OutlinedTextField(
                         value = groupName,
@@ -159,7 +159,7 @@ fun AddGroupScreen(
                 }
             }
 
-            item{
+            item {
                 FormBlock(label = "그룹 설명") {
                     OutlinedTextField(
                         value = groupDescription,
@@ -223,7 +223,7 @@ fun AddGroupScreen(
                     }
                 }
             }
-            */
+             */
 
             // ===== 멤버 헤더 =====
             item {
@@ -271,12 +271,8 @@ fun AddGroupScreen(
 
 /* --------------------------------- UI 파츠 --------------------------------- */
 
-/** 멤버 한 줄 아이템 (원형 이니셜 + 이름/역할 + 최근 대화) */
 @Composable
-private fun MemberRow(
-    member: Contact,
-    onClick: () -> Unit
-) {
+private fun MemberRow(member: Contact, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -318,10 +314,7 @@ private fun MemberRow(
 
 // +N명 더보기
 @Composable
-private fun MoreRow(
-    text: String,
-    onClick: () -> Unit
-) {
+private fun MoreRow(text: String, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
@@ -346,8 +339,12 @@ private fun MoreRow(
 @Composable
 private fun randomStableColorFor(seed: String): Color {
     val colors = listOf(
-        Color(0xFF5A7DFF), Color(0xFF35C6A8), Color(0xFFF4A425),
-        Color(0xFFEF6E6E), Color(0xFF7A6FF0), Color(0xFF3DB2FF)
+        Color(0xFF5A7DFF),
+        Color(0xFF35C6A8),
+        Color(0xFFF4A425),
+        Color(0xFFEF6E6E),
+        Color(0xFF7A6FF0),
+        Color(0xFF3DB2FF)
     )
     val idx = (seed.firstOrNull()?.code ?: 0) % colors.size
     return colors[idx]

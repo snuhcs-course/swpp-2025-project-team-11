@@ -75,7 +75,7 @@ private val formatOptions = listOf(
 data class PromptingUiState(
     val selectedContext: Set<PromptOption> = emptySet(),
     val selectedStyle: Set<PromptOption> = emptySet(),
-    val selectedFormat: Set<PromptOption> = emptySet(),
+    val selectedFormat: Set<PromptOption> = emptySet()
 )
 
 /**
@@ -84,10 +84,7 @@ data class PromptingUiState(
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun AiPromptingCard(
-    modifier: Modifier = Modifier,
-    onValueChange: (PromptingUiState) -> Unit
-) {
+fun AiPromptingCard(modifier: Modifier = Modifier, onValueChange: (PromptingUiState) -> Unit) {
     var uiState by remember { mutableStateOf(PromptingUiState()) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -161,7 +158,7 @@ private fun SummaryChip(label: String) {
     Card(
         shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Text(
             text = label,
@@ -183,7 +180,7 @@ fun PromptingBottomSheet(
     initial: PromptingUiState,
     onReset: () -> Unit,
     onSave: (PromptingUiState) -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
@@ -194,7 +191,7 @@ fun PromptingBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = {},
+        dragHandle = {}
     ) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
             Text("AI 프롬프팅 설정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -313,10 +310,7 @@ private fun Section(
 }
 
 @Composable
-private fun RowActionButtons(
-    onReset: () -> Unit,
-    onSave: () -> Unit
-) {
+private fun RowActionButtons(onReset: () -> Unit, onSave: () -> Unit) {
     androidx.compose.foundation.layout.Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
