@@ -80,8 +80,8 @@ Run the app (Debug)
 - **Send Email**  
   Send the composed AI draft through the backend to the mail provider.
 
-- **Supports email local save**  
-  Supports pre-loaded email list.
+- **Supports local email saving**  
+  Pre-loads data from local storage.
 
 - **Add Groups**  
   Assign people to group you want.
