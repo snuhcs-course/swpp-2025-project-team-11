@@ -36,12 +36,12 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ### Installation
 
-> **Branch**: `iteration-1-demo`
+> **Branch**: `iteration-2-demo`
 
 ```
 git clone https://github.com/snuhcs-course/swpp-2025-project-team-11.git
 cd swpp-2025-project-team-11
-git switch iteration-1-demo
+git switch iteration-2-demo
 cp .env.example .env   # keep defaults to use mocked external services for the demo
 ```
 
@@ -59,7 +59,7 @@ docker compose up -d --build
 docker compose down
 ```
 
-Default URL: http://localhost/
+Default URL: https://xend-fiveis-dev.duckdns.org
 
 Android App
 Open /frontend in Android Studio
@@ -80,5 +80,11 @@ Run the app (Debug)
 - **Send Email**  
   Send the composed AI draft through the backend to the mail provider.
 
+- **Supports email local save**  
+  Supports pre-loaded email list.
+
+- **Add Groups**  
+  Assign people to group you want.
+
 Demo Video
-Link: https://drive.google.com/file/d/1to4deCD6jBssx2V_oZgZU5E5Os2PlfP1/view?usp=sharing
+Link: https://drive.google.com/file/d/1D2pSNKzdieUSxCElThCU0ZZjq0TQ3GPn/view?usp=sharing
