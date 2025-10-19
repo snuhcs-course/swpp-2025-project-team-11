@@ -56,4 +56,8 @@ object RetrofitClient {
     fun getMailApiService(context: Context): MailApiService {
         return getRetrofit(getClient(context)).create(MailApiService::class.java)
     }
+
+    fun getContactApiService(context: Context): ContactApiService {
+        return getRetrofit(getClient(context)).create(ContactApiService::class.java)
+    }
 }

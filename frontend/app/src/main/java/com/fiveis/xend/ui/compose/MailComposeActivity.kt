@@ -524,10 +524,10 @@ private fun RecipientSection(
         if (trimmed.isNotEmpty()) {
             onContactsChange(
                 contacts + Contact(
-                    id = trimmed,
+                    id = 0,
                     name = trimmed,
                     email = trimmed,
-                    groupId = ""
+                    groupId = 0
                 )
             )
             onNewContactChange(TextFieldValue(""))
@@ -837,7 +837,12 @@ class MailComposeActivity : ComponentActivity() {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 // 1) AI Compose VM
                 val composeVm: MailComposeViewModel = viewModel(
-                    factory = ComposeVmFactory(MailComposeSseClient(BuildConfig.SSE_URL))
+                    factory = ComposeVmFactory(
+                        MailComposeSseClient(
+                            application.applicationContext,
+                            endpointUrl = BuildConfig.BASE_URL + "api/ai/mail/generate/stream/"
+                        )
+                    )
                 )
 
                 // 2) Mail Send VM
@@ -848,11 +853,7 @@ class MailComposeActivity : ComponentActivity() {
 
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
-                var body by rememberSaveable {
-                    mutableStateOf(
-                        "안녕하세요, 대표님.\n\nQ4 실적 보고서를 검토했습니다.\n\n전반적으로 매출 증가율이 목표치를 상회하는 우수한 성과라고 판단됩니다."
-                    )
-                }
+                var body by rememberSaveable { mutableStateOf("") }
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
 
@@ -929,7 +930,7 @@ private fun EmailComposePreview() {
             onSubjectChange = {},
             body = "초안 본문...",
             onBodyChange = {},
-            contacts = listOf(Contact("Id here", "홍길동", "test@example.com", groupId = "GroupId here")),
+            contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
             onContactsChange = {},
             newContact = TextFieldValue(""),
             onNewContactChange = {},
