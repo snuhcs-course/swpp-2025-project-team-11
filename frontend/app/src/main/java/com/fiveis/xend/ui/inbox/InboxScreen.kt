@@ -52,8 +52,6 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @Composable
 fun InboxScreen(
