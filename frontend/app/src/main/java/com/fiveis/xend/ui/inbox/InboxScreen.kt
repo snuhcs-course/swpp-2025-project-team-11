@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,9 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -203,30 +202,42 @@ private fun EmailList(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(40.dp),
                             color = Color(0xFF4285F4),
-                            strokeWidth = 3.dp
+                            strokeWidth = 4.dp
                         )
                     }
                 }
             }
         }
 
-        // Trigger load more when scrolled to bottom
-        val shouldLoadMore by remember {
-            derivedStateOf {
-                val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                lastVisibleItem != null && lastVisibleItem.index >= emails.size - 1
-            }
-        }
+        // Trigger load more when scrolled near bottom
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val layoutInfo = listState.layoutInfo
+                val visibleItems = layoutInfo.visibleItemsInfo
+                val lastVisibleItem = visibleItems.lastOrNull()
+                val totalItems = layoutInfo.totalItemsCount
 
-        LaunchedEffect(shouldLoadMore) {
-            if (shouldLoadMore && !isRefreshing && !isLoadingMore) {
-                onLoadMore()
+                if (totalItems == 0 || lastVisibleItem == null) {
+                    false
+                } else {
+                    // Trigger when last visible item is within 3 items from the end
+                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
+                    if (shouldLoad) {
+                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
+                    }
+                    shouldLoad
+                }
+            }.collect { shouldLoadMore ->
+                if (shouldLoadMore && !isRefreshing && !isLoadingMore) {
+                    Log.d("InboxScreen", "Triggering loadMore")
+                    onLoadMore()
+                }
             }
         }
     }
