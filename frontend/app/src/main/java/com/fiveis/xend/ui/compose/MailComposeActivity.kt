@@ -39,14 +39,22 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FormatBold
+import androidx.compose.material.icons.filled.FormatColorText
+import androidx.compose.material.icons.filled.FormatItalic
+import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.FormatStrikethrough
+import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -80,12 +88,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -110,6 +120,8 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.UndoBorder
+import com.mohamedrejeb.richeditor.model.rememberRichTextState
+import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 import org.json.JSONObject
 
 // ========================================================
@@ -120,8 +132,7 @@ import org.json.JSONObject
 fun EmailComposeScreen(
     subject: String,
     onSubjectChange: (String) -> Unit,
-    body: String,
-    onBodyChange: (String) -> Unit,
+    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
@@ -206,9 +217,8 @@ fun EmailComposeScreen(
                 isRealtimeOn = aiRealtime,
                 onToggle = { aiRealtime = it }
             )
-            MailBodyCard(
-                body = body,
-                onBodyChange = onBodyChange,
+            RichTextEditorCard(
+                richTextState = richTextState,
                 isStreaming = isStreaming,
                 onTapComplete = onAiComplete
             )
@@ -696,9 +706,110 @@ private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) 
 }
 
 @Composable
-private fun MailBodyCard(
-    body: String,
-    onBodyChange: (String) -> Unit,
+private fun RichTextEditorControls(
+    state: com.mohamedrejeb.richeditor.model.RichTextState,
+    modifier: Modifier = Modifier
+) {
+    var showSizeDropdown by remember { mutableStateOf(false) }
+    val fontSizes = listOf(14.sp, 18.sp, 22.sp)
+
+    var showColorDropdown by remember { mutableStateOf(false) }
+    val colors = listOf(Color.Black, Color.Red, Color.Blue, Color.Green)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Bold button
+        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }) {
+            Icon(
+                imageVector = Icons.Default.FormatBold,
+                contentDescription = "Bold",
+                tint = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) Blue60 else TextSecondary
+            )
+        }
+        // Italic button
+        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }) {
+            Icon(
+                imageVector = Icons.Default.FormatItalic,
+                contentDescription = "Italic",
+                tint = if (state.currentSpanStyle.fontStyle == FontStyle.Italic) Blue60 else TextSecondary
+            )
+        }
+        // Underline button
+        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) }) {
+            Icon(
+                imageVector = Icons.Default.FormatUnderlined,
+                contentDescription = "Underline",
+                tint = if (state.currentSpanStyle.textDecoration
+                        ?.contains(TextDecoration.Underline) == true
+                ) {
+                    Blue60
+                } else {
+                    TextSecondary
+                }
+            )
+        }
+        // Strikethrough button
+        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) }) {
+            Icon(
+                imageVector = Icons.Default.FormatStrikethrough,
+                contentDescription = "Strikethrough",
+                tint = if (state.currentSpanStyle.textDecoration
+                        ?.contains(TextDecoration.LineThrough) == true
+                ) {
+                    Blue60
+                } else {
+                    TextSecondary
+                }
+            )
+        }
+
+        // Font size selector
+        Box {
+            IconButton(onClick = { showSizeDropdown = true }) {
+                Icon(Icons.Default.FormatSize, contentDescription = "Font Size")
+            }
+            DropdownMenu(expanded = showSizeDropdown, onDismissRequest = { showSizeDropdown = false }) {
+                fontSizes.forEach { size ->
+                    DropdownMenuItem(text = { Text("${size.value}") }, onClick = {
+                        state.toggleSpanStyle(SpanStyle(fontSize = size))
+                        showSizeDropdown = false
+                    })
+                }
+            }
+        }
+
+        // Font color selector
+        Box {
+            IconButton(onClick = { showColorDropdown = true }) {
+                Icon(
+                    imageVector = Icons.Default.FormatColorText,
+                    contentDescription = "Font Color",
+                    tint = state.currentSpanStyle.color
+                )
+            }
+            DropdownMenu(expanded = showColorDropdown, onDismissRequest = { showColorDropdown = false }) {
+                colors.forEach { color ->
+                    DropdownMenuItem(text = { Text("Color") }, onClick = {
+                        state.toggleSpanStyle(SpanStyle(color = color))
+                        showColorDropdown = false
+                    }, leadingIcon = {
+                        Icon(Icons.Default.Circle, contentDescription = null, tint = color)
+                    })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RichTextEditorCard(
+    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
     isStreaming: Boolean,
     onTapComplete: () -> Unit
 ) {
@@ -710,51 +821,23 @@ private fun MailBodyCard(
         border = BorderStroke(1.dp, ComposeOutline),
         color = ComposeSurface
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 240.dp)
-        ) {
-            BasicTextField(
-                value = body,
-                onValueChange = onBodyChange,
+        Column {
+            RichTextEditorControls(state = richTextState)
+            RichTextEditor(
+                state = richTextState,
                 enabled = !isStreaming,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 68.dp),
-                decorationBox = { innerTextField ->
-                    Box {
-                        if (body.isEmpty()) {
-                            Text(
-                                text = "내용을 입력하세요",
-                                style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                            )
-                        }
-                        innerTextField()
-                    }
+                    .defaultMinSize(minHeight = 240.dp)
+                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
+                placeholder = {
+                    Text(
+                        text = "내용을 입력하세요",
+                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
+                    )
                 }
             )
-
-            OutlinedButton(
-                onClick = onTapComplete,
-                enabled = !isStreaming,
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, Blue60),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Blue60,
-                    disabledContentColor = Blue60.copy(alpha = 0.4f)
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
-            ) {
-                Icon(Icons.Default.FlashOn, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("탭 완성")
-            }
         }
     }
 }
@@ -853,9 +936,17 @@ class MailComposeActivity : ComponentActivity() {
 
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
-                var body by rememberSaveable { mutableStateOf("") }
+                val richTextState = rememberRichTextState()
+
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
+
+                // Set initial content for the editor
+                LaunchedEffect(Unit) {
+                    richTextState.setHtml(
+                        "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 <b>우수한 성과</b>라고 판단됩니다."
+                    )
+                }
 
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
@@ -863,9 +954,11 @@ class MailComposeActivity : ComponentActivity() {
 
                 // Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
-                LaunchedEffect(
-                    composeUi.bodyRendered
-                ) { if (composeUi.bodyRendered.isNotEmpty()) body = composeUi.bodyRendered }
+                LaunchedEffect(composeUi.bodyRendered) {
+                    if (composeUi.bodyRendered.isNotEmpty()) {
+                        richTextState.setHtml(composeUi.bodyRendered)
+                    }
+                }
 
                 // Show snackbar for send results
                 val snackHost = remember { SnackbarHostState() }
@@ -879,8 +972,7 @@ class MailComposeActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         subject = subject,
                         onSubjectChange = { subject = it },
-                        body = body,
-                        onBodyChange = { body = it },
+                        richTextState = richTextState,
                         contacts = contacts,
                         onContactsChange = { contacts = it },
                         newContact = newContact,
@@ -893,7 +985,8 @@ class MailComposeActivity : ComponentActivity() {
                         onAiComplete = {
                             val payload = JSONObject().apply {
                                 put("subject", subject.ifBlank { "제목 생성" })
-                                put("body", body.ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
+                                // Use HTML content for AI prompt
+                                put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
                                 put("relationship", "업무 관련")
                                 put("situational_prompt", "정중하고 간결한 결과 보고 메일")
                                 put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
@@ -909,7 +1002,8 @@ class MailComposeActivity : ComponentActivity() {
                                 // This case is handled by button's enabled state, but as a safeguard:
                                 return@EmailComposeScreen
                             }
-                            sendVm.sendEmail(to = recipient, subject = subject, body = body)
+                            // Send HTML content
+                            sendVm.sendEmail(to = recipient, subject = subject, body = richTextState.toHtml())
                         }
                     )
                 }
@@ -925,12 +1019,13 @@ class MailComposeActivity : ComponentActivity() {
 @Composable
 private fun EmailComposePreview() {
     MaterialTheme(colorScheme = lightColorScheme()) {
+        val richTextState = rememberRichTextState()
         EmailComposeScreen(
             subject = "초안 제목",
             onSubjectChange = {},
-            body = "초안 본문...",
-            onBodyChange = {},
-            contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
+            richTextState = richTextState,
+            contacts = listOf(Contact(1L, 1L, "홍길동", "test@example.com")),
+
             onContactsChange = {},
             newContact = TextFieldValue(""),
             onNewContactChange = {},
