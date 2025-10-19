@@ -60,6 +60,7 @@ fun ContactBookScreen(
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
+    onAddGroupClick: () -> Unit = {},
     onAddContactClick: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(ContactBookTab.Groups) }
@@ -117,7 +118,7 @@ fun ContactBookScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(12.dp))
-                        QuickActions()
+                        QuickActions(onAddGroupClick = onAddGroupClick)
                     }
                 }
             }
@@ -275,11 +276,11 @@ fun MemberCircle(label: String, color: Color) {
 }
 
 @Composable
-fun QuickActions() {
+fun QuickActions(onAddGroupClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(
-                onClick = { /* 새 그룹 추가 */ },
+                onClick = onAddGroupClick,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("+ 새 그룹") }
@@ -408,20 +409,26 @@ fun ContactScreenPreview() {
             1,
             "VIP",
             "중요한 고객과 상급자들",
+            emptyList(),
             listOf(
                 Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
                 Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
             ),
+            null,
+            null,
             Color(0xFFFF5C5C)
         ),
         Group(
             2,
             "업무 동료",
             "같은 회사 팀원들과 협업 파트너",
+            emptyList(),
             listOf(
                 Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
                 Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
             ),
+            null,
+            null,
             Color(0xFFFFA500)
         )
     )

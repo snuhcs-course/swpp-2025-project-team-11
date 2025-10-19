@@ -1,0 +1,13 @@
+package com.fiveis.xend.data.model
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class GroupResponse(
+    val id: Int,
+    val name: String,
+    val description: String,
+    @SerialName("created_at")val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
+)

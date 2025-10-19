@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.theme.Blue60
+import com.fiveis.xend.ui.theme.Blue80
 
 @Composable
 fun InboxScreen(
@@ -96,7 +98,7 @@ fun InboxScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 5.dp)
                     .size(56.dp),
-                containerColor = Color(0xFF4285F4),
+                containerColor = Blue80,
                 contentColor = Color.White
             ) {
                 Icon(
@@ -206,9 +208,9 @@ private fun EmailList(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(40.dp),
-                            color = Color(0xFF4285F4),
-                            strokeWidth = 4.dp
+                            color = Blue80,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -346,12 +348,12 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
                 Icon(
                     imageVector = Icons.Outlined.Email,
                     contentDescription = "받은메일함",
-                    tint = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    tint = if (selected == "inbox") Blue60 else Color(0xFF1E293B),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = "받은메일",
-                    color = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    color = if (selected == "inbox") Blue60 else Color(0xFF1E293B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -365,12 +367,12 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
                 Icon(
                     imageVector = Icons.Outlined.Person,
                     contentDescription = "연락처",
-                    tint = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    tint = if (selected == "contacts") Blue60 else Color(0xFF1E293B),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = "연락처",
-                    color = if (selected == "contacts") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    color = if (selected == "contacts") Blue60 else Color(0xFF1E293B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )

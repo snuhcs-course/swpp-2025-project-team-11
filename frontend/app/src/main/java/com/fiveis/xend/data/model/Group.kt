@@ -6,6 +6,9 @@ data class Group(
     val id: Int,
     val name: String,
     val description: String,
-    val members: List<Contact>,
-    val color: Color
+    val promptOptions: List<PromptOption> = emptyList(),
+    val members: List<Contact> = emptyList(),
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val color: Color = Color(0xFF5A7DFF)
 )

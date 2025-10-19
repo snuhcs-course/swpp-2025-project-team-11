@@ -10,8 +10,8 @@ data class ContactResponse(
     val name: String,
     val email: String,
     val context: ContactResponseContext? = null,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
 )
 
 @Serializable
@@ -21,6 +21,6 @@ data class ContactResponseContext(
     @SerialName("relationship_details") val relationshipDetails: String? = null,
     @SerialName("personal_prompt") val personalPrompt: String? = null,
     @SerialName("language_preference") val languagePreference: String? = null,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
 )
