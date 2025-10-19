@@ -45,10 +45,18 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 if (tab == ContactBookTab.Groups) {
                     val groups = repository.getAllGroups()
-                    _uiState.update { it.copy(groups = groups, contacts = emptyList(), isLoading = false, error = null) }
+                    _uiState.update {
+                        it.copy(
+                            groups = groups, contacts = emptyList(), isLoading = false, error = null
+                        )
+                    }
                 } else {
                     val contacts = repository.getAllContacts()
-                    _uiState.update { it.copy(groups = emptyList(), contacts = contacts, isLoading = false, error = null) }
+                    _uiState.update {
+                        it.copy(
+                            groups = emptyList(), contacts = contacts, isLoading = false, error = null
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message ?: "불러오기 실패") }
