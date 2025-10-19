@@ -3,8 +3,8 @@ package com.fiveis.xend.data.model
 import androidx.compose.ui.graphics.Color
 
 data class Contact(
-    val id: Int,
-    val groupId: Int? = null,
+    val id: Long,
+    val groupId: Long? = null,
     val name: String,
     val email: String,
     val context: ContactContext? = null,
@@ -14,7 +14,7 @@ data class Contact(
 )
 
 data class ContactContext(
-    val id: Int,
+    val id: Long,
     val relationshipRole: String? = null,
     val relationshipDetails: String? = null,
     val personalPrompt: String? = null,

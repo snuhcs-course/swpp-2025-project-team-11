@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.model.EmailItem
@@ -17,7 +18,8 @@ data class InboxUiState(
     val emails: List<EmailItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val nextPageToken: String? = null
+    val nextPageToken: String? = null,
+    val isRefreshing: Boolean = false
 )
 
 /**
@@ -31,55 +33,97 @@ class InboxViewModel(
     val uiState: StateFlow<InboxUiState> = _uiState.asStateFlow()
 
     init {
-        loadEmails()
+        Log.d("InboxViewModel", "Initializing InboxViewModel")
+        loadCachedEmails()
+        refreshEmails()
     }
 
-    /**
-     * 이메일 목록 로드
-     */
-    fun loadEmails() {
+    private fun loadCachedEmails() {
+        Log.d("InboxViewModel", "Starting to collect cached emails")
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, emails = emptyList()) } // 기존 목록을 비웁니다.
+            repository.getCachedEmails().collect { cachedEmails ->
+                Log.d("InboxViewModel", "Received ${cachedEmails.size} cached emails from DB")
+                _uiState.update { it.copy(emails = cachedEmails) }
+            }
+        }
+    }
+
+    fun refreshEmails() {
+        Log.d("InboxViewModel", "refreshEmails called")
+        _uiState.update { it.copy(isRefreshing = true) }
+        viewModelScope.launch {
             try {
-                val response = repository.getMails()
-                if (response.isSuccessful) {
+                val result = repository.refreshEmails()
+                if (result.isFailure) {
+                    val errorMessage = result.exceptionOrNull()?.message ?: "Unknown error"
+                    Log.e("InboxViewModel", "refreshEmails failed: $errorMessage")
                     _uiState.update {
                         it.copy(
-                            emails = response.body()?.messages ?: emptyList(),
-                            nextPageToken = response.body()?.nextPageToken,
-                            isLoading = false
+                            error = errorMessage,
+                            isRefreshing = false
                         )
                     }
                 } else {
-                    _uiState.update { it.copy(error = "Failed to load emails", isLoading = false) }
+                    val nextToken = result.getOrNull()
+                    Log.d("InboxViewModel", "refreshEmails succeeded, nextPageToken: $nextToken")
+                    _uiState.update {
+                        it.copy(
+                            isRefreshing = false,
+                            error = null,
+                            nextPageToken = nextToken
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                Log.e("InboxViewModel", "Exception during refreshEmails", e)
+                _uiState.update {
+                    it.copy(
+                        error = e.message,
+                        isRefreshing = false
+                    )
+                }
             }
         }
     }
 
     fun loadMoreEmails() {
-        // 이미 로딩 중이거나 다음 페이지 토큰이 없으면 실행하지 않습니다.
-        if (_uiState.value.isLoading || _uiState.value.nextPageToken == null) return
+        val currentState = _uiState.value
+        if (currentState.isLoading || currentState.isRefreshing) {
+            Log.d("InboxViewModel", "loadMoreEmails skipped: already loading or refreshing")
+            return
+        }
 
+        val token = currentState.nextPageToken
+        if (token == null) {
+            Log.d("InboxViewModel", "loadMoreEmails skipped: no next page token")
+            return
+        }
+
+        Log.d("InboxViewModel", "loadMoreEmails called with token: $token")
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val response = repository.getMails(pageToken = _uiState.value.nextPageToken)
+                val response = repository.getMails(pageToken = token)
                 if (response.isSuccessful) {
                     val newEmails = response.body()?.messages ?: emptyList()
+                    Log.d("InboxViewModel", "Received ${newEmails.size} more emails")
+                    if (newEmails.isNotEmpty()) {
+                        repository.saveEmailsToCache(newEmails)
+                        Log.d("InboxViewModel", "Saved ${newEmails.size} emails to cache")
+                    }
                     _uiState.update {
                         it.copy(
-                            emails = it.emails + newEmails,
                             nextPageToken = response.body()?.nextPageToken,
-                            isLoading = false
+                            isLoading = false,
+                            error = null
                         )
                     }
                 } else {
+                    Log.e("InboxViewModel", "loadMoreEmails failed with code: ${response.code()}")
                     _uiState.update { it.copy(error = "Failed to load more emails", isLoading = false) }
                 }
             } catch (e: Exception) {
+                Log.e("InboxViewModel", "Exception during loadMoreEmails", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }

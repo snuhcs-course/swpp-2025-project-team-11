@@ -9,6 +9,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.theme.XendTheme
@@ -40,7 +41,8 @@ class MailDetailViewModelFactory(
         if (modelClass.isAssignableFrom(MailDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             val mailApiService = RetrofitClient.getMailApiService(context)
-            val repository = InboxRepository(mailApiService)
+            val database = AppDatabase.getDatabase(context)
+            val repository = InboxRepository(mailApiService, database.emailDao())
             return MailDetailViewModel(repository, messageId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

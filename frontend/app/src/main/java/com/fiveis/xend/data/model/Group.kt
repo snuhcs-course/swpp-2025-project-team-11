@@ -3,7 +3,7 @@ package com.fiveis.xend.data.model
 import androidx.compose.ui.graphics.Color
 
 data class Group(
-    val id: Int,
+    val id: Long,
     val name: String,
     val description: String,
     val promptOptions: List<PromptOption> = emptyList(),

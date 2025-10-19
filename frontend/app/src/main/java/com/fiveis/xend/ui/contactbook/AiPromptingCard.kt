@@ -43,22 +43,22 @@ import com.fiveis.xend.data.model.PromptOption
 import kotlinx.coroutines.launch
 
 private val contextOptions = listOf(
-    PromptOption("context", "회사 동료", "회사 동료"),
-    PromptOption("context", "업무 관련", "업무 관련"),
-    PromptOption("context", "효율성 중시", "효율성 중시"),
-    PromptOption("context", "전문적", "전문적"),
-    PromptOption("context", "팀워크", "팀워크"),
-    PromptOption("context", "긴급성", "긴급성")
+    PromptOption("tone", "회사 동료", "회사 동료"),
+    PromptOption("tone", "업무 관련", "업무 관련"),
+    PromptOption("tone", "효율성 중시", "효율성 중시"),
+    PromptOption("tone", "전문적", "전문적"),
+    PromptOption("tone", "팀워크", "팀워크"),
+    PromptOption("tone", "긴급성", "긴급성")
 )
 
 private val styleOptions = listOf(
-    PromptOption("style", "존댓말", "존댓말"),
-    PromptOption("style", "직설적", "직설적"),
-    PromptOption("style", "간결함", "간결함"),
-    PromptOption("style", "두괄식", "두괄식"),
-    PromptOption("style", "격식적", "격식적"),
-    PromptOption("style", "친근함", "친근함"),
-    PromptOption("style", "신중함", "신중함")
+    PromptOption("tone", "존댓말", "존댓말"),
+    PromptOption("tone", "직설적", "직설적"),
+    PromptOption("tone", "간결함", "간결함"),
+    PromptOption("tone", "두괄식", "두괄식"),
+    PromptOption("tone", "격식적", "격식적"),
+    PromptOption("tone", "친근함", "친근함"),
+    PromptOption("tone", "신중함", "신중함")
 )
 
 private val formatOptions = listOf(
@@ -184,9 +184,9 @@ fun PromptingBottomSheet(
 ) {
     val scope = rememberCoroutineScope()
 
-    var selectedContext by rememberSaveable { mutableStateOf(initial.selectedContext) }
-    var selectedStyle by rememberSaveable { mutableStateOf(initial.selectedStyle) }
-    var selectedFormat by rememberSaveable { mutableStateOf(initial.selectedFormat) }
+    var selectedContext by remember { mutableStateOf(initial.selectedContext) }
+    var selectedStyle by remember { mutableStateOf(initial.selectedStyle) }
+    var selectedFormat by remember { mutableStateOf(initial.selectedFormat) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

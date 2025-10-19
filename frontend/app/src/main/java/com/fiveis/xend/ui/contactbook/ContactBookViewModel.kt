@@ -7,6 +7,7 @@ import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.ContactBookTab
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,8 @@ data class ContactBookUiState(
 )
 
 class ContactBookViewModel(application: Application) : AndroidViewModel(application) {
+    private var loadJob: Job? = null
+
     private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
 
     private val _uiState = MutableStateFlow(ContactBookUiState())
@@ -36,25 +39,19 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun loadContactInfo(tab: ContactBookTab) {
-        viewModelScope.launch {
-            _uiState.update {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.update { it.copy(selectedTab = tab, isLoading = true, error = null) }
+            try {
                 if (tab == ContactBookTab.Groups) {
-                    it.copy(
-                        selectedTab = tab,
-                        groups = repository.getAllGroups(),
-                        contacts = emptyList(),
-                        isLoading = false,
-                        error = null
-                    )
+                    val groups = repository.getAllGroups()
+                    _uiState.update { it.copy(groups = groups, contacts = emptyList(), isLoading = false, error = null) }
                 } else {
-                    it.copy(
-                        selectedTab = tab,
-                        groups = emptyList(),
-                        contacts = repository.getAllContacts(),
-                        isLoading = false,
-                        error = null
-                    )
+                    val contacts = repository.getAllContacts()
+                    _uiState.update { it.copy(groups = emptyList(), contacts = contacts, isLoading = false, error = null) }
                 }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "불러오기 실패") }
             }
         }
     }
