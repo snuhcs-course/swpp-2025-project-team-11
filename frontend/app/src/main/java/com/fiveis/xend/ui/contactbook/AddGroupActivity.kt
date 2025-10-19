@@ -67,7 +67,9 @@ class AddGroupActivity : ComponentActivity() {
                     },
                     onGroupNameChange = { name = it },
                     onGroupDescriptionChange = { description = it },
-                    onPromptOptionsChange = { options = it.selectedContext.toList() + it.selectedStyle.toList() + it.selectedFormat.toList() },
+                    onPromptOptionsChange = {
+                        options = it.selectedContext.toList() + it.selectedStyle.toList() + it.selectedFormat.toList()
+                    },
                     members = emptyList(),
                     onAddMember = {
                         // TODO

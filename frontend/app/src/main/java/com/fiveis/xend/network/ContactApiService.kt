@@ -23,6 +23,7 @@ interface ContactApiService {
 
     @POST("api/contact/groups/")
     suspend fun addGroup(@Body payload: AddGroupRequest): Response<GroupResponse>
+
     // TODO
     @GET("api/contact/groups/")
     suspend fun getAllGroups(): Response<List<GroupResponse>>
