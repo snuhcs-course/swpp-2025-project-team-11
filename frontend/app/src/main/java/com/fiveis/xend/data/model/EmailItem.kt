@@ -1,8 +1,15 @@
 package com.fiveis.xend.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import androidx.room.TypeConverters
+import com.fiveis.xend.data.database.Converters
 import com.google.gson.annotations.SerializedName
 
+@Entity(tableName = "emails")
+@TypeConverters(Converters::class)
 data class EmailItem(
+    @PrimaryKey
     @SerializedName("id")
     val id: String,
 
@@ -28,5 +35,7 @@ data class EmailItem(
     val isUnread: Boolean,
 
     @SerializedName("label_ids")
-    val labelIds: List<String>
+    val labelIds: List<String>,
+
+    val cachedAt: Long = System.currentTimeMillis()
 )

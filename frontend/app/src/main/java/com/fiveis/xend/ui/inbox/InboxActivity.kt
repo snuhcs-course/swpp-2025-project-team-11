@@ -13,10 +13,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
+import com.fiveis.xend.ui.search.SearchActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.ui.view.MailDetailActivity
 
@@ -47,10 +49,13 @@ class InboxActivity : ComponentActivity() {
                         intent.putExtra("message_id", it.id)
                         startActivity(intent)
                     },
+                    onOpenSearch = {
+                        startActivity(Intent(this, SearchActivity::class.java))
+                    },
                     onFabClick = {
                         startActivity(Intent(this@InboxActivity, MailComposeActivity::class.java))
                     },
-                    onRefresh = viewModel::loadEmails,
+                    onRefresh = viewModel::refreshEmails,
                     onLoadMore = viewModel::loadMoreEmails,
                     onBottomNavChange = {
                         if (it == "contacts") {
@@ -69,7 +74,8 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
         if (modelClass.isAssignableFrom(InboxViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             val mailApiService = RetrofitClient.getMailApiService(context)
-            val repository = InboxRepository(mailApiService)
+            val database = AppDatabase.getDatabase(context)
+            val repository = InboxRepository(mailApiService, database.emailDao())
             return InboxViewModel(repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
