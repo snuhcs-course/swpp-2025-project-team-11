@@ -18,11 +18,15 @@ val Red60 = Color(0xFFEA4335)
 // Text colors
 val TextPrimary = Color(0xFF202124)
 val TextSecondary = Color(0xFF5F6368)
+val TextTertiary = Color(0xFF9AA0A6)
 
 // Background colors
 val BackgroundWhite = Color(0xFFFFFFFF)
 val BackgroundLight = Color(0xFFF8F9FA)
 val BackgroundGray = Color(0xFFE8EAED)
+
+// Border colors
+val BorderGray = Color(0xFFDADCE0)
 
 // Compose screen specific
 val ComposeBackground = Color(0xFFFFFFFF)
@@ -49,3 +53,13 @@ val Pink80 = Color(0xFFEFB8C8)
 val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
+
+// 연락처 추가 화면
+val Slate900 = Color(0xFF1E293B)
+val IndigoText = Color(0xFF4338CA) // Gmail 동기화 카드 title
+val Orange = Color(0xFFF59E0B) // 직접 입력 카드 border/subtitle
+val OrangeText = Color(0xFFEA580C) // 직접 입력 카드 title
+val OrangeSoftBg = Color(0xFFFFF7ED) // 직접 입력 카드 배경
+val Gray600 = Color(0xFF64748B)
+val Gray400 = Color(0xFF94A3B8) // placeholder
+val Gray200 = Color(0xFFE2E8F0)

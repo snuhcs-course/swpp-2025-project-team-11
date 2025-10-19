@@ -10,6 +10,7 @@ Strict requirements:
 
 SYSTEM_PROMPT_BODY = """
 You write only the email BODY in {language} (do NOT include a subject line).
+Do not modify placeholders of the form {{PII:<...>}}; keep them verbatim.
 
 Hard constraints:
 - The body MUST strictly correspond to the locked subject below.

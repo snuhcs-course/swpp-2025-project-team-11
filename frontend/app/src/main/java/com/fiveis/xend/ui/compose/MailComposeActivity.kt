@@ -534,10 +534,10 @@ private fun RecipientSection(
         if (trimmed.isNotEmpty()) {
             onContactsChange(
                 contacts + Contact(
-                    id = trimmed,
+                    id = 0,
                     name = trimmed,
                     email = trimmed,
-                    groupId = ""
+                    groupId = 0
                 )
             )
             onNewContactChange(TextFieldValue(""))
@@ -920,7 +920,12 @@ class MailComposeActivity : ComponentActivity() {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 // 1) AI Compose VM
                 val composeVm: MailComposeViewModel = viewModel(
-                    factory = ComposeVmFactory(MailComposeSseClient(BuildConfig.SSE_URL))
+                    factory = ComposeVmFactory(
+                        MailComposeSseClient(
+                            application.applicationContext,
+                            endpointUrl = BuildConfig.BASE_URL + "api/ai/mail/generate/stream/"
+                        )
+                    )
                 )
 
                 // 2) Mail Send VM
@@ -932,6 +937,7 @@ class MailComposeActivity : ComponentActivity() {
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
                 val richTextState = rememberRichTextState()
+                //var body by rememberSaveable { mutableStateOf("") }
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
 
@@ -1019,6 +1025,11 @@ private fun EmailComposePreview() {
             onSubjectChange = {},
             richTextState = richTextState,
             contacts = listOf(Contact("Id here", "홍길동", "test@example.com", groupId = "GroupId here")),
+            /*
+            body = "초안 본문...",
+            onBodyChange = {},
+            contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
+            */
             onContactsChange = {},
             newContact = TextFieldValue(""),
             onNewContactChange = {},
