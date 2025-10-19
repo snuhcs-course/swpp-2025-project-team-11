@@ -984,43 +984,43 @@ class MailComposeActivity : ComponentActivity() {
                     } else {
                         // 메일 작성 화면
                         EmailComposeScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        subject = subject,
-                        onSubjectChange = { subject = it },
-                        richTextState = richTextState,
-                        contacts = contacts,
-                        onContactsChange = { contacts = it },
-                        newContact = newContact,
-                        onNewContactChange = { newContact = it },
-                        isStreaming = composeUi.isStreaming,
-                        error = composeUi.error,
-                        sendUiState = sendUi,
-                        onBack = { finish() },
-                        onUndo = { /* TODO */ },
-                        onAiComplete = {
-                            val payload = JSONObject().apply {
-                                put("subject", subject.ifBlank { "제목 생성" })
-                                // Use HTML content for AI prompt
-                                put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
-                                put("relationship", "업무 관련")
-                                put("situational_prompt", "정중하고 간결한 결과 보고 메일")
-                                put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
-                                put("format_prompt", "문단 구분, 끝인사 포함")
-                                put("language", "Korean")
+                            modifier = Modifier.padding(innerPadding),
+                            subject = subject,
+                            onSubjectChange = { subject = it },
+                            richTextState = richTextState,
+                            contacts = contacts,
+                            onContactsChange = { contacts = it },
+                            newContact = newContact,
+                            onNewContactChange = { newContact = it },
+                            isStreaming = composeUi.isStreaming,
+                            error = composeUi.error,
+                            sendUiState = sendUi,
+                            onBack = { finish() },
+                            onUndo = { /* TODO */ },
+                            onAiComplete = {
+                                val payload = JSONObject().apply {
+                                    put("subject", subject.ifBlank { "제목 생성" })
+                                    // Use HTML content for AI prompt
+                                    put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
+                                    put("relationship", "업무 관련")
+                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
+                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
+                                    put("format_prompt", "문단 구분, 끝인사 포함")
+                                    put("language", "Korean")
+                                }
+                                composeVm.startStreaming(payload)
+                            },
+                            onStopStreaming = { composeVm.stopStreaming() },
+                            onSend = {
+                                val recipient = contacts.firstOrNull()?.email
+                                if (recipient == null) {
+                                    // This case is handled by button's enabled state, but as a safeguard:
+                                    return@EmailComposeScreen
+                                }
+                                // Send HTML content
+                                sendVm.sendEmail(to = recipient, subject = subject, body = richTextState.toHtml())
                             }
-                            composeVm.startStreaming(payload)
-                        },
-                        onStopStreaming = { composeVm.stopStreaming() },
-                        onSend = {
-                            val recipient = contacts.firstOrNull()?.email
-                            if (recipient == null) {
-                                // This case is handled by button's enabled state, but as a safeguard:
-                                return@EmailComposeScreen
-                            }
-                            // Send HTML content
-                            sendVm.sendEmail(to = recipient, subject = subject, body = richTextState.toHtml())
-                        }
-                    )
+                        )
                     }
                 }
             }
