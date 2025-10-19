@@ -1,13 +1,10 @@
 from fastapi import FastAPI
-from .models import PromptRequest, PredictionResponse
-from .llm import generate_response
+from app.models import PredictRequest
+from app.llm import generate_reply
 
-app = FastAPI(title="EXAONE LLM GPU Server")
+app = FastAPI(title="GPU Server for EXAONE")
 
-@app.post("/predict", response_model=PredictionResponse)
-def predict(req: PromptRequest):
-    try:
-        prediction = generate_response(req.prompt, req.max_tokens)
-        return {"prediction": prediction}
-    except Exception as e:
-        return {"prediction": f"Error: {str(e)}"}
+@app.post("/predict")
+async def predict(req: PredictRequest):
+    reply = generate_reply(req.system_prompt, req.user_input, req.max_tokens)
+    return {"response": reply}
