@@ -1025,7 +1025,7 @@ private fun EmailComposePreview() {
             onSubjectChange = {},
             richTextState = richTextState,
             contacts = listOf(Contact("Id here", "홍길동", "test@example.com", groupId = "GroupId here")),
-            /*
+            /**
              * body = "초안 본문...",
              * onBodyChange = {},
              * contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
