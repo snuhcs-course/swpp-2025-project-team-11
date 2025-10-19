@@ -6,6 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
+from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
 from apps.ai.services.prompts import SYSTEM_PROMPT_BODY, SYSTEM_PROMPT_SUBJECT
 from apps.ai.services.utils import heartbeat, sse_event
 
@@ -85,44 +86,62 @@ def stream_mail_generation(
     language: str | None = None,
 ) -> Generator[str, None, None]:
 
-    inputs = _build_inputs(
+    raw_inputs = _build_inputs(
         subject, body, relationship, situational_prompt, style_prompt, format_prompt, language
     )
+
+    # 요청별 req_id 생성 + 마스킹(제목/본문)
+    req_id = make_req_id()
+    masker = PiiMasker(req_id)
+    masked_inputs, mapping = masker.mask_inputs(raw_inputs)
 
     # Ready + client-side retry hint
     yield sse_event("ready", {"ts": int(time.time() * 1000)}, retry_ms=5000)
 
-    # 1) Subject (single, non-streaming)
+    # 1) Subject (non-streaming) — 제목 생성
     try:
-        locked_title = (_subject_chain.invoke(inputs) or "").strip()
+        locked_title = (_subject_chain.invoke(masked_inputs) or "").strip()
     except Exception:
         locked_title = ""
 
-    merged_subject = f"{locked_title}\n\n" if locked_title else ""
-    yield sse_event("subject", {"title": locked_title, "text": merged_subject}, eid="0")
+    unmasked_title = (
+        locked_title
+        and masker
+        and "".join(unmask_stream([locked_title], req_id, mapping))
+        or locked_title
+    )
+
+    merged_subject = f"{unmasked_title}\n\n" if unmasked_title else ""
+    yield sse_event("subject", {"title": unmasked_title, "text": merged_subject}, eid="0")
 
     seq = 1
     last_ping = time.monotonic()
 
+    # 2) Body 스트리밍
     locked_inputs = {
         "locked_subject": locked_title,
-        "body": inputs["body"],
-        "relationship": inputs["relationship"],
-        "situational": inputs["situational"],
-        "style": inputs["style"],
-        "format": inputs["format"],
-        "language": inputs["language"],
+        "body": masked_inputs["body"],
+        "relationship": raw_inputs["relationship"],
+        "situational": raw_inputs["situational"],
+        "style": raw_inputs["style"],
+        "format": raw_inputs["format"],
+        "language": raw_inputs["language"],
     }
 
     try:
-        for chunk in _body_chain.stream(locked_inputs):
+        raw_stream = _body_chain.stream(locked_inputs)
+
+        for chunk in unmask_stream(raw_stream, req_id, mapping):
             if chunk:
                 yield sse_event("body.delta", {"seq": seq - 1, "text": chunk}, eid=str(seq))
                 seq += 1
+
             if time.monotonic() - last_ping > 10:
                 yield heartbeat()
                 last_ping = time.monotonic()
+
     except Exception as e:
         yield sse_event("error", {"message": str(e)}, eid=str(seq))
     finally:
+        mapping.clear()
         yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))
