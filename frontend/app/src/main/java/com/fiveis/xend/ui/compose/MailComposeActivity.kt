@@ -937,7 +937,7 @@ class MailComposeActivity : ComponentActivity() {
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
                 val richTextState = rememberRichTextState()
-                //var body by rememberSaveable { mutableStateOf("") }
+                // var body by rememberSaveable { mutableStateOf("") }
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
 
@@ -1026,9 +1026,9 @@ private fun EmailComposePreview() {
             richTextState = richTextState,
             contacts = listOf(Contact("Id here", "홍길동", "test@example.com", groupId = "GroupId here")),
             /*
-            body = "초안 본문...",
-            onBodyChange = {},
-            contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
+             * body = "초안 본문...",
+             * onBodyChange = {},
+             * contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
             */
             onContactsChange = {},
             newContact = TextFieldValue(""),
