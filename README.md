@@ -59,7 +59,7 @@ docker compose up -d --build
 docker compose down
 ```
 
-Default URL: https://xend-fiveis-dev.duckdns.org
+Default URL: http://localhost/
 
 Android App
 Open /frontend in Android Studio
