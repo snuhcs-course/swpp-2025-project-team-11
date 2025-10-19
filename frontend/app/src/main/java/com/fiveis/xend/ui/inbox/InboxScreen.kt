@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,31 +19,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +55,6 @@ import com.fiveis.xend.ui.theme.Blue80
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun InboxScreen(
     uiState: InboxUiState,
@@ -81,11 +74,11 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
-                if (uiState.isLoading && uiState.emails.isEmpty()) {
+                if (uiState.isRefreshing && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (uiState.error != null) {
+                } else if (uiState.error != null && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = "Error: ${uiState.error}")
                     }
@@ -95,7 +88,8 @@ fun InboxScreen(
                         onEmailClick = onEmailClick,
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
-                        isLoading = uiState.isLoading
+                        isRefreshing = uiState.isRefreshing,
+                        isLoadingMore = uiState.isLoading
                     )
                 }
             }
@@ -175,35 +169,22 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EmailList(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
-    isLoading: Boolean
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean
 ) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    var refreshing by remember { mutableStateOf(false) }
 
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = refreshing,
-        onRefresh = {
-            refreshing = true
-            onRefresh()
-            coroutineScope.launch {
-                delay(500)
-                refreshing = false
-            }
-        }
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pullRefresh(pullRefreshState)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
     ) {
         LazyColumn(
             state = listState,
@@ -218,12 +199,14 @@ private fun EmailList(
                     color = DividerDefaults.color
                 )
             }
-            if (isLoading && !refreshing) {
+
+            // Loading indicator at the bottom
+            if (isLoadingMore) {
                 item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 16.dp),
+                            .padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
@@ -236,20 +219,27 @@ private fun EmailList(
             }
         }
 
-        PullRefreshIndicator(
-            refreshing = refreshing,
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-
-        // Check if the user has scrolled to the end of the list
+        // Trigger load more when scrolled near bottom
         LaunchedEffect(listState) {
             snapshotFlow {
                 val layoutInfo = listState.layoutInfo
-                val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
-                lastVisibleItem?.index ?: -1
-            }.collect { lastVisibleItemIndex ->
-                if (!isLoading && lastVisibleItemIndex >= emails.size - 1 && emails.isNotEmpty()) {
+                val visibleItems = layoutInfo.visibleItemsInfo
+                val lastVisibleItem = visibleItems.lastOrNull()
+                val totalItems = layoutInfo.totalItemsCount
+
+                if (totalItems == 0 || lastVisibleItem == null) {
+                    false
+                } else {
+                    // Trigger when last visible item is within 3 items from the end
+                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
+                    if (shouldLoad) {
+                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
+                    }
+                    shouldLoad
+                }
+            }.collect { shouldLoadMore ->
+                if (shouldLoadMore && !isRefreshing && !isLoadingMore) {
+                    Log.d("InboxScreen", "Triggering loadMore")
                     onLoadMore()
                 }
             }
