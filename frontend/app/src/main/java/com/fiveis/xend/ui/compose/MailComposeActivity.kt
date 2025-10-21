@@ -976,7 +976,7 @@ class MailComposeActivity : ComponentActivity() {
                             onBack = { showTemplateScreen = false },
                             onTemplateSelected = { template ->
                                 subject = template.subject
-                                body = template.body
+                                richTextState.setHtml(template.body)
                                 showTemplateScreen = false
                             },
                             modifier = Modifier.padding(innerPadding)

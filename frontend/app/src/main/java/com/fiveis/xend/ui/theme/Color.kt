@@ -80,3 +80,7 @@ val OrangeSoftBg = Color(0xFFFFF7ED) // 직접 입력 카드 배경
 val Gray600 = Color(0xFF64748B)
 val Gray400 = Color(0xFF94A3B8) // placeholder
 val Gray200 = Color(0xFFE2E8F0)
+
+// 메일 상세 화면
+val MailDetailBodyBg = Color(0xFFF1F5F9) // 본문 배경
+val AttachmentHeaderText = Color(0xFF475569) // 첨부파일 헤더
