@@ -72,4 +72,11 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     fun onContactClick(contact: Contact) {
         // TODO: 연락처 상세 화면으로 이동
     }
+
+    fun onContactDelete(contactId: Long) {
+        viewModelScope.launch {
+            repository.deleteContact(contactId)
+            loadContactInfo(ContactBookTab.Contacts)
+        }
+    }
 }

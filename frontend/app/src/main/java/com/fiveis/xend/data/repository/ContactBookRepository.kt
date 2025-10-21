@@ -146,6 +146,13 @@ class ContactBookRepository(context: Context) {
         throw IllegalStateException("Failed to get all contacts: HTTP ${response.code()} ${response.message()}")
     }
 
+    suspend fun deleteContact(contactId: Long) {
+        val response = contactApiService.deleteContact(contactId)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete contact: HTTP ${response.code()} ${response.message()}")
+        }
+    }
+
     suspend fun addGroup(name: String, description: String): GroupResponse {
         val request = AddGroupRequest(
             name = name,

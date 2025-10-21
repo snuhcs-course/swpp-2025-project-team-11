@@ -80,6 +80,9 @@ class ContactBookActivity : ComponentActivity() {
                     onAddContactClick = {
                         addContactLauncher.launch(Intent(this, AddContactActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
+                    onDeleteContactClick = {
+                        viewModel.onContactDelete(it.id)
                     }
                 )
             }
