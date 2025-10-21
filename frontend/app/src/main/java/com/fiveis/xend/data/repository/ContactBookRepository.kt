@@ -20,9 +20,16 @@ sealed interface ContactBookData
 data class GroupData(val groups: List<Group>) : ContactBookData
 data class ContactData(val contacts: List<Contact>) : ContactBookData
 
-private var seed: Long = 2025L
-private var seed2: Long = -2025L
-private var rnd: Random = Random(seed)
+private var contactColorRandomSeed: Long = 5L
+private var groupColorRandomSeed: Long = 7L
+private var contactRnd: Random = Random(contactColorRandomSeed)
+private var groupRnd: Random = Random(groupColorRandomSeed)
+fun randomNotTooLightColor(rnd: Random = Random.Default): Color {
+    val hue = rnd.nextFloat() * 360f
+    val saturation = 0.65f + rnd.nextFloat() * 0.35f // 0.65 ~ 1.00
+    val value = 0.45f + rnd.nextFloat() * 0.40f // 0.45 ~ 0.85
+    return Color.hsv(hue, saturation, value)
+}
 
 class ContactBookRepository(context: Context) {
     private val contactApiService: ContactApiService = RetrofitClient.getContactApiService(context)
@@ -116,8 +123,6 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun getAllContacts(): List<Contact> {
-        rnd = Random(seed)
-
         val response = contactApiService.getAllContacts()
         if (response.isSuccessful) {
             return response.body()?.map { contactData ->
@@ -139,7 +144,7 @@ class ContactBookRepository(context: Context) {
                     },
                     createdAt = contactData.createdAt,
                     updatedAt = contactData.updatedAt,
-                    color = Color(rnd.nextInt(), rnd.nextInt(), rnd.nextInt())
+                    color = randomNotTooLightColor(contactRnd)
                 )
             } ?: emptyList()
         }
@@ -175,8 +180,6 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun getAllGroups(): List<Group> {
-        rnd = Random(seed2)
-
         val response = contactApiService.getAllGroups()
         if (response.isSuccessful) {
             return response.body()?.map {
@@ -187,7 +190,7 @@ class ContactBookRepository(context: Context) {
                     members = emptyList(),
                     createdAt = it.createdAt,
                     updatedAt = it.updatedAt,
-                    color = Color(rnd.nextInt(), rnd.nextInt(), rnd.nextInt())
+                    color = randomNotTooLightColor(groupRnd)
                 )
             } ?: emptyList()
         }
