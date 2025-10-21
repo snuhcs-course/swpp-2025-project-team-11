@@ -73,6 +73,8 @@ fun ContactBookScreen(
     onBottomNavChange: (String) -> Unit = {},
     onAddGroupClick: () -> Unit = {},
     onAddContactClick: () -> Unit = {},
+    onEditGroupClick: (Group) -> Unit = {},
+    onDeleteGroupClick: (Group) -> Unit = {},
     onEditContactClick: (Contact) -> Unit = {},
     onDeleteContactClick: (Contact) -> Unit = {}
 ) {
@@ -125,7 +127,9 @@ fun ContactBookScreen(
                     items(uiState.groups.size) { index ->
                         GroupCard(
                             group = uiState.groups[index],
-                            onClick = onGroupClick
+                            onClick = onGroupClick,
+                            onEdit = onEditGroupClick,
+                            onDelete = onDeleteGroupClick
                         )
                     }
 
@@ -231,7 +235,10 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun GroupCard(group: Group, onClick: (Group) -> Unit) {
+fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = {}, onDelete: (Group) -> Unit = {}) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Surface(
         color = group.color.copy(alpha = 0.1f),
         border = BorderStroke(2.dp, group.color),
@@ -240,7 +247,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit) {
             .fillMaxWidth()
             .clickable { onClick(group) }
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -261,19 +268,81 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit) {
                 }
                 Spacer(Modifier.weight(1f))
                 Text("${group.members.size}명", color = group.color, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(12.dp))
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                group.members.take(3).forEach {
-                    MemberCircle(it.name.first().toString(), group.color)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    group.members.take(3).forEach {
+                        MemberCircle(it.name.first().toString(), group.color)
+                    }
+                    if (group.members.size > 3) {
+                        MemberCircle("+${group.members.size - 3}", Color.LightGray)
+                    }
                 }
-                if (group.members.size > 3) {
-                    MemberCircle("+${group.members.size - 3}", Color.LightGray)
+
+                Spacer(Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier.wrapContentSize(Alignment.TopEnd)
+                ) {
+                    // 우측 "..." 버튼
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "더보기"
+                        )
+                    }
+
+                    // 오버플로우 메뉴
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                            text = { Text("수정") },
+                            onClick = {
+                                menuExpanded = false
+                                onEdit(group)
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                            text = { Text("삭제", color = Red60) },
+                            onClick = {
+                                menuExpanded = false
+                                showDeleteConfirm = true
+                            }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    // 삭제 확인 dialog
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("그룹 삭제") },
+            text = { Text("\"${group.name}\" 그룹을 삭제하시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete(group)
+                }) { Text("삭제", color = Red60) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("취소") }
+            },
+            containerColor = BackgroundLight
+        )
     }
 }
 

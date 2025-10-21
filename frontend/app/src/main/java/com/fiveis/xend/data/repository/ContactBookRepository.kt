@@ -123,6 +123,7 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun getAllContacts(): List<Contact> {
+        contactRnd = Random(contactColorRandomSeed)
         val response = contactApiService.getAllContacts()
         if (response.isSuccessful) {
             return response.body()?.map { contactData ->
@@ -180,6 +181,7 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun getAllGroups(): List<Group> {
+        groupRnd = Random(groupColorRandomSeed)
         val response = contactApiService.getAllGroups()
         if (response.isSuccessful) {
             return response.body()?.map {
@@ -195,5 +197,12 @@ class ContactBookRepository(context: Context) {
             } ?: emptyList()
         }
         throw IllegalStateException("Failed to get all groups: HTTP ${response.code()} ${response.message()}")
+    }
+
+    suspend fun deleteGroup(groupId: Long) {
+        val response = contactApiService.deleteGroup(groupId)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete group: HTTP ${response.code()} ${response.message()}")
+        }
     }
 }

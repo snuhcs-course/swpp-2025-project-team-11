@@ -32,4 +32,7 @@ interface ContactApiService {
 
     @GET("api/contact/groups/")
     suspend fun getAllGroups(): Response<List<GroupResponse>>
+
+    @DELETE("api/contact/groups/{id}/")
+    suspend fun deleteGroup(@Path("id") groupId: Long): Response<Void>
 }

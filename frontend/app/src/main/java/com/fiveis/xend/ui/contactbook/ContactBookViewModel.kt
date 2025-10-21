@@ -79,4 +79,11 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
             loadContactInfo(ContactBookTab.Contacts)
         }
     }
+
+    fun onGroupDelete(groupId: Long) {
+        viewModelScope.launch {
+            repository.deleteGroup(groupId)
+            loadContactInfo(ContactBookTab.Groups)
+        }
+    }
 }
