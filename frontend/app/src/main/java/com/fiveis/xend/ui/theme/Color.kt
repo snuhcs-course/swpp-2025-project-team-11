@@ -84,3 +84,13 @@ val Gray200 = Color(0xFFE2E8F0)
 // 메일 상세 화면
 val MailDetailBodyBg = Color(0xFFF1F5F9) // 본문 배경
 val AttachmentHeaderText = Color(0xFF475569) // 첨부파일 헤더
+
+// 답장 작성 화면
+val Green60 = Color(0xFF059669) // 녹색 primary
+val Green50 = Color(0xFF047857) // 녹색 텍스트
+val GreenSurface = Color(0xFFF0FDF4) // 연한 녹색 배경
+val GreenBorder = Color(0xFFD1FAE5) // 녹색 보더
+val Gray500 = Color(0xFF6B7280) // 회색 텍스트
+val Slate50 = Color(0xFFF8FAFC) // 연한 회색 배경
+val AttachmentExcelBg = Color(0xFF059669) // 엑셀 파일 아이콘 배경
+val AttachmentImageBg = Color(0xFFF59E0B) // 이미지 파일 아이콘 배경

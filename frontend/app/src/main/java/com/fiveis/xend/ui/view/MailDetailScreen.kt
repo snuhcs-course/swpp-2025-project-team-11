@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -81,7 +84,10 @@ fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: ()
             }
         },
         bottomBar = {
-            Column {
+            val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
+            Column(
+                modifier = Modifier.padding(bottom = navBarPadding.calculateBottomPadding())
+            ) {
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = ComposeOutline
@@ -119,11 +125,17 @@ fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: ()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MailDetailTopBar(scrollBehavior: TopAppBarScrollBehavior, onBack: () -> Unit) {
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+
     TopAppBar(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 16.dp),
+            .padding(
+                top = statusBarPadding.calculateTopPadding(),
+                start = 16.dp,
+                end = 16.dp
+            )
+            .height(56.dp),
         title = {
             Text(
                 "메일 상세",

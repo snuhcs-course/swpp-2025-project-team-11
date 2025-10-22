@@ -1,6 +1,13 @@
 package com.fiveis.xend.ui.inbox
 
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,11 +16,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,6 +49,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,9 +81,70 @@ fun InboxScreen(
     onBottomNavChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+
+    // 스크롤 방향 감지
+    var showBottomBar by remember { mutableStateOf(true) }
+    var previousIndex by remember { mutableStateOf(0) }
+    var previousScrollOffset by remember { mutableStateOf(0) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { (currentIndex, currentOffset) ->
+            // 맨 위에 있을 때는 항상 표시
+            if (currentIndex == 0 && currentOffset == 0) {
+                showBottomBar = true
+            } else {
+                // 스크롤 방향 감지
+                val isScrollingDown = if (currentIndex != previousIndex) {
+                    currentIndex > previousIndex
+                } else {
+                    currentOffset > previousScrollOffset
+                }
+
+                showBottomBar = !isScrollingDown
+            }
+
+            previousIndex = currentIndex
+            previousScrollOffset = currentOffset
+        }
+    }
+
     Scaffold(
-        bottomBar = { BottomNavBar(selected = "inbox", onSelect = onBottomNavChange) },
-        modifier = modifier.fillMaxSize()
+        bottomBar = {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    ),
+                    initialOffsetY = { it }
+                ) + fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    )
+                ),
+                exit = slideOutVertically(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    ),
+                    targetOffsetY = { it }
+                ) + fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    )
+                )
+            ) {
+                BottomNavBar(selected = "inbox", onSelect = onBottomNavChange)
+            }
+        },
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
@@ -87,25 +164,57 @@ fun InboxScreen(
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
-                        isLoadingMore = uiState.isLoading
+                        isLoadingMore = uiState.isLoading,
+                        listState = listState
                     )
                 }
             }
 
-            FloatingActionButton(
-                onClick = onFabClick,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 5.dp)
-                    .size(56.dp),
-                containerColor = Blue80,
-                contentColor = Color.White
-            ) {
-                Icon(
-                    Icons.Filled.Create,
-                    contentDescription = "새 메일 작성",
-                    modifier = Modifier.size(24.dp)
+            val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
+
+            AnimatedVisibility(
+                visible = showBottomBar,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = slideInVertically(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    ),
+                    initialOffsetY = { it }
+                ) + fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    )
+                ),
+                exit = slideOutVertically(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    ),
+                    targetOffsetY = { it }
+                ) + fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutSlowInEasing
+                    )
                 )
+            ) {
+                FloatingActionButton(
+                    onClick = onFabClick,
+                    modifier = Modifier
+                        .offset(y = 28.dp) // 하단바와 겹치도록 아래로 이동
+                        .padding(bottom = navBarPadding.calculateBottomPadding())
+                        .size(56.dp),
+                    containerColor = Blue80,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        Icons.Filled.Create,
+                        contentDescription = "새 메일 작성",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
@@ -113,11 +222,13 @@ fun InboxScreen(
 
 @Composable
 private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
             .background(Color.White)
+            .padding(top = statusBarPadding.calculateTopPadding())
     ) {
         Row(
             modifier = Modifier
@@ -175,10 +286,9 @@ private fun EmailList(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
-    isLoadingMore: Boolean
+    isLoadingMore: Boolean,
+    listState: androidx.compose.foundation.lazy.LazyListState
 ) {
-    val listState = rememberLazyListState()
-
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
@@ -279,7 +389,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = item.fromEmail,
+                        text = extractSenderName(item.fromEmail),
                         color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -320,11 +430,13 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
 
 @Composable
 private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
+    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(67.dp)
             .background(Color.White)
+            .padding(bottom = navBarPadding.calculateBottomPadding())
     ) {
         HorizontalDivider(
             modifier = Modifier,
@@ -335,7 +447,7 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(67.dp)
                 .padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -379,4 +491,11 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             }
         }
     }
+}
+
+// Helper function to extract sender name from "Name <email>" format
+private fun extractSenderName(fromEmail: String): String {
+    val nameRegex = "(.+?)\\s*<".toRegex()
+    val matchResult = nameRegex.find(fromEmail)
+    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
 }
