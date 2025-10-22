@@ -6,8 +6,6 @@ from apps.contact.views import (
     ContactListCreateView,
     GroupDetailView,
     GroupListCreateView,
-    GroupOptionMapDetailView,
-    GroupOptionMapListCreateView,
     PromptOptionDetailView,
     PromptOptionListCreateView,
     TemplateDetailView,
@@ -27,15 +25,6 @@ urlpatterns = [
     # Prompt Options
     path("prompt-options/", PromptOptionListCreateView.as_view(), name="prompt-option-list"),
     path("prompt-options/<int:pk>/", PromptOptionDetailView.as_view(), name="prompt-option-detail"),
-    # Group-Option Maps
-    path(
-        "group-option-maps/", GroupOptionMapListCreateView.as_view(), name="group-option-map-list"
-    ),
-    path(
-        "group-option-maps/<int:pk>/",
-        GroupOptionMapDetailView.as_view(),
-        name="group-option-map-detail",
-    ),
     # Templates
     path("templates/", TemplateListCreateView.as_view(), name="template-list"),
     path("templates/<int:pk>/", TemplateDetailView.as_view(), name="template-detail"),
