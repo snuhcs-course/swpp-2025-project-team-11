@@ -79,6 +79,15 @@ fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: ()
                     color = ComposeOutline
                 )
             }
+        },
+        bottomBar = {
+            Column {
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = ComposeOutline
+                )
+                ReplyButton(onClick = onReply)
+            }
         }
     ) { paddingValues ->
         Box(
@@ -99,8 +108,7 @@ fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: ()
                 }
                 uiState.mail != null -> {
                     MailDetailContent(
-                        mail = uiState.mail,
-                        onReply = onReply
+                        mail = uiState.mail
                     )
                 }
             }
@@ -176,7 +184,7 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun MailDetailContent(mail: com.fiveis.xend.data.model.MailDetailResponse, onReply: () -> Unit) {
+private fun MailDetailContent(mail: com.fiveis.xend.data.model.MailDetailResponse) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -203,9 +211,6 @@ private fun MailDetailContent(mail: com.fiveis.xend.data.model.MailDetailRespons
 
         // D. 첨부파일 섹션 (API에 데이터 없으므로 주석 처리)
         // AttachmentSection()
-
-        // E. 답장하기 버튼
-        ReplyButton(onClick = onReply)
     }
 }
 
