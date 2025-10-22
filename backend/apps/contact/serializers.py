@@ -125,6 +125,7 @@ class ContactSerializer(serializers.ModelSerializer):
 
     group_id = serializers.PrimaryKeyRelatedField(
         queryset=Group.objects.all(),
+        source="group",
         required=False,
         allow_null=True,
         write_only=True,
@@ -135,6 +136,13 @@ class ContactSerializer(serializers.ModelSerializer):
         model = Contact
         fields = ("id", "group", "name", "email", "group_id", "context", "created_at", "updated_at")
         read_only_fields = ("id", "created_at", "updated_at")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Limit queryset to select only current user-owned groups
+        request = self.context.get("request")
+        if request and request.user and "group_id" in self.fields:
+            self.fields["group_id"].queryset = Group.objects.filter(user=request.user)
 
     def validate(self, attrs):
         email = attrs.get("email")
