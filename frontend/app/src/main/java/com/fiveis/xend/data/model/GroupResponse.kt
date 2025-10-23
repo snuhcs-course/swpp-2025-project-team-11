@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class GroupResponse(
-    val id: Int,
+    val id: Long,
     val name: String,
     val description: String,
     @SerialName("created_at")val createdAt: String? = null,

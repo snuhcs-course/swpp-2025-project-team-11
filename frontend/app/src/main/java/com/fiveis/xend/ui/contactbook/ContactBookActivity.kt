@@ -54,6 +54,13 @@ class ContactBookActivity : ComponentActivity() {
                         viewModel.onTabSelected(ContactBookTab.Contacts)
                     }
                 }
+                val addGroupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == RESULT_OK) {
+                        viewModel.onTabSelected(ContactBookTab.Groups)
+                    }
+                }
 
                 ContactBookScreen(
                     uiState = uiState,
@@ -67,7 +74,7 @@ class ContactBookActivity : ComponentActivity() {
                         }
                     },
                     onAddGroupClick = {
-                        startActivity(Intent(this, AddGroupActivity::class.java))
+                        addGroupLauncher.launch(Intent(this, AddGroupActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
                     onAddContactClick = {

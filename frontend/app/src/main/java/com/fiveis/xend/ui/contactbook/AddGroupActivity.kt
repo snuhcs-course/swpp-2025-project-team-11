@@ -61,9 +61,6 @@ class AddGroupActivity : ComponentActivity() {
                             name = name,
                             description = description
                         )
-                        finish()
-                        startActivity(Intent(this, ContactBookActivity::class.java))
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                     },
                     onGroupNameChange = { name = it },
                     onGroupDescriptionChange = { description = it },
