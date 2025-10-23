@@ -1,21 +1,19 @@
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, serializers
+from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 
 from apps.contact.models import (
     Contact,
     ContactContext,
     Group,
-    GroupOptionMap,
     PromptOption,
     Template,
 )
 from apps.contact.serializers import (
     ContactContextSerializer,
     ContactSerializer,
-    GroupOptionMapSerializer,
     GroupSerializer,
     PromptOptionSerializer,
     TemplateSerializer,
@@ -131,32 +129,6 @@ class PromptOptionDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAP
         if instance.created_by is None:
             raise PermissionDenied("System-defined options cannot be deleted.")
         instance.delete()
-
-
-# ===== Group-Option Map =====
-class GroupOptionMapListCreateView(AuthRequiredMixin, generics.ListCreateAPIView):
-    serializer_class = GroupOptionMapSerializer
-
-    def get_queryset(self):
-        return GroupOptionMap.objects.filter(group__user=self.request.user)
-
-    def perform_create(self, serializer):
-        group = serializer.validated_data.get("group")
-        option = serializer.validated_data.get("option")
-        if group.user_id != self.request.user.id:
-            raise serializers.ValidationError("You can only map options to your own group.")
-        if option.created_by and option.created_by_id != self.request.user.id:
-            raise serializers.ValidationError(
-                "You cannot map a prompt option created by another user."
-            )
-        serializer.save()
-
-
-class GroupOptionMapDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = GroupOptionMapSerializer
-
-    def get_queryset(self):
-        return GroupOptionMap.objects.filter(group__user=self.request.user)
 
 
 # ===== Templates =====

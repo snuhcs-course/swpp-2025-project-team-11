@@ -52,7 +52,7 @@ class GoogleCallbackView(generics.GenericAPIView):
         except requests.RequestException as e:
             return Response(
                 {"detail": f"Failed to get token from Google: {str(e)}"},
-                status=status.HTTP_502_BAD_GATEWAY,
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         if "error" in token_json:
@@ -74,7 +74,7 @@ class GoogleCallbackView(generics.GenericAPIView):
         except requests.RequestException as e:
             return Response(
                 {"detail": f"Failed to get user info from Google: {str(e)}"},
-                status=status.HTTP_502_BAD_GATEWAY,
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         email = userinfo.get("email")

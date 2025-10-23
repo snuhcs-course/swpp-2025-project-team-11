@@ -72,6 +72,17 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Xend Service provided by Five I's",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SECURITY": [{"BearerAuth": []}],
+    "COMPONENTS": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            },
+        },
+    },
 }
 
 MIDDLEWARE = [

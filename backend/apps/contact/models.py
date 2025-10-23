@@ -13,6 +13,11 @@ class Group(TimeStampedModel):
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True)
 
+    options = models.ManyToManyField(
+        "PromptOption",
+        related_name="groups",
+    )
+
     class Meta:
         ordering = ["user_id", "name", "id"]
         constraints = [
@@ -97,31 +102,6 @@ class PromptOption(TimeStampedModel):
 
     def __str__(self):
         return f"{self.key}:{self.name}"
-
-
-class GroupOptionMap(TimeStampedModel):
-    group = models.ForeignKey(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="option_maps",
-    )
-    option = models.ForeignKey(
-        PromptOption,
-        on_delete=models.CASCADE,
-        related_name="group_maps",
-    )
-
-    class Meta:
-        ordering = ["group_id", "option_id", "id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["group", "option"],
-                name="uniq_contacts_group_option",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.group_id}-{self.option_id}"
 
 
 class Template(TimeStampedModel):
