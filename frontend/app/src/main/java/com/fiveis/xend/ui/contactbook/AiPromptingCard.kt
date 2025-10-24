@@ -47,16 +47,16 @@ import androidx.compose.ui.unit.dp
 import com.fiveis.xend.data.model.PromptOption
 import kotlinx.coroutines.launch
 
-//private val toneOptions = listOf(
+//  private val toneOptions = listOf(
 //    PromptOption(0, "tone", "회사 동료", "회사 동료"),
 //    PromptOption(0, "tone", "업무 관련", "업무 관련"),
 //    PromptOption(0, "tone", "효율성 중시", "효율성 중시"),
 //    PromptOption(0, "tone", "전문적", "전문적"),
 //    PromptOption(0, "tone", "팀워크", "팀워크"),
 //    PromptOption(0, "tone", "긴급성", "긴급성")
-//)
+//  )
 //
-//private val styleOptions = listOf(
+//  private val styleOptions = listOf(
 //    PromptOption("tone", "존댓말", "존댓말"),
 //    PromptOption("tone", "직설적", "직설적"),
 //    PromptOption("tone", "간결함", "간결함"),
@@ -64,9 +64,9 @@ import kotlinx.coroutines.launch
 //    PromptOption("tone", "격식적", "격식적"),
 //    PromptOption("tone", "친근함", "친근함"),
 //    PromptOption("tone", "신중함", "신중함")
-//)
+//  )
 //
-//private val formatOptions = listOf(
+//  private val formatOptions = listOf(
 //    PromptOption(0, "format", "3-5문장", "3-5문장"),
 //    PromptOption(0, "format", "핵심 키워드", "핵심 키워드"),
 //    PromptOption(0, "format", "구체적 일정", "구체적 일정"),
@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
 //    PromptOption(0, "format", "번호 매김", "번호 매김"),
 //    PromptOption(0, "format", "템플릿 형식", "템플릿 형식"),
 //    PromptOption(0, "format", "인삿말 최소", "인삿말 최소")
-//)
+//  )
 
 data class PromptingUiState(
     val selectedTone: Set<PromptOption> = emptySet(),
@@ -228,10 +228,11 @@ fun AiPromptingCard(
                             newName.trim(),
                             newPrompt.trim(),
                             { created ->
-                                val updated = if (currentKey == "tone")
+                                val updated = if (currentKey == "tone") {
                                     uiState.copy(selectedTone = uiState.selectedTone + created)
-                                else
+                                } else {
                                     uiState.copy(selectedFormat = uiState.selectedFormat + created)
+                                }
 
                                 uiState = updated
                                 onValueChange(updated)
@@ -246,12 +247,17 @@ fun AiPromptingCard(
                         )
                     }
                 ) {
-                    if (isAdding) CircularProgressIndicator(strokeWidth = 2.dp)
-                    else Text("저장")
+                    if (isAdding) {
+                        CircularProgressIndicator(strokeWidth = 2.dp)
+                    } else {
+                        Text("저장")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { if (!isAdding) addDialogForKey = null }) { Text("취소") }
+                TextButton(
+                    onClick = { if (!isAdding) addDialogForKey = null }
+                ) { Text("취소") }
             }
         )
     }
@@ -405,8 +411,11 @@ private fun Section(
                 onClick = { onToggle(opt) },
                 label = { Text(opt.prompt) },
                 leadingIcon = {
-                    if (isSelected) Icon(Icons.Filled.Check, contentDescription = null)
-                    else Icon(Icons.Filled.Add, contentDescription = null)
+                    if (isSelected) {
+                        Icon(Icons.Filled.Check, contentDescription = null)
+                    } else {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    }
                 }
             )
         }
