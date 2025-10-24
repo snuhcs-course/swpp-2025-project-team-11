@@ -2,7 +2,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import json
 import asyncio
-import aioredis
+import redis.asyncio as aioredis
 
 MODEL_NAME = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
 
