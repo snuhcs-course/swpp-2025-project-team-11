@@ -135,14 +135,16 @@ class ContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
         fields = ("id", "group", "name", "email", "group_id", "context", "created_at", "updated_at")
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "group", "created_at", "updated_at")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Limit queryset to select only current user-owned groups
+    def get_fields(self):
+        fields = super().get_fields()
         request = self.context.get("request")
-        if request and request.user and "group_id" in self.fields:
-            self.fields["group_id"].queryset = Group.objects.filter(user=request.user)
+        if request and request.user and request.user.is_authenticated:
+            fields["group_id"].queryset = Group.objects.filter(user=request.user)
+        else:
+            fields["group_id"].queryset = Group.objects.none()
+        return fields
 
     def validate(self, attrs):
         email = attrs.get("email")
