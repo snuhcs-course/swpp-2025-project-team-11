@@ -106,7 +106,8 @@ class ContactContextSerializer(serializers.ModelSerializer):
         model = ContactContext
         fields = (
             "id",
-            "relationship_role",
+            "sender_role",
+            "recipient_role",
             "relationship_details",
             "personal_prompt",
             "language_preference",

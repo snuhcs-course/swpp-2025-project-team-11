@@ -1,8 +1,6 @@
 """Gmail API integration service"""
 
 import base64
-import html
-import re
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -11,6 +9,8 @@ from email.utils import parsedate_to_datetime
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+from apps.mail.utils import html_to_text, text_to_html
 
 
 class GmailService:
@@ -25,16 +25,6 @@ class GmailService:
         """
         credentials = Credentials(token=access_token)
         self.service = build("gmail", "v1", credentials=credentials)
-
-    def _html_to_text(self, html_str: str) -> str:
-        s = re.sub(r"(?i)<\s*br\s*/?>", "\n", html_str)
-        s = re.sub(r"(?i)</\s*p\s*>", "\n\n", s)
-        s = re.sub(r"(?s)<[^>]+>", "", s)
-        return html.unescape(s).strip()
-
-    def _text_to_html(self, text_str: str) -> str:
-        esc = html.escape(text_str)
-        return esc.replace("\n", "<br>")
 
     def list_messages(self, max_results: int = 20, page_token: str = None, label_ids: list = None):
         """
@@ -219,10 +209,10 @@ class GmailService:
 
             if is_html:
                 html_body = body
-                text_body = self._html_to_text(body)
+                text_body = html_to_text(body)
             else:
                 text_body = body
-                html_body = self._text_to_html(body)
+                html_body = text_to_html(body)
 
             message = MIMEMultipart("alternative")
             message["Subject"] = str(Header(subject, "utf-8"))

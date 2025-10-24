@@ -7,6 +7,7 @@ from drf_spectacular.utils import (
     extend_schema,
 )
 from rest_framework import generics
+from rest_framework.permissions import AllowAny
 
 from ..core.mixins import AuthRequiredMixin
 from .serializers import MailGenerateRequest
@@ -15,6 +16,7 @@ from .services.langchain import stream_mail_generation
 
 class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = MailGenerateRequest
+    permission_classes = [AllowAny]
 
     @extend_schema(
         operation_id="mail_generate_stream",
@@ -102,13 +104,10 @@ class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
         data = serializer.validated_data
 
         gen = stream_mail_generation(
+            user=request.user,
             subject=data.get("subject"),
             body=data.get("body"),
-            relationship=data.get("relationship"),
-            situational_prompt=data.get("situational_prompt"),
-            style_prompt=data.get("style_prompt"),
-            format_prompt=data.get("format_prompt"),
-            language=data.get("language"),
+            to_emails=data.get("to_emails"),
         )
 
         resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")

@@ -1,4 +1,6 @@
+import html
 import logging
+import re
 
 from apps.mail.services import GmailService
 from apps.user.utils import google_token_required
@@ -57,3 +59,15 @@ def mark_read_logic(access_token, message_id, is_read):
         return gmail_service.mark_as_read(message_id)
     else:
         return gmail_service.mark_as_unread(message_id)
+
+
+def html_to_text(html_str: str) -> str:
+    s = re.sub(r"(?i)<\s*br\s*/?>", "\n", html_str)
+    s = re.sub(r"(?i)</\s*p\s*>", "\n\n", s)
+    s = re.sub(r"(?s)<[^>]+>", "", s)
+    return html.unescape(s).strip()
+
+
+def text_to_html(text_str: str) -> str:
+    esc = html.escape(text_str)
+    return esc.replace("\n", "<br>")
