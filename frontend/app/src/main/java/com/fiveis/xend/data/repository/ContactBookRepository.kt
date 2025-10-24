@@ -10,6 +10,8 @@ import com.fiveis.xend.data.model.ContactContext
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
+import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.data.model.PromptOptionRequest
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import kotlin.random.Random
@@ -159,10 +161,11 @@ class ContactBookRepository(context: Context) {
         }
     }
 
-    suspend fun addGroup(name: String, description: String): GroupResponse {
+    suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
         val request = AddGroupRequest(
             name = name,
-            description = description
+            description = description,
+            optionIds = options.map { it.id }
         )
 
         val response = contactApiService.addGroup(
@@ -189,6 +192,7 @@ class ContactBookRepository(context: Context) {
                     id = it.id,
                     name = it.name,
                     description = it.description,
+                    promptOptions = it.options,
                     members = emptyList(),
                     createdAt = it.createdAt,
                     updatedAt = it.updatedAt,
@@ -204,5 +208,35 @@ class ContactBookRepository(context: Context) {
         if (!response.isSuccessful) {
             throw IllegalStateException("Failed to delete group: HTTP ${response.code()} ${response.message()}")
         }
+    }
+
+    suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
+        val request = PromptOptionRequest(
+            key = key,
+            name = name,
+            prompt = prompt
+        )
+
+        val response = contactApiService.addPromptOption(request)
+        if (response.isSuccessful) {
+            return response.body()
+                ?: throw IllegalStateException("Success response but body is null")
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Add prompt option failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun getAllPromptOptions(): Pair<List<PromptOption>, List<PromptOption>> {
+        val response = contactApiService.getAllPromptOptions()
+        if (response.isSuccessful) {
+            val allOptions = response.body() ?: emptyList()
+            val toneOptions = allOptions.filter { it.key == "tone" }
+            val formatOptions = allOptions.filter { it.key == "format" }
+            return Pair(toneOptions, formatOptions)
+        }
+        throw IllegalStateException("Failed to get all prompt options: HTTP ${response.code()} ${response.message()}")
     }
 }

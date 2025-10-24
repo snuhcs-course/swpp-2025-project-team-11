@@ -4,6 +4,8 @@ import com.fiveis.xend.data.model.AddContactRequest
 import com.fiveis.xend.data.model.AddGroupRequest
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.GroupResponse
+import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.data.model.PromptOptionRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -33,6 +35,16 @@ interface ContactApiService {
     @GET("api/contact/groups/")
     suspend fun getAllGroups(): Response<List<GroupResponse>>
 
+    // TODO
+    @GET("api/contact/groups/{id}/")
+    suspend fun getGroup(@Path("id") groupId: Long): Response<GroupResponse>
+
     @DELETE("api/contact/groups/{id}/")
     suspend fun deleteGroup(@Path("id") groupId: Long): Response<Void>
+
+    @POST("api/contact/prompt-options/")
+    suspend fun addPromptOption(@Body payload: PromptOptionRequest): Response<PromptOption>
+
+    @GET("api/contact/prompt-options/")
+    suspend fun getAllPromptOptions(): Response<List<PromptOption>>
 }
