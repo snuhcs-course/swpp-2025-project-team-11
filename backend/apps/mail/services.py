@@ -1,6 +1,11 @@
 """Gmail API integration service"""
 
 import base64
+import html
+import re
+from email.header import Header
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import parsedate_to_datetime
 
 from google.oauth2.credentials import Credentials
@@ -20,6 +25,16 @@ class GmailService:
         """
         credentials = Credentials(token=access_token)
         self.service = build("gmail", "v1", credentials=credentials)
+
+    def _html_to_text(self, html_str: str) -> str:
+        s = re.sub(r"(?i)<\s*br\s*/?>", "\n", html_str)
+        s = re.sub(r"(?i)</\s*p\s*>", "\n\n", s)
+        s = re.sub(r"(?s)<[^>]+>", "", s)
+        return html.unescape(s).strip()
+
+    def _text_to_html(self, text_str: str) -> str:
+        esc = html.escape(text_str)
+        return esc.replace("\n", "<br>")
 
     def list_messages(self, max_results: int = 20, page_token: str = None, label_ids: list = None):
         """
@@ -174,7 +189,15 @@ class GmailService:
         except Exception:
             return ""
 
-    def send_message(self, to: str, subject: str, body: str):
+    def send_message(
+        self,
+        to: list[str],
+        subject: str,
+        body: str,
+        is_html: bool = True,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+    ):
         """
         Send an email via Gmail API
 
@@ -189,18 +212,31 @@ class GmailService:
         Raises:
             HttpError: Gmail API error
         """
-        from email.mime.text import MIMEText
 
         try:
-            # Create message
-            message = MIMEText(body, "plain", "utf-8")
-            message["To"] = to
-            message["Subject"] = subject
+            cc = cc or []
+            bcc = bcc or []
 
-            # Encode message
+            if is_html:
+                html_body = body
+                text_body = self._html_to_text(body)
+            else:
+                text_body = body
+                html_body = self._text_to_html(body)
+
+            message = MIMEMultipart("alternative")
+            message["Subject"] = str(Header(subject, "utf-8"))
+            message["To"] = ", ".join(to)
+            if cc:
+                message["Cc"] = ", ".join(cc)
+            if bcc:
+                message["Bcc"] = ", ".join(bcc)
+
+            # 순서 중요: plain 먼저, html 나중
+            message.attach(MIMEText(text_body, "plain", "utf-8"))
+            message.attach(MIMEText(html_body, "html", "utf-8"))
+
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
-
-            # Send via Gmail API
             result = self.service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
             return {
