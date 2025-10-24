@@ -210,18 +210,22 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
 
         # Send email via Gmail API with decorator
         try:
+            data = serializer.validated_data
             result = send_email_logic(
                 user,
-                to=serializer.validated_data["to"],
-                subject=serializer.validated_data["subject"],
-                body=serializer.validated_data["body"],
+                to=data["to"],
+                cc=data.get("cc", []),
+                bcc=data.get("bcc", []),
+                subject=data["subject"],
+                body=data["body"],
+                is_html=data.get("is_html", True),
             )
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
             if e.resp.status == 403:
                 return Response(
-                    {"detail": "Rate limit exceeded or permission denied"},
+                    {"detail": "Google Rate limit exceeded or permission denied"},
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             elif e.resp.status == 401:

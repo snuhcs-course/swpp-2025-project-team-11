@@ -36,10 +36,17 @@ def get_email_detail_logic(access_token, message_id):
 
 
 @google_token_required
-def send_email_logic(access_token, to, subject, body):
+def send_email_logic(access_token, to, subject, body, is_html=True, cc=None, bcc=None):
     """Helper function to send email using Google access token"""
     gmail_service = GmailService(access_token)
-    return gmail_service.send_message(to=to, subject=subject, body=body)
+    return gmail_service.send_message(
+        to=to,
+        cc=cc or [],
+        bcc=bcc or [],
+        subject=subject,
+        body=body,
+        is_html=is_html,
+    )
 
 
 @google_token_required
