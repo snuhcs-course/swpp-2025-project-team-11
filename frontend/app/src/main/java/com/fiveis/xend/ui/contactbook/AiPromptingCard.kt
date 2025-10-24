@@ -207,9 +207,9 @@ fun AiPromptingCard(
                     OutlinedTextField(
                         value = newPrompt,
                         onValueChange = { newPrompt = it },
-                        label = { Text("프롬프트") },
+                        label = { Text("프롬프트 설명") },
                         singleLine = false,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().height(160.dp)
                     )
                     if (addError != null) {
                         Spacer(Modifier.height(6.dp))
