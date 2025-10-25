@@ -35,7 +35,7 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = AddContactUiState(isLoading = true)
         viewModelScope.launch {
             try {
-                val res = repository.addContact(name, email, relationshipRole, personalPrompt)
+                val res = repository.addContact(name, email, group?.id, relationshipRole, personalPrompt)
                 _uiState.value = AddContactUiState(
                     isLoading = false,
                     lastSuccessMsg = "추가 성공(연락처 ID: ${res.id})",

@@ -95,6 +95,7 @@ class ContactBookRepository(context: Context) {
     suspend fun addContact(
         name: String,
         email: String,
+        groupId: Long?,
         relationshipRole: String,
         personalPrompt: String?
     ): ContactResponse {
@@ -106,6 +107,7 @@ class ContactBookRepository(context: Context) {
         val request = AddContactRequest(
             name = name,
             email = email,
+            groupId = groupId ?: -1L,
             context = requestContext
         )
 
@@ -120,6 +122,36 @@ class ContactBookRepository(context: Context) {
             val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
             throw IllegalStateException(
                 "Add contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun getContact(id: Long): Contact {
+        val response = contactApiService.getContact(id)
+        if (response.isSuccessful) {
+            return Contact(
+                id = response.body()?.id ?: throw IllegalStateException("Contact id is null"),
+                groupId = response.body()?.groupId,
+                name = response.body()?.name ?: throw IllegalStateException("Contact name is null"),
+                email = response.body()?.email ?: throw IllegalStateException("Contact email is null"),
+                context = response.body()?.context?.let { contextData ->
+                    ContactContext(
+                        id = contextData.id,
+                        relationshipRole = contextData.relationshipRole,
+                        relationshipDetails = contextData.relationshipDetails,
+                        personalPrompt = contextData.personalPrompt,
+                        languagePreference = contextData.languagePreference,
+                        createdAt = contextData.createdAt,
+                        updatedAt = contextData.updatedAt
+                    )
+                },
+                createdAt = response.body()?.createdAt,
+                updatedAt = response.body()?.updatedAt
+            )
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Get contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
             )
         }
     }
@@ -183,6 +215,25 @@ class ContactBookRepository(context: Context) {
         }
     }
 
+    suspend fun getGroup(id: Long): Group {
+        val response = contactApiService.getGroup(id)
+        if (response.isSuccessful) {
+            return Group(
+                id = response.body()?.id ?: throw IllegalStateException("Group id is null"),
+                name = response.body()?.name ?: throw IllegalStateException("Group name is null"),
+                description = response.body()?.description,
+                options = response.body()?.options ?: emptyList(),
+                createdAt = response.body()?.createdAt,
+                updatedAt = response.body()?.updatedAt
+            )
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Get group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
     suspend fun getAllGroups(): List<Group> {
         groupRnd = Random(groupColorRandomSeed)
         val response = contactApiService.getAllGroups()
@@ -192,7 +243,7 @@ class ContactBookRepository(context: Context) {
                     id = it.id,
                     name = it.name,
                     description = it.description,
-                    promptOptions = it.options,
+                    options = it.options,
                     members = emptyList(),
                     createdAt = it.createdAt,
                     updatedAt = it.updatedAt,
@@ -239,4 +290,13 @@ class ContactBookRepository(context: Context) {
         }
         throw IllegalStateException("Failed to get all prompt options: HTTP ${response.code()} ${response.message()}")
     }
+
+    fun GroupResponse.toDomain(): Group = Group(
+        id = id,
+        name = name,
+        description = description,
+        options = options,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
 }
