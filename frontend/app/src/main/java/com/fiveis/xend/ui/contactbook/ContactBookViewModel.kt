@@ -74,16 +74,24 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun onContactDelete(contactId: Long) {
-        viewModelScope.launch {
-            repository.deleteContact(contactId)
-            loadContactInfo(ContactBookTab.Contacts)
+        try{
+            viewModelScope.launch {
+                repository.deleteContact(contactId)
+                loadContactInfo(ContactBookTab.Contacts)
+            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(error = e.message ?: "연락처 삭제 실패") }
         }
     }
 
     fun onGroupDelete(groupId: Long) {
-        viewModelScope.launch {
-            repository.deleteGroup(groupId)
-            loadContactInfo(ContactBookTab.Groups)
+        try {
+            viewModelScope.launch {
+                repository.deleteGroup(groupId)
+                loadContactInfo(ContactBookTab.Groups)
+            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(error = e.message ?: "그룹 삭제 실패") }
         }
     }
 }
