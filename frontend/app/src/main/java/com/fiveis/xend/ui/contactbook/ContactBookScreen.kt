@@ -15,15 +15,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +58,9 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookTab
+import com.fiveis.xend.ui.theme.BackgroundLight
+import com.fiveis.xend.ui.theme.Red60
+import com.fiveis.xend.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +72,11 @@ fun ContactBookScreen(
     onContactClick: (Contact) -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
     onAddGroupClick: () -> Unit = {},
-    onAddContactClick: () -> Unit = {}
+    onAddContactClick: () -> Unit = {},
+    onEditGroupClick: (Group) -> Unit = {},
+    onDeleteGroupClick: (Group) -> Unit = {},
+    onEditContactClick: (Contact) -> Unit = {},
+    onDeleteContactClick: (Contact) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(ContactBookTab.Groups) }
 
@@ -112,7 +127,9 @@ fun ContactBookScreen(
                     items(uiState.groups.size) { index ->
                         GroupCard(
                             group = uiState.groups[index],
-                            onClick = onGroupClick
+                            onClick = onGroupClick,
+                            onEdit = onEditGroupClick,
+                            onDelete = onDeleteGroupClick
                         )
                     }
 
@@ -186,7 +203,9 @@ fun ContactBookScreen(
                             contact = uiState.contacts[index],
                             subtitle = uiState.contacts[index].email,
                             color = uiState.contacts[index].color,
-                            onClick = onContactClick
+                            onClick = onContactClick,
+                            onEdit = onEditContactClick,
+                            onDelete = onDeleteContactClick
                         )
                     }
 
@@ -216,7 +235,10 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun GroupCard(group: Group, onClick: (Group) -> Unit) {
+fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = {}, onDelete: (Group) -> Unit = {}) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Surface(
         color = group.color.copy(alpha = 0.1f),
         border = BorderStroke(2.dp, group.color),
@@ -225,7 +247,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit) {
             .fillMaxWidth()
             .clickable { onClick(group) }
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -246,19 +268,81 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit) {
                 }
                 Spacer(Modifier.weight(1f))
                 Text("${group.members.size}명", color = group.color, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(12.dp))
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                group.members.take(3).forEach {
-                    MemberCircle(it.name.first().toString(), group.color)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    group.members.take(3).forEach {
+                        MemberCircle(it.name.first().toString(), group.color)
+                    }
+                    if (group.members.size > 3) {
+                        MemberCircle("+${group.members.size - 3}", Color.LightGray)
+                    }
                 }
-                if (group.members.size > 3) {
-                    MemberCircle("+${group.members.size - 3}", Color.LightGray)
+
+                Spacer(Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier.wrapContentSize(Alignment.TopEnd)
+                ) {
+                    // 우측 "..." 버튼
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "더보기"
+                        )
+                    }
+
+                    // 오버플로우 메뉴
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                            text = { Text("수정") },
+                            onClick = {
+                                menuExpanded = false
+                                onEdit(group)
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                            text = { Text("삭제", color = Red60) },
+                            onClick = {
+                                menuExpanded = false
+                                showDeleteConfirm = true
+                            }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    // 삭제 확인 dialog
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("그룹 삭제") },
+            text = { Text("\"${group.name}\" 그룹을 삭제하시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete(group)
+                }) { Text("삭제", color = Red60) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("취소") }
+            },
+            containerColor = BackgroundLight
+        )
     }
 }
 
@@ -351,6 +435,7 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
+// deprecated ContactRow
 @Composable
 private fun ContactRow(contact: Contact, subtitle: String, color: Color, onClick: (Contact) -> Unit) {
     Row(
@@ -385,6 +470,97 @@ private fun ContactRow(contact: Contact, subtitle: String, color: Color, onClick
         ) {
             Text("😎", fontSize = 14.sp)
         }
+    }
+}
+
+@Composable
+private fun ContactRow(
+    contact: Contact,
+    subtitle: String,
+    color: Color,
+    onClick: (Contact) -> Unit,
+    onEdit: (Contact) -> Unit = {},
+    onDelete: (Contact) -> Unit = {}
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick(contact) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MonogramAvatar(
+            letter = contact.name.firstOrNull()?.toString() ?: "?",
+            bg = color
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(contact.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(
+                subtitle,
+                color = TextSecondary,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Box(
+            modifier = Modifier.wrapContentSize(Alignment.TopEnd)
+        ) {
+            // 우측 "..." 버튼
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "더보기"
+                )
+            }
+
+            // 오버플로우 메뉴
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                    text = { Text("수정") },
+                    onClick = {
+                        menuExpanded = false
+                        onEdit(contact)
+                    }
+                )
+                DropdownMenuItem(
+                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                    text = { Text("삭제", color = Red60) },
+                    onClick = {
+                        menuExpanded = false
+                        showDeleteConfirm = true
+                    }
+                )
+            }
+        }
+    }
+
+    // 삭제 확인 dialog
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("연락처 삭제") },
+            text = { Text("\"${contact.name}\" 님의 연락처를 삭제하시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete(contact)
+                }) { Text("삭제", color = Red60) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("취소") }
+            },
+            containerColor = BackgroundLight
+        )
     }
 }
 

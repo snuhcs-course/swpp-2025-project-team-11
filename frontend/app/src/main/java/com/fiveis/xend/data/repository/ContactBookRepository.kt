@@ -10,6 +10,8 @@ import com.fiveis.xend.data.model.ContactContext
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
+import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.data.model.PromptOptionRequest
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import kotlin.random.Random
@@ -20,9 +22,16 @@ sealed interface ContactBookData
 data class GroupData(val groups: List<Group>) : ContactBookData
 data class ContactData(val contacts: List<Contact>) : ContactBookData
 
-private var seed: Long = 2025L
-private var seed2: Long = -2025L
-private var rnd: Random = Random(seed)
+private var contactColorRandomSeed: Long = 5L
+private var groupColorRandomSeed: Long = 7L
+private var contactRnd: Random = Random(contactColorRandomSeed)
+private var groupRnd: Random = Random(groupColorRandomSeed)
+fun randomNotTooLightColor(rnd: Random = Random.Default): Color {
+    val hue = rnd.nextFloat() * 360f
+    val saturation = 0.65f + rnd.nextFloat() * 0.35f // 0.65 ~ 1.00
+    val value = 0.45f + rnd.nextFloat() * 0.40f // 0.45 ~ 0.85
+    return Color.hsv(hue, saturation, value)
+}
 
 class ContactBookRepository(context: Context) {
     private val contactApiService: ContactApiService = RetrofitClient.getContactApiService(context)
@@ -116,8 +125,7 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun getAllContacts(): List<Contact> {
-        rnd = Random(seed)
-
+        contactRnd = Random(contactColorRandomSeed)
         val response = contactApiService.getAllContacts()
         if (response.isSuccessful) {
             return response.body()?.map { contactData ->
@@ -139,17 +147,25 @@ class ContactBookRepository(context: Context) {
                     },
                     createdAt = contactData.createdAt,
                     updatedAt = contactData.updatedAt,
-                    color = Color(rnd.nextInt(), rnd.nextInt(), rnd.nextInt())
+                    color = randomNotTooLightColor(contactRnd)
                 )
             } ?: emptyList()
         }
         throw IllegalStateException("Failed to get all contacts: HTTP ${response.code()} ${response.message()}")
     }
 
-    suspend fun addGroup(name: String, description: String): GroupResponse {
+    suspend fun deleteContact(contactId: Long) {
+        val response = contactApiService.deleteContact(contactId)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete contact: HTTP ${response.code()} ${response.message()}")
+        }
+    }
+
+    suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
         val request = AddGroupRequest(
             name = name,
-            description = description
+            description = description,
+            optionIds = options.map { it.id }
         )
 
         val response = contactApiService.addGroup(
@@ -168,8 +184,7 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun getAllGroups(): List<Group> {
-        rnd = Random(seed2)
-
+        groupRnd = Random(groupColorRandomSeed)
         val response = contactApiService.getAllGroups()
         if (response.isSuccessful) {
             return response.body()?.map {
@@ -177,13 +192,51 @@ class ContactBookRepository(context: Context) {
                     id = it.id,
                     name = it.name,
                     description = it.description,
+                    promptOptions = it.options,
                     members = emptyList(),
                     createdAt = it.createdAt,
                     updatedAt = it.updatedAt,
-                    color = Color(rnd.nextInt(), rnd.nextInt(), rnd.nextInt())
+                    color = randomNotTooLightColor(groupRnd)
                 )
             } ?: emptyList()
         }
         throw IllegalStateException("Failed to get all groups: HTTP ${response.code()} ${response.message()}")
+    }
+
+    suspend fun deleteGroup(groupId: Long) {
+        val response = contactApiService.deleteGroup(groupId)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete group: HTTP ${response.code()} ${response.message()}")
+        }
+    }
+
+    suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
+        val request = PromptOptionRequest(
+            key = key,
+            name = name,
+            prompt = prompt
+        )
+
+        val response = contactApiService.addPromptOption(request)
+        if (response.isSuccessful) {
+            return response.body()
+                ?: throw IllegalStateException("Success response but body is null")
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Add prompt option failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun getAllPromptOptions(): Pair<List<PromptOption>, List<PromptOption>> {
+        val response = contactApiService.getAllPromptOptions()
+        if (response.isSuccessful) {
+            val allOptions = response.body() ?: emptyList()
+            val toneOptions = allOptions.filter { it.key == "tone" }
+            val formatOptions = allOptions.filter { it.key == "format" }
+            return Pair(toneOptions, formatOptions)
+        }
+        throw IllegalStateException("Failed to get all prompt options: HTTP ${response.code()} ${response.message()}")
     }
 }

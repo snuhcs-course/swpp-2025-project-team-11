@@ -77,9 +77,15 @@ class ContactBookActivity : ComponentActivity() {
                         addGroupLauncher.launch(Intent(this, AddGroupActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
+                    onDeleteGroupClick = {
+                        viewModel.onGroupDelete(it.id)
+                    },
                     onAddContactClick = {
                         addContactLauncher.launch(Intent(this, AddContactActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
+                    onDeleteContactClick = {
+                        viewModel.onContactDelete(it.id)
                     }
                 )
             }
