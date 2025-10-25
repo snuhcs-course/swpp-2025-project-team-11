@@ -74,7 +74,7 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun onContactDelete(contactId: Long) {
-        try{
+        try {
             viewModelScope.launch {
                 repository.deleteContact(contactId)
                 loadContactInfo(ContactBookTab.Contacts)
