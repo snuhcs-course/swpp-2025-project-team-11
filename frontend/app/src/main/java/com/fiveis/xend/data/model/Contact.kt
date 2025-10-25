@@ -15,7 +15,8 @@ data class Contact(
 
 data class ContactContext(
     val id: Long,
-    val relationshipRole: String? = null,
+    val senderRole: String? = null,
+    val recipientRole: String? = null,
     val relationshipDetails: String? = null,
     val personalPrompt: String? = null,
     val languagePreference: String? = null,

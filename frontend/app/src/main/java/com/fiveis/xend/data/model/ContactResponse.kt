@@ -17,7 +17,8 @@ data class ContactResponse(
 @Serializable
 data class ContactResponseContext(
     val id: Long,
-    @SerialName("relationship_role") val relationshipRole: String? = null,
+    @SerialName("sender_role") val senderRole: String? = null,
+    @SerialName("recipient_role") val recipientRole: String? = null,
     @SerialName("relationship_details") val relationshipDetails: String? = null,
     @SerialName("personal_prompt") val personalPrompt: String? = null,
     @SerialName("language_preference") val languagePreference: String? = null,
@@ -37,7 +38,8 @@ fun ContactResponse.toDomain(): Contact = Contact(
 
 fun ContactResponseContext.toDomain(): ContactContext = ContactContext(
     id = id,
-    relationshipRole = relationshipRole,
+    senderRole = senderRole,
+    recipientRole = recipientRole,
     relationshipDetails = relationshipDetails,
     personalPrompt = personalPrompt,
     languagePreference = languagePreference,

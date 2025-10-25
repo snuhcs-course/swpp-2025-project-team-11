@@ -22,7 +22,14 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
     private val _uiState = MutableStateFlow(AddContactUiState())
     val uiState: StateFlow<AddContactUiState> = _uiState.asStateFlow()
 
-    fun addContact(name: String, email: String, relationshipRole: String, personalPrompt: String?, group: Group?) {
+    fun addContact(
+        name: String,
+        email: String,
+        senderRole: String?,
+        recipientRole: String,
+        personalPrompt: String?,
+        group: Group?
+    ) {
         if (name.isBlank()) {
             _uiState.value = AddContactUiState(isLoading = false, error = "이름을 입력해 주세요.")
             return
@@ -35,7 +42,7 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = AddContactUiState(isLoading = true)
         viewModelScope.launch {
             try {
-                val res = repository.addContact(name, email, group?.id, relationshipRole, personalPrompt)
+                val res = repository.addContact(name, email, group?.id, senderRole, recipientRole, personalPrompt)
                 _uiState.value = AddContactUiState(
                     isLoading = false,
                     lastSuccessMsg = "추가 성공(연락처 ID: ${res.id})",

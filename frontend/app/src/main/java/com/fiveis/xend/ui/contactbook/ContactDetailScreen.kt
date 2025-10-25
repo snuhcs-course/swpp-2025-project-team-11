@@ -116,7 +116,7 @@ fun ContactDetailScreen(
             tonalElevation = 1.dp
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoRow("관계", contact.context?.relationshipRole ?: "-")
+                InfoRow("관계", contact.context?.recipientRole ?: "-")
                 Divider()
                 InfoRow("개인 프롬프트", contact.context?.personalPrompt ?: "-")
             }

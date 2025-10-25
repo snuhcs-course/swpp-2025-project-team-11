@@ -96,12 +96,14 @@ class ContactBookRepository(context: Context) {
         name: String,
         email: String,
         groupId: Long?,
-        relationshipRole: String,
+        senderRole: String?,
+        recipientRole: String,
         personalPrompt: String?
     ): ContactResponse {
         val requestContext = AddContactRequestContext(
-            relationshipRole = relationshipRole,
-            personalPrompt = personalPrompt
+            senderRole = senderRole ?: "Mail writer",
+            recipientRole = recipientRole,
+            personalPrompt = personalPrompt ?: ""
         )
 
         val request = AddContactRequest(

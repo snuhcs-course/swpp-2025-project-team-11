@@ -50,7 +50,8 @@ class AddContactActivity : ComponentActivity() {
                 // AddContactScreen 입력값들 보관
                 var name by rememberSaveable { mutableStateOf("") }
                 var email by rememberSaveable { mutableStateOf("") }
-                var relationRole by rememberSaveable { mutableStateOf<String?>(null) }
+                var senderRole by rememberSaveable { mutableStateOf<String?>(null) }
+                var recipientRole by rememberSaveable { mutableStateOf<String?>(null) }
                 var personalPrompt by rememberSaveable { mutableStateOf<String?>(null) }
                 var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
 
@@ -58,7 +59,7 @@ class AddContactActivity : ComponentActivity() {
                     groups = bookUiState.groups,
                     onNameChange = { name = it },
                     onEmailChange = { email = it },
-                    onRelationshipRoleChange = { relationRole = it },
+                    onRelationshipRoleChange = { recipientRole = it },
                     onPersonalPromptChange = { personalPrompt = it },
                     onGroupChange = { selectedGroup = it },
                     onBack = {
@@ -69,7 +70,8 @@ class AddContactActivity : ComponentActivity() {
                         addViewModel.addContact(
                             name = name,
                             email = email,
-                            relationshipRole = relationRole ?: "",
+                            senderRole = senderRole,
+                            recipientRole = recipientRole ?: "",
                             personalPrompt = personalPrompt,
                             group = selectedGroup
                         )

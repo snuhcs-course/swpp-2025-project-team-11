@@ -13,7 +13,8 @@ data class AddContactRequest(
 
 @Serializable
 data class AddContactRequestContext(
-    @SerialName("relationship_role") val relationshipRole: String? = "",
+    @SerialName("sender_role") val senderRole: String? = "Mail writer",
+    @SerialName("recipient_role") val recipientRole: String? = "",
     @SerialName("relationship_details") val relationshipDetails: String? = "",
     @SerialName("personal_prompt") val personalPrompt: String? = "",
     @SerialName("language_preference") val languagePreference: String? = "KOR"
