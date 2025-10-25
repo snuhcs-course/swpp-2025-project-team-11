@@ -9,3 +9,9 @@ class MailGenerateRequest(serializers.Serializer):
         allow_empty=False,
         required=True,
     )
+
+
+class ReplyGenerateRequest(serializers.Serializer):
+    subject = serializers.CharField(allow_blank=True, required=True)
+    body = serializers.CharField(allow_blank=True, required=True)
+    to_email = serializers.EmailField(required=True, allow_blank=False)
