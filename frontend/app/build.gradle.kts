@@ -50,6 +50,11 @@ android {
             "BASE_URL",
             "\"${localProperties.getProperty("base_url", "")}\""
         )
+        buildConfigField(
+            "String",
+            "WS_URL",
+            "\"${localProperties.getProperty("ws.url", "")}\""
+        )
     }
 
     buildTypes {
