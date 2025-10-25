@@ -66,7 +66,8 @@ class ContactContext(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="context",
     )
-    relationship_role = models.CharField(max_length=50, blank=True)
+    sender_role = models.CharField(max_length=50, blank=True)
+    recipient_role = models.CharField(max_length=50, blank=True)
     relationship_details = models.TextField(blank=True)
     personal_prompt = models.TextField(blank=True)
     language_preference = models.CharField(max_length=5, blank=True)

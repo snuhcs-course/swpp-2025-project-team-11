@@ -14,14 +14,7 @@ OPEN_TOKENS = ("{{PII:", "{PII:")
 CLOSE_FOR = {"{{PII:": "}}", "{PII:": "}"}
 LONGEST_OPEN = max(len(t) for t in OPEN_TOKENS)
 
-PLACEHOLDER_RX = re.compile(
-    r"(?P<open>\{\{?)"
-    r"PII:"
-    r"(?P<rid>[a-z0-9]{12}):"
-    r"(?P<n>\d+):"
-    r"(?P<tag>[A-Za-z0-9_-]{4,16})"
-    r"(?P<close>\}\}?)"
-)
+PLACEHOLDER_RX = re.compile(r"(?P<open>\{\{?)" r"PII:" r"(?P<rid>[a-z0-9]{12}):" r"(?P<n>\d+):" r"(?P<tag>[A-Za-z0-9_-]{4,16})" r"(?P<close>\}\}?)")
 
 MAX_PLACEHOLDER_LEN = 96
 
@@ -45,9 +38,7 @@ class PatternSpec:
 PATTERNS: list[PatternSpec] = [
     PatternSpec(
         "EMAIL",
-        re.compile(
-            r"(?P<email>[A-Za-z0-9._%+\-]+@(?:[A-Za-z0-9\-]+\.)+[A-Za-z]{2,24})(?![A-Za-z0-9._%+\-@])"
-        ),
+        re.compile(r"(?P<email>[A-Za-z0-9._%+\-]+@(?:[A-Za-z0-9\-]+\.)+[A-Za-z]{2,24})(?![A-Za-z0-9._%+\-@])"),
         0,
     ),
     PatternSpec(
@@ -63,25 +54,19 @@ PATTERNS: list[PatternSpec] = [
     PatternSpec("IBAN", re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b"), 0),
     PatternSpec("SWIFT_BIC", re.compile(r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b"), 0),
     PatternSpec("SSN_US", re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), 0),
-    PatternSpec(
-        "JWT", re.compile(r"\beyJ[A-Za-z0-9_\-]+?\.[A-Za-z0-9_\-]+?\.[A-Za-z0-9_\-]*\b"), 0
-    ),
+    PatternSpec("JWT", re.compile(r"\beyJ[A-Za-z0-9_\-]+?\.[A-Za-z0-9_\-]+?\.[A-Za-z0-9_\-]*\b"), 0),
     PatternSpec("BEARER", re.compile(r"\bBearer\s+[A-Za-z0-9\-_.=]{20,}\b", re.I), 0),
     PatternSpec("AWS", re.compile(r"\bAKIA[0-9A-Z]{16}\b"), 0),
     PatternSpec("GITHUB_PAT", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"), 0),
     PatternSpec(
         "UUID",
-        re.compile(
-            r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b"
-        ),
+        re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b"),
         0,
     ),
     PatternSpec("IPV4", re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?:\.(?!$)|$)){4}\b"), 0),
     PatternSpec("MAC", re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b"), 0),
     PatternSpec("VIN", re.compile(r"\b[A-HJ-NPR-Za-hj-npr-z0-9]{17}\b"), 0),
-    PatternSpec(
-        "PASS", re.compile(r"(?i)(?:password|pwd|pass|비밀번호)\s*[:=]\s*([^\s,;]{4,64})"), 1
-    ),
+    PatternSpec("PASS", re.compile(r"(?i)(?:password|pwd|pass|비밀번호)\s*[:=]\s*([^\s,;]{4,64})"), 1),
     PatternSpec("LONG_DIGITS", re.compile(r"\b\d{6,20}\b"), 0),
     PatternSpec("URL", re.compile(r"https?://[^\s]+"), 0),
 ]
@@ -222,7 +207,7 @@ def unmask_stream(
     chunks: Iterable[str],
     req_id: str,
     mapping: dict[int, str],
-) -> Generator[str, None, None]:
+) -> Generator[str]:
     """
     최소 버퍼 DFA:
     - PLAIN 모드: 즉시 방출

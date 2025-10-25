@@ -20,8 +20,6 @@ def extend_schema_with_common_errors(**kwargs):
     exclude_codes = set(kwargs.pop("exclude_codes", []) or [])
     base_responses = kwargs.pop("responses", {}) or {}
     # 공통 에러에서 제외할 응답 코드 제거
-    common = {
-        code: resp for code, resp in COMMON_ERROR_RESPONSES.items() if code not in exclude_codes
-    }
+    common = {code: resp for code, resp in COMMON_ERROR_RESPONSES.items() if code not in exclude_codes}
     merged = {**base_responses, **common}
     return extend_schema(responses=merged, **kwargs)

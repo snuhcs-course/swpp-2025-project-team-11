@@ -18,9 +18,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
-                    ),
+                    models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID"),
                 ),
                 ("gmail_id", models.CharField(max_length=255, unique=True)),
                 ("thread_id", models.CharField(max_length=255)),
@@ -45,9 +43,7 @@ class Migration(migrations.Migration):
             options={
                 "ordering": ["-received_at"],
                 "indexes": [
-                    models.Index(
-                        fields=["user", "-received_at"], name="mail_email_user_id_248506_idx"
-                    ),
+                    models.Index(fields=["user", "-received_at"], name="mail_email_user_id_248506_idx"),
                     models.Index(fields=["gmail_id"], name="mail_email_gmail_i_249ed8_idx"),
                 ],
             },

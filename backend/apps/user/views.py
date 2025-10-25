@@ -81,9 +81,7 @@ class GoogleCallbackView(generics.GenericAPIView):
         name = userinfo.get("name")
 
         if not email:
-            return Response(
-                {"detail": "Email not provided by Google."}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": "Email not provided by Google."}, status=status.HTTP_400_BAD_REQUEST)
 
         # User DB 저장
         user, created = User.objects.get_or_create(email=email, defaults={"name": name})

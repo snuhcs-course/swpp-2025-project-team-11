@@ -19,9 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
-                    ),
+                    models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID"),
                 ),
                 ("provider", models.CharField(db_index=True, default="gmail", max_length=20)),
                 ("external_message_id", models.CharField(blank=True, max_length=255)),
@@ -61,9 +59,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="sentmail",
-            index=models.Index(
-                fields=["provider", "thread_id"], name="mail_sentma_provide_0c3955_idx"
-            ),
+            index=models.Index(fields=["provider", "thread_id"], name="mail_sentma_provide_0c3955_idx"),
         ),
         migrations.AddConstraint(
             model_name="sentmail",
