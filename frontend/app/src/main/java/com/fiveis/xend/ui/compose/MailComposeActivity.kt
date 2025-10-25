@@ -538,7 +538,7 @@ private fun RecipientSection(
                     id = 0,
                     name = trimmed,
                     email = trimmed,
-                    groupId = 0
+                    group = null
                 )
             )
             onNewContactChange(TextFieldValue(""))
@@ -976,7 +976,7 @@ class MailComposeActivity : ComponentActivity() {
                             onBack = { showTemplateScreen = false },
                             onTemplateSelected = { template ->
                                 subject = template.subject
-                                body = template.body
+                                richTextState.setHtml(template.body)
                                 showTemplateScreen = false
                             },
                             modifier = Modifier.padding(innerPadding)
@@ -1040,7 +1040,7 @@ private fun EmailComposePreview() {
             subject = "초안 제목",
             onSubjectChange = {},
             richTextState = richTextState,
-            contacts = listOf(Contact(0L, 0L, "홍길동", "test@example.com")),
+            contacts = listOf(Contact(0L, null, "홍길동", "test@example.com")),
 
             onContactsChange = {},
             newContact = TextFieldValue(""),

@@ -21,7 +21,6 @@ interface ContactApiService {
     @GET("api/contact/")
     suspend fun getAllContacts(): Response<List<ContactResponse>>
 
-    // TODO
     @GET("api/contact/{id}/")
     suspend fun getContact(@Path("id") contactId: Long): Response<ContactResponse>
 
@@ -35,7 +34,6 @@ interface ContactApiService {
     @GET("api/contact/groups/")
     suspend fun getAllGroups(): Response<List<GroupResponse>>
 
-    // TODO
     @GET("api/contact/groups/{id}/")
     suspend fun getGroup(@Path("id") groupId: Long): Response<GroupResponse>
 

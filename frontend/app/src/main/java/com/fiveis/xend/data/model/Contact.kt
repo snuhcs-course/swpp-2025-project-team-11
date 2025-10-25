@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 data class Contact(
     val id: Long,
-    val groupId: Long? = null,
+    val group: Group? = null,
     val name: String,
     val email: String,
     val context: ContactContext? = null,

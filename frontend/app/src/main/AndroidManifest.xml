@@ -42,6 +42,8 @@
         <activity android:name=".ui.search.SearchActivity" />
         <activity android:name=".ui.contactbook.AddContactActivity" />
         <activity android:name=".ui.contactbook.AddGroupActivity" />
+        <activity android:name=".ui.contactbook.GroupDetailActivity" />
+        <activity android:name=".ui.contactbook.ContactDetailActivity" />
 
 
 
