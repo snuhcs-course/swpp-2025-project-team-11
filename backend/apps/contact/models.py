@@ -35,14 +35,14 @@ class Contact(TimeStampedModel):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="contact",
+        related_name="contacts",
     )
     group = models.ForeignKey(
         Group,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="contact",
+        related_name="contacts",
     )
     name = models.CharField(max_length=120)
     email = models.EmailField()
@@ -70,7 +70,7 @@ class ContactContext(TimeStampedModel):
     recipient_role = models.CharField(max_length=50, blank=True)
     relationship_details = models.TextField(blank=True)
     personal_prompt = models.TextField(blank=True)
-    language_preference = models.CharField(max_length=5, blank=True)
+    language_preference = models.CharField(max_length=12, blank=True)
 
     class Meta:
         ordering = ["contact_id"]

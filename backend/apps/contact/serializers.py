@@ -27,6 +27,40 @@ class PromptOptionSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class ContactContextInGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactContext
+        fields = (
+            "id",
+            "sender_role",
+            "recipient_role",
+            "relationship_details",
+            "personal_prompt",
+            "language_preference",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "sender_role",
+            "recipient_role",
+            "relationship_details",
+            "personal_prompt",
+            "language_preference",
+            "created_at",
+            "updated_at",
+        )
+
+
+class ContactInGroupSerializer(serializers.ModelSerializer):
+    context = ContactContextInGroupSerializer(read_only=True, allow_null=True)
+
+    class Meta:
+        model = Contact
+        fields = ("id", "name", "email", "context", "created_at", "updated_at")
+        read_only_fields = ("id", "name", "email", "context", "created_at", "updated_at")
+
+
 class GroupSerializer(serializers.ModelSerializer):
     options = PromptOptionSerializer(many=True, read_only=True)
 
@@ -37,10 +71,12 @@ class GroupSerializer(serializers.ModelSerializer):
         write_only=True,
     )
 
+    contacts = ContactInGroupSerializer(many=True, read_only=True)
+
     class Meta:
         model = Group
-        fields = ("id", "name", "description", "options", "option_ids", "created_at", "updated_at")
-        read_only_fields = ("id", "created_at", "updated_at")
+        fields = ("id", "name", "description", "options", "option_ids", "contacts", "created_at", "updated_at")
+        read_only_fields = ("id", "contacts", "created_at", "updated_at")
 
     def _resolve_options_for_user(self, option_ids):
         """
@@ -97,6 +133,15 @@ class GroupSerializer(serializers.ModelSerializer):
         return instance
 
 
+class GroupInContactSerializer(serializers.ModelSerializer):
+    options = PromptOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ("id", "name", "description", "options", "created_at", "updated_at")
+        read_only_fields = ("id", "name", "description", "options", "created_at", "updated_at")
+
+
 class ContactContextSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactContext
@@ -118,7 +163,7 @@ class ContactContextSerializer(serializers.ModelSerializer):
 
 
 class ContactSerializer(serializers.ModelSerializer):
-    group = GroupSerializer(read_only=True)
+    group = GroupInContactSerializer(read_only=True)
 
     group_id = serializers.PrimaryKeyRelatedField(
         queryset=Group.objects.all(),
