@@ -1,5 +1,8 @@
+from email.utils import parseaddr
+
 from cryptography.fernet import Fernet
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -15,8 +18,10 @@ from rest_framework.views import APIView
 from apps.user.models import GoogleAccount, User
 from apps.user.services import google_refresh
 
+from ..contact.models import Contact
 from ..core.mixins import AuthRequiredMixin
 from ..core.utils.docs import extend_schema_with_common_errors
+from .models import SentMail
 from .serializers import (
     EmailDetailSerializer,
     EmailListQuerySerializer,
@@ -26,8 +31,7 @@ from .serializers import (
     EmailSendResponseSerializer,
     EmailSendSerializer,
 )
-from .services import GmailService
-from .utils import get_email_detail_logic, list_emails_logic, mark_read_logic, send_email_logic
+from .services import GmailService, get_email_detail_logic, list_emails_logic, mark_read_logic, send_email_logic
 
 
 class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
@@ -114,9 +118,7 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             elif e.resp.status == 401:
-                return Response(
-                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response({"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -169,9 +171,7 @@ class EmailDetailView(AuthRequiredMixin, generics.GenericAPIView):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             elif e.resp.status == 401:
-                return Response(
-                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response({"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -229,13 +229,9 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             elif e.resp.status == 401:
-                return Response(
-                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response({"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
             elif e.resp.status == 400:
-                return Response(
-                    {"detail": "Invalid email format"}, status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"detail": "Invalid email format"}, status=status.HTTP_400_BAD_REQUEST)
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -245,6 +241,38 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
                 {"detail": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        try:
+            to_list = data.get("to", []) or []
+
+            def extract_email(addr: str) -> str:
+                _, email = parseaddr(addr or "")
+                return (email or "").strip().lower()
+
+            to_emails = {extract_email(a) for a in to_list if extract_email(a)}
+
+            if to_emails:
+                contacts = list(Contact.objects.filter(user=user, email__in=to_emails).only("id"))
+
+                if contacts:
+                    now = timezone.now()
+                    subject = (data.get("subject") or "")[:300]
+                    body = data.get("body") or ""
+
+                    rows = [
+                        SentMail(
+                            user=user,
+                            contact=c,
+                            subject=subject,
+                            body=body,
+                            sent_at=now,
+                        )
+                        for c in contacts
+                    ]
+                    with transaction.atomic():
+                        SentMail.objects.bulk_create(rows, batch_size=1000)
+        except Exception:
+            pass
 
         response_serializer = EmailSendResponseSerializer(result)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -349,9 +377,7 @@ class EmailMarkReadView(AuthRequiredMixin, generics.GenericAPIView):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             elif e.resp.status == 401:
-                return Response(
-                    {"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response({"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
             return Response(
                 {"detail": f"Gmail API error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -56,15 +56,11 @@ class GroupSerializer(serializers.ModelSerializer):
             return []
 
         user = self.context["request"].user
-        qs = PromptOption.objects.filter(id__in=deduped).filter(
-            models.Q(created_by__isnull=True) | models.Q(created_by=user)
-        )
+        qs = PromptOption.objects.filter(id__in=deduped).filter(models.Q(created_by__isnull=True) | models.Q(created_by=user))
         found = set(qs.values_list("id", flat=True))
         missing = [oid for oid in deduped if oid not in found]
         if missing:
-            raise serializers.ValidationError(
-                {"option_ids": f"ID not allowed or non-existent: {missing}"}
-            )
+            raise serializers.ValidationError({"option_ids": f"ID not allowed or non-existent: {missing}"})
 
         by_id = {o.id: o for o in qs}
         return [by_id[oid] for oid in deduped]
@@ -155,17 +151,13 @@ class ContactSerializer(serializers.ModelSerializer):
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
-                raise serializers.ValidationError(
-                    {"email": "The contact information for that email already exists."}
-                )
+                raise serializers.ValidationError({"email": "The contact information for that email already exists."})
         return attrs
 
     def validate_group(self, group):
         # Allow null group; otherwise enforce same owner
         if group and group.user_id != self.context["request"].user.id:
-            raise serializers.ValidationError(
-                "You cannot assign a contact to a group owned by another user."
-            )
+            raise serializers.ValidationError("You cannot assign a contact to a group owned by another user.")
         return group
 
     @transaction.atomic
@@ -187,9 +179,7 @@ class ContactSerializer(serializers.ModelSerializer):
         # Re-validate group ownership if group is being changed
         group = validated_data.get("group", None)
         if group and group.user_id != self.context["request"].user.id:
-            raise serializers.ValidationError(
-                "You cannot assign a contact to a group owned by another user."
-            )
+            raise serializers.ValidationError("You cannot assign a contact to a group owned by another user.")
 
         contact = super().update(instance, validated_data)
 

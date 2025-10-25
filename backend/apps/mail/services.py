@@ -1,6 +1,7 @@
 """Gmail API integration service"""
 
 import base64
+import logging
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -11,6 +12,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from apps.mail.utils import html_to_text, text_to_html
+from apps.user.utils import google_token_required
+
+logger = logging.getLogger(__name__)
 
 
 class GmailService:
@@ -49,12 +53,7 @@ class GmailService:
             label_ids = ["INBOX"]
 
         try:
-            results = (
-                self.service.users()
-                .messages()
-                .list(userId="me", maxResults=max_results, pageToken=page_token, labelIds=label_ids)
-                .execute()
-            )
+            results = self.service.users().messages().list(userId="me", maxResults=max_results, pageToken=page_token, labelIds=label_ids).execute()
             return results
         except HttpError:
             raise
@@ -73,12 +72,7 @@ class GmailService:
             HttpError: Gmail API error
         """
         try:
-            message = (
-                self.service.users()
-                .messages()
-                .get(userId="me", id=message_id, format="full")
-                .execute()
-            )
+            message = self.service.users().messages().get(userId="me", id=message_id, format="full").execute()
             return self._parse_message(message)
         except HttpError:
             raise
@@ -251,12 +245,7 @@ class GmailService:
             HttpError: Gmail API error
         """
         try:
-            result = (
-                self.service.users()
-                .messages()
-                .modify(userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]})
-                .execute()
-            )
+            result = self.service.users().messages().modify(userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]}).execute()
             return result
         except HttpError:
             raise
@@ -275,12 +264,58 @@ class GmailService:
             HttpError: Gmail API error
         """
         try:
-            result = (
-                self.service.users()
-                .messages()
-                .modify(userId="me", id=message_id, body={"addLabelIds": ["UNREAD"]})
-                .execute()
-            )
+            result = self.service.users().messages().modify(userId="me", id=message_id, body={"addLabelIds": ["UNREAD"]}).execute()
             return result
         except HttpError:
             raise
+
+
+@google_token_required
+def list_emails_logic(access_token, max_results, page_token, label_ids):
+    """Helper function to list emails using Google access token"""
+    gmail_service = GmailService(access_token)
+    result = gmail_service.list_messages(max_results=max_results, page_token=page_token, label_ids=label_ids)
+
+    # Fetch detailed info for each message
+    messages = []
+    for msg in result.get("messages", []):
+        try:
+            message_detail = gmail_service.get_message(msg["id"])
+            messages.append(message_detail)
+        except Exception as e:
+            # Skip individual message fetch failures
+            logger.warning(f"Failed to fetch message {msg['id']}: {str(e)}")
+            continue
+
+    return result, messages
+
+
+@google_token_required
+def get_email_detail_logic(access_token, message_id):
+    """Helper function to get email detail using Google access token"""
+    gmail_service = GmailService(access_token)
+    return gmail_service.get_message(message_id)
+
+
+@google_token_required
+def send_email_logic(access_token, to, subject, body, is_html=True, cc=None, bcc=None):
+    """Helper function to send email using Google access token"""
+    gmail_service = GmailService(access_token)
+    return gmail_service.send_message(
+        to=to,
+        cc=cc or [],
+        bcc=bcc or [],
+        subject=subject,
+        body=body,
+        is_html=is_html,
+    )
+
+
+@google_token_required
+def mark_read_logic(access_token, message_id, is_read):
+    """Helper function to mark email as read/unread using Google access token"""
+    gmail_service = GmailService(access_token)
+    if is_read:
+        return gmail_service.mark_as_read(message_id)
+    else:
+        return gmail_service.mark_as_unread(message_id)

@@ -56,9 +56,7 @@ class ContactListCreateView(AuthRequiredMixin, OwnerQuerysetMixin, generics.List
         serializer.save(user=self.request.user)
 
 
-class ContactDetailView(
-    AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView
-):
+class ContactDetailView(AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Contact.objects.select_related("group")
     serializer_class = ContactSerializer
     owner_field = "user"
@@ -113,9 +111,7 @@ class PromptOptionDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAP
 
     def get_queryset(self):
         user = self.request.user
-        return PromptOption.objects.filter(created_by=user) | PromptOption.objects.filter(
-            created_by__isnull=True
-        )
+        return PromptOption.objects.filter(created_by=user) | PromptOption.objects.filter(created_by__isnull=True)
 
     def perform_update(self, serializer):
         # System-defined options are read-only
@@ -140,8 +136,6 @@ class TemplateListCreateView(AuthRequiredMixin, OwnerQuerysetMixin, generics.Lis
         serializer.save(user=self.request.user)
 
 
-class TemplateDetailView(
-    AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView
-):
+class TemplateDetailView(AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Template.objects.all()
     serializer_class = TemplateSerializer
