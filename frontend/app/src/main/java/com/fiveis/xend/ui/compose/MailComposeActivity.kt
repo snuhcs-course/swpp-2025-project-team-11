@@ -1020,7 +1020,11 @@ class MailComposeActivity : ComponentActivity() {
                                     return@EmailComposeScreen
                                 }
                                 // Send HTML content
-                                sendVm.sendEmail(to = recipient, subject = subject, body = richTextState.toHtml())
+                                sendVm.sendEmail(
+                                    to = contacts.map { it.email },
+                                    subject = subject.ifBlank { "(제목 없음)" },
+                                    body = richTextState.toHtml()
+                                )
                             }
                         )
                     }
