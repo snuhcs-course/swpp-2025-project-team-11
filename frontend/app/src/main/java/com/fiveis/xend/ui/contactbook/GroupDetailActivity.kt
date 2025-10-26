@@ -29,7 +29,11 @@ class GroupDetailActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val groupId = intent.getLongExtra(EXTRA_GROUP_ID, -1L)
-        require(groupId > 0) { "GroupDetailActivity requires EXTRA_GROUP_ID" }
+        if (groupId < 0L) {
+            finish()
+            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            return
+        }
 
         val groupColorInt = intent.getIntExtra(EXTRA_GROUP_COLOR, Color.Black.toArgb())
         val groupColor = Color(groupColorInt)

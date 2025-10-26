@@ -29,7 +29,11 @@ class ContactDetailActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val contactId = intent.getLongExtra(EXTRA_CONTACT_ID, -1L)
-        require(contactId > 0) { "ContactDetailActivity requires EXTRA_CONTACT_ID" }
+        if (contactId < 0L) {
+            finish()
+            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            return
+        }
 
         val contactColorInt = intent.getIntExtra(EXTRA_CONTACT_COLOR, Color.Black.toArgb())
         val contactColor = Color(contactColorInt)
