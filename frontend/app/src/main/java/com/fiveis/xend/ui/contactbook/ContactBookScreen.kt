@@ -88,7 +88,7 @@ fun ContactBookScreen(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .background(Color(0xFFF8F8F8))
+                    .background(BackgroundLight)
             ) {
                 // 헤더
                 TopAppBar(
@@ -148,7 +148,7 @@ fun ContactBookScreen(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .background(Color(0xFFF8F8F8))
+                    .background(BackgroundLight)
             ) {
                 // 헤더
                 TopAppBar(
@@ -259,7 +259,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                 Column {
                     Text(group.name, fontWeight = FontWeight.Bold, color = group.color, fontSize = 18.sp)
                     Text(
-                        group.description,
+                        group.description ?: "",
                         color = Color.Gray,
                         fontSize = 14.sp,
                         maxLines = 1,
@@ -587,8 +587,8 @@ fun ContactScreenPreview() {
             "중요한 고객과 상급자들",
             emptyList(),
             listOf(
-                Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
-                Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
+                Contact(0, null, name = "김철수", email = "kim@snu.ac.kr"),
+                Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
             null,
             null,
@@ -600,8 +600,8 @@ fun ContactScreenPreview() {
             "같은 회사 팀원들과 협업 파트너",
             emptyList(),
             listOf(
-                Contact(0, 0, name = "김철수", email = "kim@snu.ac.kr"),
-                Contact(0, 0, name = "최철수", email = "choi@snu.ac.kr")
+                Contact(0, null, name = "김철수", email = "kim@snu.ac.kr"),
+                Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
             null,
             null,

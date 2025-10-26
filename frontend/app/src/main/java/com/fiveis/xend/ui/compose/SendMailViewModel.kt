@@ -22,8 +22,8 @@ class SendMailViewModel(application: Application) : AndroidViewModel(application
     private val _ui = MutableStateFlow(SendUiState())
     val ui: StateFlow<SendUiState> = _ui
 
-    fun sendEmail(to: String, subject: String, body: String) {
-        if (to.isBlank()) {
+    fun sendEmail(to: List<String>, subject: String, body: String) {
+        if (to.isEmpty()) {
             _ui.value = SendUiState(isSending = false, error = "수신자(to)가 비어있습니다.")
             return
         }

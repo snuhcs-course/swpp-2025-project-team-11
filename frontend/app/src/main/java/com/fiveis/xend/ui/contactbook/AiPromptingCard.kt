@@ -138,7 +138,7 @@ fun AiPromptingCard(
                 val remain = (options.size - shown.size).coerceAtLeast(0)
 
                 shown.forEach { label ->
-                    SummaryChip(label = label.prompt)
+                    SummaryChip(label = label.name)
                 }
                 if (remain > 0) {
                     SummaryChip(label = "+${remain}개")
@@ -409,7 +409,7 @@ private fun Section(
             FilterChip(
                 selected = isSelected,
                 onClick = { onToggle(opt) },
-                label = { Text(opt.prompt) },
+                label = { Text(opt.name) },
                 leadingIcon = {
                     if (isSelected) {
                         Icon(Icons.Filled.Check, contentDescription = null)
