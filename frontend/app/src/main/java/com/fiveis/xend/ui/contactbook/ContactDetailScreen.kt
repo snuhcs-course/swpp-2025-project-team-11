@@ -100,7 +100,7 @@ fun ContactDetailScreen(
             }
         }
 
-        uiState.group?.let { g ->
+        uiState.contact.group?.let { g ->
             GroupBriefCard(
                 group = g,
                 onClick = { onOpenGroup(g.id) }
@@ -141,11 +141,17 @@ private fun GroupBriefCard(group: Group, onClick: () -> Unit) {
 
             if (group.options.isNotEmpty()) {
                 Divider(Modifier.padding(vertical = 4.dp))
-                Text("그룹 프롬프트 정보", color = Color.Gray, fontSize = 12.sp)
+                Text("그룹 프롬프트 정보", style = MaterialTheme.typography.titleMedium)
                 val tone = group.options.filter { it.key.equals("tone", true) }
                 val format = group.options.filter { it.key.equals("format", true) }
-                if (tone.isNotEmpty()) ChipRow(tone)
-                if (format.isNotEmpty()) ChipRow(format)
+                if (tone.isNotEmpty()) {
+                    Text("문체 스타일", color = Color.Gray)
+                    ChipRow(tone)
+                }
+                if (format.isNotEmpty()) {
+                    Text("형식 가이드", color = Color.Gray)
+                    ChipRow(format)
+                }
             }
         }
     }
@@ -171,7 +177,8 @@ private fun TagChip(text: String) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold
         )
     }
 }

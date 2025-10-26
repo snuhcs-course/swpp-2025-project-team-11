@@ -68,7 +68,10 @@ class ContactDetailActivity : ComponentActivity() {
                 )
 
                 if (state.isLoading && state.contact == null) {
-                    Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) { CircularProgressIndicator() }
                 }
             }
         }

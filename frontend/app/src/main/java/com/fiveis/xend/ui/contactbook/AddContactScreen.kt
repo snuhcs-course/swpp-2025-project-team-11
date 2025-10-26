@@ -90,7 +90,7 @@ fun AddContactScreen(
     var isManualOpen by rememberSaveable { mutableStateOf(true) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
-    val recipientRoleOptions = listOf("업무 동료", "개인 관계", "대학 동기")
+    val recipientRoleOptions = listOf("업무 동료", "개인 관계", "학술 관계")
     var isRecipientRoleExpanded by remember { mutableStateOf(false) }
     var recipientRole by rememberSaveable { mutableStateOf<String?>(null) }
     var personalPrompt by rememberSaveable { mutableStateOf("") }

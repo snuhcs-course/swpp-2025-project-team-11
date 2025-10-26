@@ -23,7 +23,7 @@ data class GroupData(val groups: List<Group>) : ContactBookData
 data class ContactData(val contacts: List<Contact>) : ContactBookData
 
 private var contactColorRandomSeed: Long = 5L
-private var groupColorRandomSeed: Long = 7L
+private var groupColorRandomSeed: Long = 10L
 private var contactRnd: Random = Random(contactColorRandomSeed)
 private var groupRnd: Random = Random(groupColorRandomSeed)
 fun randomNotTooLightColor(rnd: Random = Random.Default): Color {
@@ -109,7 +109,7 @@ class ContactBookRepository(context: Context) {
         val request = AddContactRequest(
             name = name,
             email = email,
-            groupId = groupId ?: -1L,
+            groupId = groupId,
             context = requestContext
         )
 

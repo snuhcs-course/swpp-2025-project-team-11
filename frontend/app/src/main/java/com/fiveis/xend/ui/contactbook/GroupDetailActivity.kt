@@ -66,7 +66,10 @@ class GroupDetailActivity : ComponentActivity() {
                 )
 
                 if (state.isLoading && state.group == null) {
-                    Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) { CircularProgressIndicator() }
                 }
             }
         }
