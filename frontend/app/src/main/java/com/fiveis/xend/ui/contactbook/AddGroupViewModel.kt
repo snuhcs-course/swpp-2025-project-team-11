@@ -44,4 +44,14 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
             }
         }
     }
+
+    class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(AddGroupViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return AddGroupViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
 }

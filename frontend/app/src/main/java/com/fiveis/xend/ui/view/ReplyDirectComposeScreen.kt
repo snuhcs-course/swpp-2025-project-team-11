@@ -67,6 +67,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,20 +107,37 @@ fun ReplyDirectComposeScreen(
     subject: String,
     groups: List<String>,
     onBack: () -> Unit,
-    onSend: () -> Unit,
+    onSend: (String) -> Unit,
+    onTemplateClick: () -> Unit = {},
+    onSubjectChange: (String) -> Unit = {},
+    richTextState: com.mohamedrejeb.richeditor.model.RichTextState = rememberRichTextState(),
     senderEmail: String = "",
     date: String = "",
-    originalBody: String = ""
+    originalBody: String = "",
+    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState()
 ) {
-    val richTextState = rememberRichTextState()
-    var subjectText by rememberSaveable { mutableStateOf(subject) }
     var isRealtimeAiOn by rememberSaveable { mutableStateOf(true) }
     var isStreaming by rememberSaveable { mutableStateOf(false) }
     var isMailContentExpanded by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+
+    // 전송 상태 처리
+    LaunchedEffect(sendUiState) {
+        when {
+            sendUiState.lastSuccessMsg != null -> {
+                snackbarHostState.showSnackbar(sendUiState.lastSuccessMsg)
+            }
+            sendUiState.error != null -> {
+                snackbarHostState.showSnackbar("전송 실패: ${sendUiState.error}")
+            }
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = ComposeBackground,
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
             TopAppBar(
@@ -152,7 +170,7 @@ fun ReplyDirectComposeScreen(
                 },
                 actions = {
                     DirectComposeToolbarIconButton(
-                        onClick = { /* TODO: 템플릿 */ },
+                        onClick = onTemplateClick,
                         border = null,
                         modifier = Modifier.padding(end = 2.dp)
                     ) {
@@ -168,10 +186,14 @@ fun ReplyDirectComposeScreen(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     DirectComposeToolbarIconButton(
-                        onClick = onSend,
+                        onClick = {
+                            // HTML body를 전달하여 전송
+                            onSend(richTextState.toHtml())
+                        },
                         border = null,
                         contentTint = Blue60,
-                        modifier = Modifier.padding(start = 2.dp)
+                        modifier = Modifier.padding(start = 2.dp),
+                        enabled = !sendUiState.isSending
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Send,
@@ -219,7 +241,7 @@ fun ReplyDirectComposeScreen(
                 // 메일 제목 + 본문 (조건부 표시)
                 AnimatedVisibility(visible = isMailContentExpanded) {
                     Column {
-                        DirectComposeSubjectDisplaySection(subject = subjectText)
+                        DirectComposeSubjectDisplaySection(subject = subject)
                         DirectComposeCollapsibleBodySection(body = originalBody)
                     }
                 }
@@ -239,8 +261,8 @@ fun ReplyDirectComposeScreen(
             // 제목 섹션
             SubjectSectionHeader()
             DirectComposeSubjectField(
-                value = subjectText,
-                onValueChange = { subjectText = it },
+                value = subject,
+                onValueChange = onSubjectChange,
                 enabled = !isStreaming
             )
 
@@ -758,7 +780,7 @@ private fun ReplyDirectComposeScreenPreview() {
             subject = "Re: Q4 실적 보고서 검토 부탁드립니다",
             groups = listOf("대이사", "업무"),
             onBack = {},
-            onSend = {},
+            onSend = { _ -> },
             senderEmail = "김대표 <ceo@company.com>",
             date = "Q4 실적 보고서 검토 요청 · 협업미팅 2개",
             originalBody = "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 우수한 성과라고 판단됩니다."

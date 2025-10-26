@@ -996,6 +996,7 @@ class MailComposeActivity : ComponentActivity() {
                             error = composeUi.error,
                             sendUiState = sendUi,
                             onBack = { finish() },
+                            onTemplateClick = { showTemplateScreen = true },
                             onUndo = { /* TODO */ },
                             onAiComplete = {
                                 val payload = JSONObject().apply {

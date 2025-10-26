@@ -31,12 +31,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
@@ -82,7 +80,6 @@ import com.fiveis.xend.ui.theme.Green60
 import com.fiveis.xend.ui.theme.GreenBorder
 import com.fiveis.xend.ui.theme.GreenSurface
 import com.fiveis.xend.ui.theme.MailDetailBodyBg
-import com.fiveis.xend.ui.theme.Orange
 import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.Slate50
 import com.fiveis.xend.ui.theme.TextPrimary
@@ -187,45 +184,7 @@ private fun ReplyComposeTopBar(onBack: () -> Unit, onTemplate: () -> Unit, onAtt
             }
         },
         actions = {
-            // 템플릿 아이콘
-            ToolbarIconButton(
-                onClick = onTemplate,
-                border = null,
-                modifier = Modifier.padding(end = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GridView,
-                    contentDescription = "템플릿",
-                    tint = Orange
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            // 첨부파일 아이콘
-            ToolbarIconButton(
-                onClick = onAttach,
-                border = null,
-                modifier = Modifier.padding(end = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Attachment,
-                    contentDescription = "첨부파일",
-                    tint = ToolbarIconTint
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            // 전송 아이콘
-            ToolbarIconButton(
-                onClick = onSend,
-                border = null,
-                contentTint = Blue60,
-                modifier = Modifier.padding(start = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "전송",
-                    tint = Blue60
-                )
-            }
+            // 아이콘 제거 - 답장 옵션 추천 화면에서는 필요없음
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = ComposeBackground,

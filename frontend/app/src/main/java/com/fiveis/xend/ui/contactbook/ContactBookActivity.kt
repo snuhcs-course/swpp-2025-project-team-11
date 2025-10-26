@@ -36,7 +36,9 @@ class ContactBookActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                val viewModel: ContactBookViewModel = viewModel()
+                val viewModel: ContactBookViewModel = viewModel(
+                    factory = ContactBookViewModel.Factory(application)
+                )
                 val uiState by viewModel.uiState.collectAsState()
 
                 val startTab = intent.getStringExtra(START_TAB)

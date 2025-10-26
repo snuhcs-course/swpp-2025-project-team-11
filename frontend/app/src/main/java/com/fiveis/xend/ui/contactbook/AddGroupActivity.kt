@@ -40,10 +40,14 @@ class AddGroupActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                val addViewModel: AddGroupViewModel = viewModel()
+                val addViewModel: AddGroupViewModel = viewModel(
+                    factory = AddGroupViewModel.Factory(application)
+                )
                 val addUiState by addViewModel.uiState.collectAsState()
 
-                val bookViewModel: ContactBookViewModel = viewModel()
+                val bookViewModel: ContactBookViewModel = viewModel(
+                    factory = ContactBookViewModel.Factory(application)
+                )
                 val bookUiState by bookViewModel.uiState.collectAsState()
 
                 // AddGroupScreen 입력값들 보관
