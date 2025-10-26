@@ -152,20 +152,32 @@ class ContactBookRepository(context: Context) {
 
     suspend fun getAllContacts(): List<Contact> {
         contactRnd = Random(contactColorRandomSeed)
+        android.util.Log.d("ContactBookRepository", "Calling getAllContacts API...")
         val response = contactApiService.getAllContacts()
+        android.util.Log.d("ContactBookRepository", "getAllContacts response code: ${response.code()}")
         if (response.isSuccessful) {
-            return response.body()?.map { contactData ->
-                Contact(
-                    id = contactData.id,
-                    group = contactData.group?.toDomain(),
-                    name = contactData.name,
-                    email = contactData.email,
-                    context = contactData.context?.toDomain(),
-                    createdAt = contactData.createdAt,
-                    updatedAt = contactData.updatedAt,
-                    color = randomNotTooLightColor(contactRnd)
-                )
-            } ?: emptyList()
+            try {
+                val body = response.body()
+                android.util.Log.d("ContactBookRepository", "Response body size: ${body?.size}")
+                val contacts = body?.map { contactData ->
+                    android.util.Log.d("ContactBookRepository", "Parsing contact: ${contactData.name}")
+                    Contact(
+                        id = contactData.id,
+                        group = contactData.group?.toDomain(),
+                        name = contactData.name,
+                        email = contactData.email,
+                        context = contactData.context?.toDomain(),
+                        createdAt = contactData.createdAt,
+                        updatedAt = contactData.updatedAt,
+                        color = randomNotTooLightColor(contactRnd)
+                    )
+                } ?: emptyList()
+                android.util.Log.d("ContactBookRepository", "Parsed ${contacts.size} contacts")
+                return contacts
+            } catch (e: Exception) {
+                android.util.Log.e("ContactBookRepository", "Error parsing contacts", e)
+                throw e
+            }
         }
         throw IllegalStateException("Failed to get all contacts: HTTP ${response.code()} ${response.message()}")
     }
@@ -174,6 +186,17 @@ class ContactBookRepository(context: Context) {
         val response = contactApiService.deleteContact(contactId)
         if (!response.isSuccessful) {
             throw IllegalStateException("Failed to delete contact: HTTP ${response.code()} ${response.message()}")
+        }
+    }
+
+    suspend fun updateContactGroup(contactId: Long, groupId: Long) {
+        val payload = mapOf("group_id" to groupId)
+        val response = contactApiService.updateContact(contactId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update contact group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
         }
     }
 
@@ -220,20 +243,48 @@ class ContactBookRepository(context: Context) {
 
     suspend fun getAllGroups(): List<Group> {
         groupRnd = Random(groupColorRandomSeed)
+        contactRnd = Random(contactColorRandomSeed)
+        android.util.Log.d("ContactBookRepository", "Calling getAllGroups API...")
         val response = contactApiService.getAllGroups()
+        android.util.Log.d("ContactBookRepository", "getAllGroups response code: ${response.code()}")
         if (response.isSuccessful) {
-            return response.body()?.map {
-                Group(
-                    id = it.id,
-                    name = it.name,
-                    description = it.description,
-                    options = it.options,
-                    members = emptyList(),
-                    createdAt = it.createdAt,
-                    updatedAt = it.updatedAt,
-                    color = randomNotTooLightColor(groupRnd)
-                )
-            } ?: emptyList()
+            try {
+                val body = response.body()
+                android.util.Log.d("ContactBookRepository", "Response body size: ${body?.size}")
+                val groups = body?.map { groupResponse ->
+                    android.util.Log.d(
+                        "ContactBookRepository",
+                        "Parsing group: ${groupResponse.name} with ${groupResponse.contacts?.size ?: 0} contacts"
+                    )
+                    Group(
+                        id = groupResponse.id,
+                        name = groupResponse.name,
+                        description = groupResponse.description,
+                        options = groupResponse.options,
+                        members = groupResponse.contacts?.map { contactResponse ->
+                            Contact(
+                                id = contactResponse.id,
+                                // 순환 참조 방지
+                                group = null,
+                                name = contactResponse.name,
+                                email = contactResponse.email,
+                                context = contactResponse.context?.toDomain(),
+                                createdAt = contactResponse.createdAt,
+                                updatedAt = contactResponse.updatedAt,
+                                color = randomNotTooLightColor(contactRnd)
+                            )
+                        } ?: emptyList(),
+                        createdAt = groupResponse.createdAt,
+                        updatedAt = groupResponse.updatedAt,
+                        color = randomNotTooLightColor(groupRnd)
+                    )
+                } ?: emptyList()
+                android.util.Log.d("ContactBookRepository", "Parsed ${groups.size} groups")
+                return groups
+            } catch (e: Exception) {
+                android.util.Log.e("ContactBookRepository", "Error parsing groups", e)
+                throw e
+            }
         }
         throw IllegalStateException("Failed to get all groups: HTTP ${response.code()} ${response.message()}")
     }
