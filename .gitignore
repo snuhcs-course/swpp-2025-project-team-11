@@ -3,3 +3,10 @@ backend/.env
 backend/config/__pycache__
 frontend/.gradle
 frontend/app/build
+
+*.txt
+!requirements.txt
+**/__pycache__
+*.pyc
+.DS_Store
+**/.DS_Store

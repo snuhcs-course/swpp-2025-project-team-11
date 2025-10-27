@@ -7,9 +7,28 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.13"
-django = "^5.2.6"
 psycopg = {extras = ["binary"], version = "^3.2.10"}
 uvicorn = {extras = ["standard"], version = "^0.37.0"}
+cryptography = "^46.0.2"
+google-auth = "^2.37.0"
+google-auth-oauthlib = "^1.2.1"
+google-auth-httplib2 = "^0.2.0"
+google-api-python-client = "^2.161.0"
+requests = "^2.32.5"
+jinja2 = "^3.1.6"
+
+
+[tool.poetry.group.django.dependencies]
+django = "^5.2.6"
+django-environ = "^0.12.0"
+djangorestframework = "^3.16.1"
+djangorestframework-simplejwt = "^5.5.1"
+drf-spectacular = "^0.28.0"
+
+
+[tool.poetry.group.langchain.dependencies]
+langchain-core = "^0.3.77"
+langchain-openai = "^0.3.33"
 
 
 [build-system]
@@ -17,17 +36,18 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 
+
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.6.9"
 black = "^25.9.0"
 
 [tool.black]
-line-length = 100
+line-length = 150
 target-version = ["py313"]
 
 [tool.ruff]
 target-version = "py313"
-line-length = 100
+line-length = 150
 select = [
   "E",   # pycodestyle errors
   "F",   # pyflakes

@@ -1,0 +1,372 @@
+package com.fiveis.xend.ui.contactbook
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.ui.theme.BackgroundLight
+import com.fiveis.xend.ui.theme.Blue80
+import com.fiveis.xend.ui.theme.BorderGray
+import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Purple60
+import com.fiveis.xend.ui.theme.TextPrimary
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddGroupScreen(
+    uiState: AddGroupUiState,
+    onBack: () -> Unit,
+    onAdd: () -> Unit,
+    onGroupNameChange: (String) -> Unit,
+    onGroupDescriptionChange: (String) -> Unit,
+    onPromptOptionsChange: (PromptingUiState) -> Unit,
+    onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> },
+    members: List<Contact> = emptyList(),
+    onAddMember: () -> Unit = {},
+    onMemberClick: () -> Unit = {},
+    onBottomNavChange: (String) -> Unit = {}
+) {
+    var groupName by rememberSaveable { mutableStateOf("") }
+    var groupDescription by rememberSaveable { mutableStateOf("") }
+    // 등록된 연락처 “+N명 더보기” 토글 상태
+    var isMembersExpanded by rememberSaveable { mutableStateOf(false) }
+    val savable = groupName.isNotBlank()
+
+    Scaffold(
+        containerColor = BackgroundLight,
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "뒤로가기",
+                            tint = Purple60
+                        )
+                    }
+                },
+                title = {
+                    Text(
+                        "그룹 추가",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                },
+                actions = {
+                    TextButton(
+                        onClick = onAdd,
+                        enabled = savable,
+                        colors = ButtonDefaults.textButtonColors(contentColor = Purple60)
+                    ) { Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                }
+            )
+        },
+        bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAdd,
+                containerColor = Blue80,
+                contentColor = Color.White
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "그룹 추가")
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                FormBlock(label = "그룹 이름") {
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = {
+                            groupName = it
+                            onGroupNameChange(it)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        placeholder = {
+                            Text(
+                                text = "이름을 입력하세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
+                        )
+                    )
+                }
+            }
+
+            item {
+                FormBlock(label = "그룹 설명") {
+                    OutlinedTextField(
+                        value = groupDescription,
+                        onValueChange = {
+                            groupDescription = it
+                            onGroupDescriptionChange(it)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        placeholder = {
+                            Text(
+                                text = "그룹을 소개해 주세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
+                        )
+                    )
+                }
+            }
+
+            item {
+                Text(
+                    text = "그룹별 AI 프롬프팅",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+
+            item {
+                AiPromptingCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onValueChange = onPromptOptionsChange,
+                    allToneOptions = uiState.tonePromptOptions,
+                    allFormatOptions = uiState.formatPromptOptions,
+                    onAddPromptOption = onAddPromptOption
+                )
+            }
+
+            /*
+            item {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("예상 결과:", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "12월 20일 오전 10시 회의자료 검토 요청드립니다. 첨부파일 확인 후 피드백 주세요.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+             */
+
+            // ===== 멤버 헤더 =====
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "그룹 멤버 (${members.size}명)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onAddMember) {
+                        Icon(Icons.Outlined.Add, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("추가")
+                    }
+                }
+            }
+
+            // ===== 멤버 리스트 (처음엔 3명만, 더보기 시 전체) =====
+            val visible = if (isMembersExpanded) members else members.take(3)
+            itemsIndexed(visible, key = { _, m -> m.name }) { _, member ->
+                MemberRow(
+                    member = member,
+                    onClick = { onMemberClick() }
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
+            // ===== +N명 더보기 토글 =====
+            if (!isMembersExpanded && members.size > 3) {
+                val remain = members.size - 3
+                item {
+                    MoreRow(
+                        text = "+${remain}명 더보기",
+                        onClick = { isMembersExpanded = true }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/* --------------------------------- UI 파츠 --------------------------------- */
+
+@Composable
+private fun MemberRow(member: Contact, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val initial = member.name.firstOrNull()?.toString() ?: "?"
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(randomStableColorFor(initial)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initial, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = member.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+// +N명 더보기
+@Composable
+private fun MoreRow(text: String, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+        }
+    }
+}
+
+/**
+ * 임시 Color 목록
+ */
+@Composable
+private fun randomStableColorFor(seed: String): Color {
+    val colors = listOf(
+        Color(0xFF5A7DFF),
+        Color(0xFF35C6A8),
+        Color(0xFFF4A425),
+        Color(0xFFEF6E6E),
+        Color(0xFF7A6FF0),
+        Color(0xFF3DB2FF)
+    )
+    val idx = (seed.firstOrNull()?.code ?: 0) % colors.size
+    return colors[idx]
+}
+
+@Composable
+private fun FormBlock(label: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        content()
+    }
+}
