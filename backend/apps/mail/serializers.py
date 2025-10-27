@@ -32,11 +32,51 @@ class EmailDetailSerializer(serializers.Serializer):
 
 
 class EmailSendSerializer(serializers.Serializer):
-    """Email send request serializer"""
+    """Email send request serializer (single body + auto multipart)"""
 
-    to = serializers.EmailField(help_text="Recipient email address")
+    to = serializers.ListField(
+        child=serializers.EmailField(),
+        min_length=1,
+        help_text="Primary recipients (To). One or more email addresses.",
+    )
+    cc = serializers.ListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        help_text="Carbon copy recipients (optional).",
+    )
+    bcc = serializers.ListField(
+        child=serializers.EmailField(),
+        required=False,
+        allow_empty=True,
+        help_text="Blind carbon copy recipients (optional).",
+    )
+
     subject = serializers.CharField(max_length=500, help_text="Email subject")
-    body = serializers.CharField(help_text="Email body (plain text)")
+    body = serializers.CharField(help_text="Email body (HTML or plain text)")
+    is_html = serializers.BooleanField(required=False, default=True, help_text="Treat body as HTML")
+
+    def validate(self, attrs):
+        def _dedup(emails):
+            seen, out = set(), []
+            for e in emails or []:
+                key = e.strip().lower()
+                if key and key not in seen:
+                    seen.add(key)
+                    out.append(e.strip())
+            return out
+
+        attrs["to"] = _dedup(attrs.get("to"))
+        attrs["cc"] = _dedup(attrs.get("cc"))
+        attrs["bcc"] = _dedup(attrs.get("bcc"))
+        if not attrs["to"]:
+            raise serializers.ValidationError({"to": "At least one recipient is required."})
+
+        total_rcpts = len(attrs["to"]) + len(attrs["cc"]) + len(attrs["bcc"])
+        if total_rcpts > 100:
+            raise serializers.ValidationError({"detail": "Too many recipients (max 100)."})
+
+        return attrs
 
 
 class EmailSendResponseSerializer(serializers.Serializer):

@@ -13,6 +13,11 @@ class Group(TimeStampedModel):
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True)
 
+    options = models.ManyToManyField(
+        "PromptOption",
+        related_name="groups",
+    )
+
     class Meta:
         ordering = ["user_id", "name", "id"]
         constraints = [
@@ -30,14 +35,14 @@ class Contact(TimeStampedModel):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="contact",
+        related_name="contacts",
     )
     group = models.ForeignKey(
         Group,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="contact",
+        related_name="contacts",
     )
     name = models.CharField(max_length=120)
     email = models.EmailField()
@@ -61,10 +66,11 @@ class ContactContext(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="context",
     )
-    relationship_role = models.CharField(max_length=50, blank=True)
+    sender_role = models.CharField(max_length=50, blank=True)
+    recipient_role = models.CharField(max_length=50, blank=True)
     relationship_details = models.TextField(blank=True)
     personal_prompt = models.TextField(blank=True)
-    language_preference = models.CharField(max_length=5, blank=True)
+    language_preference = models.CharField(max_length=12, blank=True)
 
     class Meta:
         ordering = ["contact_id"]
@@ -97,31 +103,6 @@ class PromptOption(TimeStampedModel):
 
     def __str__(self):
         return f"{self.key}:{self.name}"
-
-
-class GroupOptionMap(TimeStampedModel):
-    group = models.ForeignKey(
-        Group,
-        on_delete=models.CASCADE,
-        related_name="option_maps",
-    )
-    option = models.ForeignKey(
-        PromptOption,
-        on_delete=models.CASCADE,
-        related_name="group_maps",
-    )
-
-    class Meta:
-        ordering = ["group_id", "option_id", "id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["group", "option"],
-                name="uniq_contacts_group_option",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.group_id}-{self.option_id}"
 
 
 class Template(TimeStampedModel):

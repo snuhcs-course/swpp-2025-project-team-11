@@ -52,7 +52,7 @@ class GoogleCallbackView(generics.GenericAPIView):
         except requests.RequestException as e:
             return Response(
                 {"detail": f"Failed to get token from Google: {str(e)}"},
-                status=status.HTTP_502_BAD_GATEWAY,
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         if "error" in token_json:
@@ -74,16 +74,14 @@ class GoogleCallbackView(generics.GenericAPIView):
         except requests.RequestException as e:
             return Response(
                 {"detail": f"Failed to get user info from Google: {str(e)}"},
-                status=status.HTTP_502_BAD_GATEWAY,
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         email = userinfo.get("email")
         name = userinfo.get("name")
 
         if not email:
-            return Response(
-                {"detail": "Email not provided by Google."}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": "Email not provided by Google."}, status=status.HTTP_400_BAD_REQUEST)
 
         # User DB 저장
         user, created = User.objects.get_or_create(email=email, defaults={"name": name})

@@ -7,6 +7,7 @@ plugins {
 
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
+    id("kotlin-parcelize")
 }
 
 // Read local.properties

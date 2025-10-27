@@ -29,9 +29,7 @@ class ContactAppTests(APITestCase):
         self.other_group = Group.objects.create(name="OtherGroup", user=self.other_user)
 
         # ===== Contacts =====
-        self.contact = Contact.objects.create(
-            name="Contact1", email="contact1@example.com", group=self.group, user=self.user
-        )
+        self.contact = Contact.objects.create(name="Contact1", email="contact1@example.com", group=self.group, user=self.user)
         self.contact_context = ContactContext.objects.create(
             contact=self.contact,
             relationship_role="Friend",
@@ -41,16 +39,10 @@ class ContactAppTests(APITestCase):
         )
 
         # ===== Prompt Options =====
-        self.prompt_option = PromptOption.objects.create(
-            name="Option1", key="tone", prompt="Prompt text", created_by=self.user
-        )
-        self.system_option = PromptOption.objects.create(
-            name="SystemOption", key="format", prompt="System prompt", created_by=None
-        )
+        self.prompt_option = PromptOption.objects.create(name="Option1", key="tone", prompt="Prompt text", created_by=self.user)
+        self.system_option = PromptOption.objects.create(name="SystemOption", key="format", prompt="System prompt", created_by=None)
         # 새 옵션 추가 (GroupOptionMap 테스트용)
-        self.new_option = PromptOption.objects.create(
-            name="Option2", key="tone", prompt="New prompt", created_by=self.user
-        )
+        self.new_option = PromptOption.objects.create(name="Option2", key="tone", prompt="New prompt", created_by=self.user)
 
         # ===== Group-Option Map =====
         self.map = GroupOptionMap.objects.create(group=self.group, option=self.prompt_option)
@@ -129,13 +121,9 @@ class ContactAppTests(APITestCase):
         self.assertIn(self.prompt_option.name, names)
         self.assertIn(self.system_option.name, names)
 
-        response = self.client.post(
-            url, {"name": "NewOption", "key": "style", "prompt": "New prompt"}  # noqa: E501
-        )
+        response = self.client.post(url, {"name": "NewOption", "key": "style", "prompt": "New prompt"})  # noqa: E501
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(
-            PromptOption.objects.filter(created_by=self.user).count(), 3
-        )  # Option1 + NewOption + new_option
+        self.assertEqual(PromptOption.objects.filter(created_by=self.user).count(), 3)  # Option1 + NewOption + new_option
 
     def test_prompt_option_update_delete_permission(self):
         # system-defined
@@ -160,16 +148,12 @@ class ContactAppTests(APITestCase):
         self.assertEqual(len(response.data), 1)
 
         # 중복 아닌 새로운 매핑 생성
-        response = self.client.post(
-            url, {"group": self.group.id, "option": self.new_option.id}
-        )  # noqa: E501
+        response = self.client.post(url, {"group": self.group.id, "option": self.new_option.id})  # noqa: E501
         self.assertEqual(response.status_code, 201)
         self.assertEqual(GroupOptionMap.objects.filter(group=self.group).count(), 2)
 
         # 다른 사용자의 그룹 매핑 시도 → 400
-        response = self.client.post(
-            url, {"group": self.other_group.id, "option": self.prompt_option.id}
-        )
+        response = self.client.post(url, {"group": self.other_group.id, "option": self.prompt_option.id})
         self.assertEqual(response.status_code, 400)
 
     def test_group_option_map_update_delete(self):
