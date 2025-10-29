@@ -52,6 +52,7 @@ class AddGroupActivity : ComponentActivity() {
                 var options by rememberSaveable { mutableStateOf(emptyList<PromptOption>()) }
 
                 AddGroupScreen(
+                    uiState = addUiState,
                     onBack = {
                         finish()
                         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
@@ -59,13 +60,23 @@ class AddGroupActivity : ComponentActivity() {
                     onAdd = {
                         addViewModel.addGroup(
                             name = name,
-                            description = description
+                            description = description,
+                            options = options
                         )
                     },
                     onGroupNameChange = { name = it },
                     onGroupDescriptionChange = { description = it },
                     onPromptOptionsChange = {
-                        options = it.selectedContext.toList() + it.selectedStyle.toList() + it.selectedFormat.toList()
+                        options = it.selectedTone.toList() + it.selectedFormat.toList()
+                    },
+                    onAddPromptOption = { key, nm, pr, onSuccess, onError ->
+                        addViewModel.addPromptOption(
+                            key = key,
+                            name = nm,
+                            prompt = pr,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
                     },
                     members = emptyList(),
                     onAddMember = {
@@ -96,7 +107,10 @@ class AddGroupActivity : ComponentActivity() {
                 }
 
                 if (addUiState.isLoading) {
-                    Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) { CircularProgressIndicator() }
                 }
             }
         }

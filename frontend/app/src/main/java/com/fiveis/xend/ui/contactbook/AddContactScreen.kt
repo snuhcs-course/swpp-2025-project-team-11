@@ -90,9 +90,9 @@ fun AddContactScreen(
     var isManualOpen by rememberSaveable { mutableStateOf(true) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
-    val relationRoleOptions = listOf("업무 동료", "개인 관계", "대학 동기")
-    var isRelationRoleExpanded by remember { mutableStateOf(false) }
-    var relationRole by rememberSaveable { mutableStateOf<String?>(null) }
+    val recipientRoleOptions = listOf("업무 동료", "개인 관계", "학술 관계")
+    var isRecipientRoleExpanded by remember { mutableStateOf(false) }
+    var recipientRole by rememberSaveable { mutableStateOf<String?>(null) }
     var personalPrompt by rememberSaveable { mutableStateOf("") }
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
@@ -252,11 +252,11 @@ fun AddContactScreen(
 
                 FormBlock(label = "관계") {
                     ExposedDropdownMenuBox(
-                        expanded = isRelationRoleExpanded,
-                        onExpandedChange = { isRelationRoleExpanded = !isRelationRoleExpanded }
+                        expanded = isRecipientRoleExpanded,
+                        onExpandedChange = { isRecipientRoleExpanded = !isRecipientRoleExpanded }
                     ) {
                         OutlinedTextField(
-                            value = relationRole ?: "관계 선택",
+                            value = recipientRole ?: "관계 선택",
                             onValueChange = {},
                             readOnly = true,
                             leadingIcon = {
@@ -267,7 +267,7 @@ fun AddContactScreen(
                                 )
                             },
                             trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRelationRoleExpanded)
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientRoleExpanded)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -285,15 +285,15 @@ fun AddContactScreen(
                             )
                         )
                         ExposedDropdownMenu(
-                            expanded = isRelationRoleExpanded,
-                            onDismissRequest = { isRelationRoleExpanded = false }
+                            expanded = isRecipientRoleExpanded,
+                            onDismissRequest = { isRecipientRoleExpanded = false }
                         ) {
-                            relationRoleOptions.forEach { option ->
+                            recipientRoleOptions.forEach { option ->
                                 DropdownMenuItem(
                                     text = { Text(option) },
                                     onClick = {
-                                        relationRole = option
-                                        isRelationRoleExpanded = false
+                                        recipientRole = option
+                                        isRecipientRoleExpanded = false
                                         onRelationshipRoleChange(option)
                                     }
                                 )

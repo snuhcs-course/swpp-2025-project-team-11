@@ -5,16 +5,17 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AddContactRequest(
-    @SerialName("group") val groupId: Int = 0,
     val name: String,
     val email: String,
+    @SerialName("group_id") val groupId: Long? = null,
     val context: AddContactRequestContext? = null
 )
 
 @Serializable
 data class AddContactRequestContext(
-    @SerialName("relationship_role") val relationshipRole: String? = null,
-    @SerialName("relationship_details") val relationshipDetails: String? = null,
-    @SerialName("personal_prompt") val personalPrompt: String? = null,
-    @SerialName("language_preference") val languagePreference: String? = null
+    @SerialName("sender_role") val senderRole: String? = "Mail writer",
+    @SerialName("recipient_role") val recipientRole: String? = "",
+    @SerialName("relationship_details") val relationshipDetails: String? = "",
+    @SerialName("personal_prompt") val personalPrompt: String? = "",
+    @SerialName("language_preference") val languagePreference: String? = "KOR"
 )

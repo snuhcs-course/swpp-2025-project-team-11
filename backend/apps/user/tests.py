@@ -287,15 +287,11 @@ class RefreshTokenViewTest(TestCase):
         """삭제된 사용자의 refresh token으로 요청"""
         # 다른 앱의 관련 테이블이 없어 삭제가 불가능할 수 있으므로 스킵
         # 대신 is_active=False로 비활성화 시나리오를 테스트
-        self.skipTest(
-            "Skipping user deletion test due to cross-app dependencies. Use test_refresh_token_inactive_user instead."  # noqa: E501
-        )
+        self.skipTest("Skipping user deletion test due to cross-app dependencies. Use test_refresh_token_inactive_user instead.")  # noqa: E501
 
     def test_refresh_token_inactive_user(self):
         """비활성화된 사용자의 refresh token으로 요청"""
-        inactive_user = User.objects.create(
-            email="inactive@example.com", name="Inactive User", is_active=False
-        )
+        inactive_user = User.objects.create(email="inactive@example.com", name="Inactive User", is_active=False)
         refresh = RefreshToken.for_user(inactive_user)
         refresh_token = str(refresh)
 

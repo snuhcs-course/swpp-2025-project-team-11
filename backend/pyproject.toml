@@ -18,6 +18,7 @@ requests = "^2.32.5"
 channels = "^4.1" 
 channels-redis = "^4.2"
 redis = {extras = ["asyncio"], version = "^5.0"}
+jinja2 = "^3.1.6"
 
 
 [tool.poetry.group.django.dependencies]
@@ -38,17 +39,18 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 
+
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.6.9"
 black = "^25.9.0"
 
 [tool.black]
-line-length = 100
+line-length = 150
 target-version = ["py313"]
 
 [tool.ruff]
 target-version = "py313"
-line-length = 100
+line-length = 150
 select = [
   "E",   # pycodestyle errors
   "F",   # pyflakes

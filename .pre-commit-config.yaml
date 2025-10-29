@@ -6,7 +6,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.14.2
     hooks:
       - id: ruff
         name: ruff (lint + fix)
@@ -15,7 +15,7 @@ repos:
         types_or: [python]
 
   - repo: https://github.com/psf/black
-    rev: 24.8.0
+    rev: 25.9.0
     hooks:
       - id: black
         name: black (format)

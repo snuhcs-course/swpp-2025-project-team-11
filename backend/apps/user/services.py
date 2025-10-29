@@ -39,9 +39,7 @@ def google_refresh(google_account: GoogleAccount):
 
     access_token = token_json.get("access_token")
     if not access_token:
-        raise ValueError(
-            f"Google token refresh failed: {token_json.get('error_description', 'unknown error')}"
-        )
+        raise ValueError(f"Google token refresh failed: {token_json.get('error_description', 'unknown error')}")
 
     expires_in = token_json.get("expires_in", 3600)
     google_account.access_token = fernet.encrypt(access_token.encode()).decode()

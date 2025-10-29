@@ -72,4 +72,26 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     fun onContactClick(contact: Contact) {
         // TODO: 연락처 상세 화면으로 이동
     }
+
+    fun onContactDelete(contactId: Long) {
+        viewModelScope.launch {
+            try {
+                repository.deleteContact(contactId)
+                loadContactInfo(ContactBookTab.Contacts)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message ?: "연락처 삭제 실패") }
+            }
+        }
+    }
+
+    fun onGroupDelete(groupId: Long) {
+        viewModelScope.launch {
+            try {
+                repository.deleteGroup(groupId)
+                loadContactInfo(ContactBookTab.Groups)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message ?: "그룹 삭제 실패") }
+            }
+        }
+    }
 }
