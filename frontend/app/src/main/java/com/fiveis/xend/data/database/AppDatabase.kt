@@ -10,7 +10,7 @@ import com.fiveis.xend.data.model.EmailItem
 @Database(
     entities = [EmailItem::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
