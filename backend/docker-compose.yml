@@ -18,6 +18,12 @@ services:
       poetry run python manage.py migrate &&
       poetry run uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --reload-include '*.html'"
 
+  redis:
+    image: redis:7
+    container_name: xend-redis
+    ports:
+      - "6379:6379"
+      
   postgres:
     image: postgres:15.3
     container_name: xend-postgres
