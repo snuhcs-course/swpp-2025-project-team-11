@@ -168,8 +168,7 @@ class ContactBookRepository(context: Context) {
                         email = contactData.email,
                         context = contactData.context?.toDomain(),
                         createdAt = contactData.createdAt,
-                        updatedAt = contactData.updatedAt,
-                        color = randomNotTooLightColor(contactRnd)
+                        updatedAt = contactData.updatedAt
                     )
                 } ?: emptyList()
                 android.util.Log.d("ContactBookRepository", "Parsed ${contacts.size} contacts")
@@ -261,22 +260,9 @@ class ContactBookRepository(context: Context) {
                         name = groupResponse.name,
                         description = groupResponse.description,
                         options = groupResponse.options,
-                        members = groupResponse.contacts?.map { contactResponse ->
-                            Contact(
-                                id = contactResponse.id,
-                                // 순환 참조 방지
-                                group = null,
-                                name = contactResponse.name,
-                                email = contactResponse.email,
-                                context = contactResponse.context?.toDomain(),
-                                createdAt = contactResponse.createdAt,
-                                updatedAt = contactResponse.updatedAt,
-                                color = randomNotTooLightColor(contactRnd)
-                            )
-                        } ?: emptyList(),
+                        members = emptyList(),
                         createdAt = groupResponse.createdAt,
-                        updatedAt = groupResponse.updatedAt,
-                        color = randomNotTooLightColor(groupRnd)
+                        updatedAt = groupResponse.updatedAt
                     )
                 } ?: emptyList()
                 android.util.Log.d("ContactBookRepository", "Parsed ${groups.size} groups")

@@ -13,15 +13,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.ui.theme.StableColor
 
 class GroupDetailActivity : ComponentActivity() {
     companion object {
         const val EXTRA_GROUP_ID = "extra_group_id"
-        const val EXTRA_GROUP_COLOR = "extra_group_color"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,9 +33,6 @@ class GroupDetailActivity : ComponentActivity() {
             return
         }
 
-        val groupColorInt = intent.getIntExtra(EXTRA_GROUP_COLOR, Color.Black.toArgb())
-        val groupColor = Color(groupColorInt)
-
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
@@ -50,6 +45,8 @@ class GroupDetailActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
+                val groupColor = StableColor.forId(groupId)
+
                 val vm: GroupDetailViewModel = viewModel()
                 LaunchedEffect(groupId) { vm.load(groupId) }
                 val state by vm.uiState.collectAsState()

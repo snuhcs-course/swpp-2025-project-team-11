@@ -10,7 +10,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
@@ -72,7 +71,6 @@ class ContactBookActivity : ComponentActivity() {
                         startActivity(
                             Intent(this, GroupDetailActivity::class.java)
                                 .putExtra(GroupDetailActivity.EXTRA_GROUP_ID, group.id)
-                                .putExtra(GroupDetailActivity.EXTRA_GROUP_COLOR, group.color.toArgb())
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
@@ -80,7 +78,6 @@ class ContactBookActivity : ComponentActivity() {
                         startActivity(
                             Intent(this, ContactDetailActivity::class.java)
                                 .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
-                                .putExtra(ContactDetailActivity.EXTRA_CONTACT_COLOR, contact.color.toArgb())
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },

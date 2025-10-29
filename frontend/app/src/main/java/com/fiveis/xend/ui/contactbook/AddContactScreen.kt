@@ -70,6 +70,7 @@ import com.fiveis.xend.ui.theme.OrangeSoftBg
 import com.fiveis.xend.ui.theme.OrangeText
 import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.Slate900
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 
@@ -373,7 +374,7 @@ fun AddContactScreen(
                                                 Modifier
                                                     .size(10.dp)
                                                     .clip(CircleShape)
-                                                    .background(g.color)
+                                                    .background(StableColor.forId(g.id))
                                             )
                                             Spacer(Modifier.width(8.dp))
                                             Text(

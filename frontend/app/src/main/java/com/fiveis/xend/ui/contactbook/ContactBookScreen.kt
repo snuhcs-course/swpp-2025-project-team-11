@@ -60,6 +60,7 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookTab
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.Red60
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -206,7 +207,7 @@ fun ContactBookScreen(
                         ContactRow(
                             contact = uiState.contacts[index],
                             subtitle = uiState.contacts[index].email,
-                            color = uiState.contacts[index].color,
+                            color = StableColor.forId(uiState.contacts[index].id),
                             onClick = onContactClick,
                             onEdit = onEditContactClick,
                             onDelete = onDeleteContactClick
@@ -243,9 +244,11 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
+    val groupColor = StableColor.forId(group.id)
+
     Surface(
-        color = group.color.copy(alpha = 0.1f),
-        border = BorderStroke(2.dp, group.color),
+        color = groupColor.copy(alpha = 0.1f),
+        border = BorderStroke(2.dp, groupColor),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -257,11 +260,11 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(group.color)
+                        .background(groupColor)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(group.name, fontWeight = FontWeight.Bold, color = group.color, fontSize = 18.sp)
+                    Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
                     Text(
                         group.description ?: "",
                         color = Color.Gray,
@@ -271,7 +274,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                Text("${group.members.size}명", color = group.color, fontWeight = FontWeight.Bold)
+                Text("${group.members.size}명", color = groupColor, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(12.dp))
             }
 
@@ -283,7 +286,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     group.members.take(3).forEach {
-                        MemberCircle(it.name.first().toString(), group.color)
+                        MemberCircle(it.name.first().toString(), groupColor)
                     }
                     if (group.members.size > 3) {
                         MemberCircle("+${group.members.size - 3}", Color.LightGray)
@@ -595,8 +598,7 @@ fun ContactScreenPreview() {
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
             null,
-            null,
-            Color(0xFFFF5C5C)
+            null
         ),
         Group(
             2,
@@ -608,8 +610,7 @@ fun ContactScreenPreview() {
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
             null,
-            null,
-            Color(0xFFFFA500)
+            null
         )
     )
     ContactBookScreen(

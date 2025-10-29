@@ -117,6 +117,7 @@ import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.SuccessSurface
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
@@ -926,7 +927,7 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
                 modifier = Modifier
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(contact.color),
+                    .background(StableColor.forId(contact.id)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
