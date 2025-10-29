@@ -17,11 +17,17 @@ services:
       poetry run python manage.py migrate &&
       poetry run uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --reload-include '*.html'"
 
-
+  redis:
+    image: redis:7
+    container_name: xend-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+ 
   nginx:
     image: nginx:1.27-alpine
     container_name: xend-nginx
-    depends_on: [server]
+    depends_on: [server, redis]
     volumes:
       - ./nginx/default.dev.conf:/etc/nginx/conf.d/default.conf:ro
 #      - static_volume:/static:ro
