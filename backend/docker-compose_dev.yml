@@ -25,6 +25,7 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    command: redis-server --loglevel debug
  
   nginx:
     image: nginx:1.27-alpine
