@@ -22,3 +22,8 @@ EXPOSE 8000
 FROM base AS local
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-root
+
+# Dev
+FROM base AS dev
+RUN poetry config virtualenvs.create false
+RUN poetry install --no-root
