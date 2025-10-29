@@ -37,9 +37,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class GoogleAccount(models.Model):  # 구글 API 접근을 위한 모델
-    user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="google_accounts"
-    )  # 실제 필드명은 자동으로 user_id가 됨
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="google_accounts")  # 실제 필드명은 자동으로 user_id가 됨
     access_token = models.TextField()
     refresh_token = models.TextField()
     expires_at = models.DateTimeField()  # 토큰 만료 시간

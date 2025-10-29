@@ -1,21 +1,19 @@
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, serializers
+from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 
 from apps.contact.models import (
     Contact,
     ContactContext,
     Group,
-    GroupOptionMap,
     PromptOption,
     Template,
 )
 from apps.contact.serializers import (
     ContactContextSerializer,
     ContactSerializer,
-    GroupOptionMapSerializer,
     GroupSerializer,
     PromptOptionSerializer,
     TemplateSerializer,
@@ -58,9 +56,7 @@ class ContactListCreateView(AuthRequiredMixin, OwnerQuerysetMixin, generics.List
         serializer.save(user=self.request.user)
 
 
-class ContactDetailView(
-    AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView
-):
+class ContactDetailView(AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Contact.objects.select_related("group")
     serializer_class = ContactSerializer
     owner_field = "user"
@@ -115,9 +111,7 @@ class PromptOptionDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAP
 
     def get_queryset(self):
         user = self.request.user
-        return PromptOption.objects.filter(created_by=user) | PromptOption.objects.filter(
-            created_by__isnull=True
-        )
+        return PromptOption.objects.filter(created_by=user) | PromptOption.objects.filter(created_by__isnull=True)
 
     def perform_update(self, serializer):
         # System-defined options are read-only
@@ -133,32 +127,6 @@ class PromptOptionDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAP
         instance.delete()
 
 
-# ===== Group-Option Map =====
-class GroupOptionMapListCreateView(AuthRequiredMixin, generics.ListCreateAPIView):
-    serializer_class = GroupOptionMapSerializer
-
-    def get_queryset(self):
-        return GroupOptionMap.objects.filter(group__user=self.request.user)
-
-    def perform_create(self, serializer):
-        group = serializer.validated_data.get("group")
-        option = serializer.validated_data.get("option")
-        if group.user_id != self.request.user.id:
-            raise serializers.ValidationError("You can only map options to your own group.")
-        if option.created_by and option.created_by_id != self.request.user.id:
-            raise serializers.ValidationError(
-                "You cannot map a prompt option created by another user."
-            )
-        serializer.save()
-
-
-class GroupOptionMapDetailView(AuthRequiredMixin, generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = GroupOptionMapSerializer
-
-    def get_queryset(self):
-        return GroupOptionMap.objects.filter(group__user=self.request.user)
-
-
 # ===== Templates =====
 class TemplateListCreateView(AuthRequiredMixin, OwnerQuerysetMixin, generics.ListCreateAPIView):
     queryset = Template.objects.all()
@@ -168,8 +136,6 @@ class TemplateListCreateView(AuthRequiredMixin, OwnerQuerysetMixin, generics.Lis
         serializer.save(user=self.request.user)
 
 
-class TemplateDetailView(
-    AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView
-):
+class TemplateDetailView(AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Template.objects.all()
     serializer_class = TemplateSerializer

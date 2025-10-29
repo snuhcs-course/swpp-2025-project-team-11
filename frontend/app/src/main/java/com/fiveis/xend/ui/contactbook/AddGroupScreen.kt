@@ -64,11 +64,13 @@ import com.fiveis.xend.ui.theme.TextPrimary
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGroupScreen(
+    uiState: AddGroupUiState,
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onGroupNameChange: (String) -> Unit,
     onGroupDescriptionChange: (String) -> Unit,
     onPromptOptionsChange: (PromptingUiState) -> Unit,
+    onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> },
     members: List<Contact> = emptyList(),
     onAddMember: () -> Unit = {},
     onMemberClick: () -> Unit = {},
@@ -201,7 +203,10 @@ fun AddGroupScreen(
             item {
                 AiPromptingCard(
                     modifier = Modifier.fillMaxWidth(),
-                    onValueChange = onPromptOptionsChange
+                    onValueChange = onPromptOptionsChange,
+                    allToneOptions = uiState.tonePromptOptions,
+                    allFormatOptions = uiState.formatPromptOptions,
+                    onAddPromptOption = onAddPromptOption
                 )
             }
 

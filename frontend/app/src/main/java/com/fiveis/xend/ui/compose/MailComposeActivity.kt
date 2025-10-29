@@ -122,6 +122,7 @@ import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.UndoBorder
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
+import org.json.JSONArray
 import org.json.JSONObject
 
 // ========================================================
@@ -538,7 +539,7 @@ private fun RecipientSection(
                     id = 0,
                     name = trimmed,
                     email = trimmed,
-                    groupId = 0
+                    group = null
                 )
             )
             onNewContactChange(TextFieldValue(""))
@@ -1001,12 +1002,13 @@ class MailComposeActivity : ComponentActivity() {
                                 val payload = JSONObject().apply {
                                     put("subject", subject.ifBlank { "제목 생성" })
                                     // Use HTML content for AI prompt
-                                    put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성해 주세요." })
-                                    put("relationship", "업무 관련")
-                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
-                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
-                                    put("format_prompt", "문단 구분, 끝인사 포함")
-                                    put("language", "Korean")
+                                    put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
+                                    put("to_emails", JSONArray(contacts.map { it.email }))
+//                                    put("relationship", "업무 관련")
+//                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
+//                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
+//                                    put("format_prompt", "문단 구분, 끝인사 포함")
+//                                    put("language", "Korean")
                                 }
                                 composeVm.startStreaming(payload)
                             },
@@ -1018,7 +1020,11 @@ class MailComposeActivity : ComponentActivity() {
                                     return@EmailComposeScreen
                                 }
                                 // Send HTML content
-                                sendVm.sendEmail(to = recipient, subject = subject, body = richTextState.toHtml())
+                                sendVm.sendEmail(
+                                    to = contacts.map { it.email },
+                                    subject = subject.ifBlank { "(제목 없음)" },
+                                    body = richTextState.toHtml()
+                                )
                             }
                         )
                     }
@@ -1040,7 +1046,7 @@ private fun EmailComposePreview() {
             subject = "초안 제목",
             onSubjectChange = {},
             richTextState = richTextState,
-            contacts = listOf(Contact(0, 0, "홍길동", "test@example.com")),
+            contacts = listOf(Contact(0L, null, "홍길동", "test@example.com")),
 
             onContactsChange = {},
             newContact = TextFieldValue(""),

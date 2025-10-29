@@ -4,6 +4,8 @@ import android.content.Context
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.source.AuthApiService
 import com.fiveis.xend.data.source.TokenManager
+import com.google.gson.FieldNamingPolicy
+import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -37,10 +39,15 @@ object RetrofitClient {
 
     // Retrofit 인스턴스 생성
     private fun getRetrofit(client: OkHttpClient): Retrofit {
+        val gson = GsonBuilder()
+            .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+            .serializeNulls() // null 값도 처리?
+            .create()
+
         return Retrofit.Builder()
             .baseUrl(SERVER_BASE_URL)
             .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
