@@ -874,6 +874,39 @@ private fun DirectComposeSubjectDisplaySection(subject: String) {
 
 @Composable
 private fun DirectComposeCollapsibleBodySection(body: String) {
+    // 원본 메시지 분리
+    val markers = listOf(
+        "-- original message --",
+        "--original message--",
+        "-----Original Message-----",
+        "-----원본 메시지-----",
+        "<br><br>From:",
+        "<br><br>from:"
+    )
+
+    var splitIndex = -1
+    for (marker in markers) {
+        val index = body.indexOf(marker, ignoreCase = true)
+        if (index != -1) {
+            splitIndex = index
+            break
+        }
+    }
+
+    // 원본 메시지가 있으면 CollapsibleBodyPreview 사용
+    if (splitIndex != -1) {
+        CollapsibleBodyPreview(
+            bodyPreview = body,
+            modifier = Modifier.padding(horizontal = 20.dp),
+            showHeader = false,
+            backgroundColor = MailDetailBodyBg,
+            borderColor = MailDetailBodyBg,
+            textColor = androidx.compose.ui.graphics.Color(0xFF202124)
+        )
+        return
+    }
+
+    // 원본 메시지가 없으면 기존 방식대로 (전체 접기/펼치기)
     var isExpanded by remember { mutableStateOf(false) }
     val collapsedHeight = 200.dp
 

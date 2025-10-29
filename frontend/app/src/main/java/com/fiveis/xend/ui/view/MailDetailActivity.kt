@@ -24,6 +24,15 @@ class MailDetailActivity : ComponentActivity() {
         )
     }
 
+    // Re: 중복 방지 헬퍼 함수
+    private fun addReplyPrefix(subject: String): String {
+        return if (subject.trim().startsWith("Re:", ignoreCase = true)) {
+            subject
+        } else {
+            "Re: $subject"
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -38,7 +47,7 @@ class MailDetailActivity : ComponentActivity() {
                             val intent = Intent(this@MailDetailActivity, ReplyComposeActivity::class.java).apply {
                                 putExtra("sender_email", mail.from_email)
                                 putExtra("date", mail.date)
-                                putExtra("subject", "Re: ${mail.subject}")
+                                putExtra("subject", addReplyPrefix(mail.subject))
                                 putExtra("body", mail.body)
                             }
                             startActivity(intent)

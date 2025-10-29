@@ -266,67 +266,105 @@ private fun SubjectSection(subject: String) {
 
 @Composable
 private fun BodySection(body: String) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MailDetailBodyBg
-    ) {
-        AndroidView(
-            factory = { context ->
-                WebView(context).apply {
-                    settings.apply {
-                        javaScriptEnabled = false // 보안을 위해 JavaScript 비활성화
-                        loadWithOverviewMode = true
-                        useWideViewPort = false
-                        setSupportZoom(false)
-                    }
-                }
-            },
-            update = { webView ->
-                val htmlContent = """
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <style>
-                            body {
-                                margin: 16px;
-                                padding: 0;
-                                font-family: sans-serif;
-                                font-size: 14px;
-                                line-height: 1.5;
-                                color: #202124;
-                                background-color: transparent;
-                            }
-                            img {
-                                max-width: 100%;
-                                height: auto;
-                            }
-                            a {
-                                color: #1A73E8;
-                                text-decoration: none;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        $body
-                    </body>
-                    </html>
-                """.trimIndent()
+    // 디버깅: 메일 본문 확인
+    android.util.Log.d("MailDetailScreen", "=== BODY ===")
+    android.util.Log.d("MailDetailScreen", body)
+    android.util.Log.d("MailDetailScreen", "============")
 
-                webView.loadDataWithBaseURL(
-                    null,
-                    htmlContent,
-                    "text/html",
-                    "UTF-8",
-                    null
-                )
-            },
+    // 원본 메시지 분리
+    val markers = listOf(
+        "-- original message --",
+        "--original message--",
+        "-----Original Message-----",
+        "-----원본 메시지-----",
+        "<br><br>From:",
+        "<br><br>from:"
+    )
+
+    var splitIndex = -1
+    for (marker in markers) {
+        val index = body.indexOf(marker, ignoreCase = true)
+        if (index != -1) {
+            splitIndex = index
+            break
+        }
+    }
+
+    if (splitIndex == -1) {
+        // 원본 메시지가 없으면 기존 방식대로 표시
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 200.dp, max = 2000.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = MailDetailBodyBg
+        ) {
+            AndroidView(
+                factory = { context ->
+                    WebView(context).apply {
+                        settings.apply {
+                            javaScriptEnabled = false
+                            loadWithOverviewMode = true
+                            useWideViewPort = false
+                            setSupportZoom(false)
+                        }
+                    }
+                },
+                update = { webView ->
+                    val htmlContent = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <style>
+                                body {
+                                    margin: 16px;
+                                    padding: 0;
+                                    font-family: sans-serif;
+                                    font-size: 14px;
+                                    line-height: 1.5;
+                                    color: #202124;
+                                    background-color: transparent;
+                                }
+                                img {
+                                    max-width: 100%;
+                                    height: auto;
+                                }
+                                a {
+                                    color: #1A73E8;
+                                    text-decoration: none;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            $body
+                        </body>
+                        </html>
+                    """.trimIndent()
+
+                    webView.loadDataWithBaseURL(
+                        null,
+                        htmlContent,
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp, max = 2000.dp)
+            )
+        }
+    } else {
+        // 원본 메시지가 있으면 CollapsibleBodyPreview 사용
+        val mainBody = body.substring(0, splitIndex).trim()
+        CollapsibleBodyPreview(
+            bodyPreview = body,
+            modifier = Modifier.padding(horizontal = 20.dp),
+            showHeader = false,
+            backgroundColor = MailDetailBodyBg,
+            borderColor = MailDetailBodyBg,
+            textColor = androidx.compose.ui.graphics.Color(0xFF202124)
         )
     }
 }

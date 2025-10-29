@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.view
 
-import android.webkit.WebView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -63,7 +61,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.AttachmentExcelBg
 import com.fiveis.xend.ui.theme.AttachmentHeaderText
@@ -77,7 +74,6 @@ import com.fiveis.xend.ui.theme.Gray500
 import com.fiveis.xend.ui.theme.Gray600
 import com.fiveis.xend.ui.theme.Green50
 import com.fiveis.xend.ui.theme.Green60
-import com.fiveis.xend.ui.theme.GreenBorder
 import com.fiveis.xend.ui.theme.GreenSurface
 import com.fiveis.xend.ui.theme.MailDetailBodyBg
 import com.fiveis.xend.ui.theme.Purple60
@@ -85,6 +81,7 @@ import com.fiveis.xend.ui.theme.Slate50
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
+import kotlinx.coroutines.launch
 
 data class AttachmentFile(
     val id: String,
@@ -110,12 +107,15 @@ fun ReplyComposeScreen(
     body: String,
     attachments: List<AttachmentFile> = emptyList(),
     replyOptions: List<ReplyOption> = emptyList(),
+    isLoadingOptions: Boolean = false,
+    isStreamingOptions: Boolean = false,
     onBack: () -> Unit = {},
     onTemplate: () -> Unit = {},
     onAttach: () -> Unit = {},
     onSend: () -> Unit = {},
     onDirectCompose: () -> Unit = {},
-    onGenerateMore: () -> Unit = {}
+    onGenerateMore: () -> Unit = {},
+    onUseOption: (ReplyOption) -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -140,8 +140,11 @@ fun ReplyComposeScreen(
             body = body,
             attachments = attachments,
             replyOptions = replyOptions,
+            isLoadingOptions = isLoadingOptions,
+            isStreamingOptions = isStreamingOptions,
             onDirectCompose = onDirectCompose,
-            onGenerateMore = onGenerateMore
+            onGenerateMore = onGenerateMore,
+            onUseOption = onUseOption
         )
     }
 }
@@ -231,8 +234,11 @@ private fun ReplyComposeContent(
     body: String,
     attachments: List<AttachmentFile>,
     replyOptions: List<ReplyOption>,
+    isLoadingOptions: Boolean,
+    isStreamingOptions: Boolean,
     onDirectCompose: () -> Unit,
-    onGenerateMore: () -> Unit
+    onGenerateMore: () -> Unit,
+    onUseOption: (ReplyOption) -> Unit
 ) {
     val scrollState = rememberScrollState()
     var isMailContentExpanded by remember { mutableStateOf(true) }
@@ -266,9 +272,12 @@ private fun ReplyComposeContent(
         }
 
         // 답장 옵션 추천 섹션
-        if (replyOptions.isNotEmpty()) {
-            ReplyOptionsSection(replyOptions = replyOptions)
-        }
+        ReplyOptionsSection(
+            replyOptions = replyOptions,
+            isLoading = isLoadingOptions,
+            isStreaming = isStreamingOptions,
+            onUseOption = onUseOption
+        )
 
         // 하단 버튼들
         BottomActionButtons(
@@ -328,107 +337,15 @@ private fun SubjectSection(subject: String) {
 
 @Composable
 private fun CollapsibleBodySection(body: String) {
-    var isExpanded by remember { mutableStateOf(false) }
-    val collapsedHeight = 200.dp
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp)
-    ) {
-        Surface(
-            onClick = { isExpanded = !isExpanded },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = MailDetailBodyBg
-        ) {
-            AndroidView(
-                factory = { context ->
-                    WebView(context).apply {
-                        settings.apply {
-                            javaScriptEnabled = false
-                            loadWithOverviewMode = true
-                            useWideViewPort = false
-                            setSupportZoom(false)
-                        }
-                    }
-                },
-                update = { webView ->
-                    val htmlContent = """
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                            <style>
-                                body {
-                                    margin: 16px;
-                                    padding: 0;
-                                    font-family: sans-serif;
-                                    font-size: 14px;
-                                    line-height: 1.5;
-                                    color: #202124;
-                                    background-color: transparent;
-                                }
-                                img {
-                                    max-width: 100%;
-                                    height: auto;
-                                }
-                                a {
-                                    color: #1A73E8;
-                                    text-decoration: none;
-                                }
-                            </style>
-                        </head>
-                        <body>
-                            $body
-                        </body>
-                        </html>
-                    """.trimIndent()
-
-                    webView.loadDataWithBaseURL(
-                        null,
-                        htmlContent,
-                        "text/html",
-                        "UTF-8",
-                        null
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (isExpanded) {
-                            Modifier.heightIn(min = collapsedHeight, max = 2000.dp)
-                        } else {
-                            Modifier.height(collapsedHeight)
-                        }
-                    )
-            )
-        }
-
-        // 접기/펼치기 힌트 (클릭 영역 확장)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { isExpanded = !isExpanded }
-                .padding(vertical = 12.dp, horizontal = 20.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (isExpanded) "접기" else "더보기",
-                fontSize = 13.sp,
-                color = TextSecondary,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = TextSecondary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
+    // CollapsibleBodyPreview 사용으로 원본 메시지 파싱 지원
+    CollapsibleBodyPreview(
+        bodyPreview = body,
+        modifier = Modifier.padding(horizontal = 20.dp),
+        showHeader = false,
+        backgroundColor = MailDetailBodyBg,
+        borderColor = MailDetailBodyBg,
+        textColor = androidx.compose.ui.graphics.Color(0xFF202124)
+    )
 }
 
 @Composable
@@ -545,7 +462,12 @@ private fun AttachmentItem(attachment: AttachmentFile) {
 }
 
 @Composable
-private fun ReplyOptionsSection(replyOptions: List<ReplyOption>) {
+private fun ReplyOptionsSection(
+    replyOptions: List<ReplyOption>,
+    isLoading: Boolean,
+    isStreaming: Boolean,
+    onUseOption: (ReplyOption) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -562,8 +484,40 @@ private fun ReplyOptionsSection(replyOptions: List<ReplyOption>) {
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
 
+        // 로딩 중일 때 표시
+        if (isLoading && replyOptions.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(40.dp),
+                        color = Green60
+                    )
+                    Text(
+                        text = "답장 옵션 생성 중...",
+                        fontSize = 14.sp,
+                        color = Gray500
+                    )
+                }
+            }
+            return
+        }
+
+        // 옵션이 없으면 표시하지 않음
+        if (replyOptions.isEmpty()) {
+            return
+        }
+
         // 페이지 인디케이터와 탭
         val pagerState = rememberPagerState(pageCount = { replyOptions.size })
+        val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
         // 페이지 인디케이터
         Row(
@@ -600,7 +554,12 @@ private fun ReplyOptionsSection(replyOptions: List<ReplyOption>) {
                 OptionTab(
                     title = option.title,
                     isSelected = isSelected,
-                    onClick = { /* TODO: 탭 클릭 시 페이지 이동 */ }
+                    onClick = {
+                        val index = replyOptions.indexOf(option)
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    }
                 )
             }
         }
@@ -612,7 +571,19 @@ private fun ReplyOptionsSection(replyOptions: List<ReplyOption>) {
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
         ) { page ->
-            ReplyContentCard(replyOption = replyOptions[page])
+            ReplyContentCard(
+                replyOption = replyOptions[page],
+                onNext = {
+                    // 다음 옵션으로 이동
+                    val nextPage = (page + 1) % replyOptions.size
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(nextPage)
+                    }
+                },
+                onUse = {
+                    onUseOption(replyOptions[page])
+                }
+            )
         }
     }
 }
@@ -639,7 +610,7 @@ private fun OptionTab(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ReplyContentCard(replyOption: ReplyOption) {
+private fun ReplyContentCard(replyOption: ReplyOption, onNext: () -> Unit, onUse: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -664,7 +635,7 @@ private fun ReplyContentCard(replyOption: ReplyOption) {
                 )
             }
 
-            // 제목
+            // 옵션 타입 (예: 상세 보고형, 간결형)
             Text(
                 text = replyOption.title,
                 fontSize = 18.sp,
@@ -673,56 +644,8 @@ private fun ReplyContentCard(replyOption: ReplyOption) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // 제목 섹션
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = BackgroundWhite,
-                border = BorderStroke(1.dp, GreenBorder)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "제목",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Gray500,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    Text(
-                        text = replyOption.subject,
-                        fontSize = 13.sp,
-                        color = Gray500
-                    )
-                }
-            }
-
-            // 본문 미리보기 섹션
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = BackgroundWhite,
-                border = BorderStroke(1.dp, GreenBorder)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "본문 미리보기",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Gray500,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    Text(
-                        text = replyOption.bodyPreview,
-                        fontSize = 13.sp,
-                        lineHeight = 15.6.sp,
-                        color = Green50
-                    )
-                }
-            }
+            // 본문 미리보기 섹션 (원본 메시지 포함)
+            CollapsibleBodyPreview(bodyPreview = replyOption.bodyPreview)
 
             // 하단 버튼들
             Row(
@@ -731,7 +654,7 @@ private fun ReplyContentCard(replyOption: ReplyOption) {
             ) {
                 // 다음 옵션 버튼
                 OutlinedButton(
-                    onClick = { /* TODO */ },
+                    onClick = onNext,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -755,7 +678,7 @@ private fun ReplyContentCard(replyOption: ReplyOption) {
 
                 // 이 옵션 사용 버튼
                 Button(
-                    onClick = { /* TODO */ },
+                    onClick = onUse,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         val senderEmail = intent.getStringExtra("sender_email") ?: ""
         val date = intent.getStringExtra("date") ?: ""
         val originalBody = intent.getStringExtra("original_body") ?: ""
+        val generatedBody = intent.getStringExtra("generated_body") ?: ""
 
         setContent {
             XendTheme {
@@ -44,6 +46,13 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 // subject와 body 상태 관리
                 var currentSubject by rememberSaveable { mutableStateOf(initialSubject) }
                 val richTextState = rememberRichTextState()
+
+                // AI가 생성한 본문이 있으면 초기값으로 설정
+                LaunchedEffect(generatedBody) {
+                    if (generatedBody.isNotEmpty()) {
+                        richTextState.setHtml(generatedBody)
+                    }
+                }
 
                 if (showTemplateScreen) {
                     // 템플릿 선택 화면
