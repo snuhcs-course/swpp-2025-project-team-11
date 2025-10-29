@@ -40,6 +40,7 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
 
         try:
+            print("[DEBUG] Sending GPU request:", settings.GPU_SERVER_BASEURL + "predict")
             # GPU 서버로 직접 REST POST
             response = requests.post(
                 settings.GPU_SERVER_BASEURL + "predict",
@@ -52,11 +53,11 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
                 timeout=5,  # GPU 서버 응답 지연 시 타임아웃 방지
             )
             response.raise_for_status()
+            print("[DEBUG] GPU Response:", response.status_code, response.text)
         except Exception as e:
             # GPU 서버 요청 실패 시 프론트로 에러 메시지 전달
-            await self.send(
-                text_data=json.dumps({"type": "error", "message": f"GPU 요청 실패: {str(e)}"})
-            )
+            print("[ERROR] GPU Request Failed:", e)
+            await self.send(text_data=json.dumps({"type": "error", "message": f"GPU 요청 실패: {str(e)}"}))
 
     async def redis_listener(self):
         """
