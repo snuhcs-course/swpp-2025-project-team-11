@@ -346,9 +346,15 @@ private fun EmailList(
                     shouldLoad
                 }
             }.collect { shouldLoadMore ->
-                if (shouldLoadMore && !isRefreshing && !isLoadingMore) {
+                Log.d(
+                    "InboxScreen",
+                    "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
+                )
+                if (shouldLoadMore && !isLoadingMore) {
                     Log.d("InboxScreen", "Triggering loadMore")
                     onLoadMore()
+                } else {
+                    Log.d("InboxScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }

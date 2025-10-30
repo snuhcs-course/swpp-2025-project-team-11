@@ -106,6 +106,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.network.MailComposeSseClient
+import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.AddButtonText
 import com.fiveis.xend.ui.theme.BannerBackground
@@ -147,12 +148,15 @@ fun EmailComposeScreen(
     onStopStreaming: () -> Unit = {},
     modifier: Modifier = Modifier,
     sendUiState: SendUiState,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    suggestionText: String = "",
+    onAcceptSuggestion: () -> Unit = {},
+    aiRealtime: Boolean = true,
+    onAiRealtimeToggle: (Boolean) -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val scrollState = rememberScrollState()
     var showBanner by rememberSaveable { mutableStateOf(true) }
-    var aiRealtime by rememberSaveable { mutableStateOf(true) }
 
     Scaffold(
         modifier = modifier
@@ -217,12 +221,14 @@ fun EmailComposeScreen(
 
             BodyHeader(
                 isRealtimeOn = aiRealtime,
-                onToggle = { aiRealtime = it }
+                onToggle = onAiRealtimeToggle
             )
             RichTextEditorCard(
                 richTextState = richTextState,
                 isStreaming = isStreaming,
-                onTapComplete = onAiComplete
+                onTapComplete = onAiComplete,
+                suggestionText = suggestionText,
+                onAcceptSuggestion = onAcceptSuggestion
             )
 
             error?.let { ErrorMessage(it) }
@@ -813,7 +819,9 @@ private fun RichTextEditorControls(
 private fun RichTextEditorCard(
     richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
     isStreaming: Boolean,
-    onTapComplete: () -> Unit
+    onTapComplete: () -> Unit,
+    suggestionText: String = "",
+    onAcceptSuggestion: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -825,21 +833,34 @@ private fun RichTextEditorCard(
     ) {
         Column {
             RichTextEditorControls(state = richTextState)
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                placeholder = {
+            Box {
+                RichTextEditor(
+                    state = richTextState,
+                    enabled = !isStreaming,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 240.dp)
+                        .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
+                    placeholder = {
+                        Text(
+                            text = "내용을 입력하세요",
+                            style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
+                        )
+                    }
+                )
+                if (suggestionText.isNotEmpty()) {
                     Text(
-                        text = "내용을 입력하세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
+                        text = suggestionText,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = TextSecondary.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier
+                            .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
+                            .clickable { onAcceptSuggestion() }
                     )
                 }
-            )
+            }
         }
     }
 }
@@ -903,10 +924,13 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
     }
 }
 
-class ComposeVmFactory(private val client: MailComposeSseClient) : ViewModelProvider.Factory {
+class ComposeVmFactory(
+    private val sseClient: MailComposeSseClient,
+    private val wsClient: MailComposeWebSocketClient
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MailComposeViewModel(client) as T
+        return MailComposeViewModel(sseClient, wsClient) as T
     }
 }
 
@@ -923,9 +947,13 @@ class MailComposeActivity : ComponentActivity() {
                 // 1) AI Compose VM
                 val composeVm: MailComposeViewModel = viewModel(
                     factory = ComposeVmFactory(
-                        MailComposeSseClient(
+                        sseClient = MailComposeSseClient(
                             application.applicationContext,
-                            endpointUrl = BuildConfig.BASE_URL + "api/ai/mail/generate/stream/"
+                            endpointUrl = BuildConfig.BASE_URL + "/api/ai/mail/generate/stream/"
+                        ),
+                        wsClient = MailComposeWebSocketClient(
+                            context = application.applicationContext,
+                            wsUrl = BuildConfig.WS_URL
                         )
                     )
                 )
@@ -943,16 +971,29 @@ class MailComposeActivity : ComponentActivity() {
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
                 var showTemplateScreen by remember { mutableStateOf(false) }
+                var aiRealtime by rememberSaveable { mutableStateOf(true) }
 
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
+
+                // Enable/disable realtime mode when toggle changes
+                LaunchedEffect(aiRealtime) {
+                    composeVm.enableRealtimeMode(aiRealtime)
+                }
 
                 // Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
                         richTextState.setHtml(composeUi.bodyRendered)
+                    }
+                }
+
+                // Monitor text changes for realtime suggestions
+                LaunchedEffect(richTextState.annotatedString.text) {
+                    if (aiRealtime) {
+                        composeVm.onTextChanged(richTextState.toHtml())
                     }
                 }
 
@@ -992,6 +1033,14 @@ class MailComposeActivity : ComponentActivity() {
                             onBack = { finish() },
                             onTemplateClick = { showTemplateScreen = true },
                             onUndo = { /* TODO */ },
+                            suggestionText = composeUi.suggestionText,
+                            onAcceptSuggestion = {
+                                val currentText = richTextState.toHtml()
+                                richTextState.setHtml(currentText + composeUi.suggestionText)
+                                composeVm.acceptSuggestion()
+                            },
+                            aiRealtime = aiRealtime,
+                            onAiRealtimeToggle = { aiRealtime = it },
                             onAiComplete = {
                                 val payload = JSONObject().apply {
                                     put("subject", subject.ifBlank { "제목 생성" })
@@ -1049,7 +1098,11 @@ private fun EmailComposePreview() {
             error = null,
             sendUiState = SendUiState(),
             onTemplateClick = {},
-            onSend = {}
+            onSend = {},
+            suggestionText = "",
+            onAcceptSuggestion = {},
+            aiRealtime = true,
+            onAiRealtimeToggle = {}
         )
     }
 }
