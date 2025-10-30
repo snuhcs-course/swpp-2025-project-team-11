@@ -42,7 +42,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `sendAuthCodeToServer with jwt tokens returns Success`() = runTest {
+    fun sendAuthCodeToServer_with_jwt_tokens_returns_Success() = runTest {
         val authCode = "test_auth_code_123"
         val accessToken = "access_token_123"
         val refreshToken = "refresh_token_123"
@@ -76,7 +76,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `sendAuthCodeToServer with legacy tokens returns Success`() = runTest {
+    fun sendAuthCodeToServer_with_legacy_tokens_returns_Success() = runTest {
         val authCode = "test_auth_code_123"
         val accessToken = "access_token_123"
         val refreshToken = "refresh_token_123"
@@ -101,7 +101,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `sendAuthCodeToServer with null body returns Failure`() = runTest {
+    fun sendAuthCodeToServer_with_null_body_returns_Failure() = runTest {
         val authCode = "test_auth_code_123"
 
         val mockResponse = Response.success<AuthResponse>(null)
@@ -117,7 +117,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `sendAuthCodeToServer with no tokens in response returns Failure`() = runTest {
+    fun sendAuthCodeToServer_with_no_tokens_in_response_returns_Failure() = runTest {
         val authCode = "test_auth_code_123"
 
         val mockResponse = Response.success(
@@ -139,7 +139,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `sendAuthCodeToServer with error response returns Failure`() = runTest {
+    fun sendAuthCodeToServer_with_error_response_returns_Failure() = runTest {
         val authCode = "test_auth_code_123"
 
         val mockResponse = Response.error<AuthResponse>(
@@ -159,7 +159,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `sendAuthCodeToServer with network exception returns Failure`() = runTest {
+    fun sendAuthCodeToServer_with_network_exception_returns_Failure() = runTest {
         val authCode = "test_auth_code_123"
 
         coEvery {
@@ -174,7 +174,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `logout with valid tokens calls api service`() = runTest {
+    fun logout_with_valid_tokens_calls_api_service() = runTest {
         val accessToken = "access_token_123"
         val refreshToken = "refresh_token_123"
 
@@ -198,7 +198,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `logout with null access token does not call api`() = runTest {
+    fun logout_with_null_access_token_does_not_call_api() = runTest {
         val refreshToken = "refresh_token_123"
 
         repository.logout(null, refreshToken)
@@ -209,7 +209,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `logout with null refresh token uses empty string`() = runTest {
+    fun logout_with_null_refresh_token_uses_empty_string() = runTest {
         val accessToken = "access_token_123"
 
         coEvery {
@@ -232,7 +232,7 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `logout with api failure does not throw exception`() = runTest {
+    fun logout_with_api_failure_does_not_throw_exception() = runTest {
         val accessToken = "access_token_123"
         val refreshToken = "refresh_token_123"
 
