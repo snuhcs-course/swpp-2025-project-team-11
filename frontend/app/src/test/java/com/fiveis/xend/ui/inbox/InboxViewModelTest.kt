@@ -72,7 +72,7 @@ class InboxViewModelTest {
         viewModel = InboxViewModel(repository)
         advanceUntilIdle()
 
-        assertEquals("token123", viewModel.uiState.value.nextPageToken)
+        assertEquals("token123", viewModel.uiState.value.loadMoreNextPageToken)
         assertFalse(viewModel.uiState.value.isRefreshing)
         assertNull(viewModel.uiState.value.error)
     }
@@ -113,7 +113,7 @@ class InboxViewModelTest {
         advanceUntilIdle()
 
         coVerify { repository.saveEmailsToCache(newEmails) }
-        assertEquals("token456", viewModel.uiState.value.nextPageToken)
+        assertEquals("token456", viewModel.uiState.value.loadMoreNextPageToken)
         assertFalse(viewModel.uiState.value.isLoading)
     }
 
