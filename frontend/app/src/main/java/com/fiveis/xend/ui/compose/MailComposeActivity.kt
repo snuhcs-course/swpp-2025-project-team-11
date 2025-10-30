@@ -944,13 +944,6 @@ class MailComposeActivity : ComponentActivity() {
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
                 var showTemplateScreen by remember { mutableStateOf(false) }
 
-                // Set initial content for the editor
-                LaunchedEffect(Unit) {
-                    richTextState.setHtml(
-                        "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 <b>우수한 성과</b>라고 판단됩니다."
-                    )
-                }
-
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()

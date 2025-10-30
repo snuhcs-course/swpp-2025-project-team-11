@@ -78,7 +78,7 @@ fun ContactBookScreen(
     onEditContactClick: (Contact) -> Unit = {},
     onDeleteContactClick: (Contact) -> Unit = {}
 ) {
-    var selectedTab by remember { mutableStateOf(ContactBookTab.Groups) }
+    val selectedTab = uiState.selectedTab
 
     if (selectedTab == ContactBookTab.Groups) {
         Scaffold(
@@ -111,12 +111,14 @@ fun ContactBookScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
-                        selectedTab = ContactBookTab.Groups
-                        onTabSelected(ContactBookTab.Groups)
+                        if (selectedTab != ContactBookTab.Groups) {
+                            onTabSelected(ContactBookTab.Groups)
+                        }
                     }
                     TabChip("전체", selectedTab == ContactBookTab.Contacts) {
-                        selectedTab = ContactBookTab.Contacts
-                        onTabSelected(ContactBookTab.Contacts)
+                        if (selectedTab != ContactBookTab.Contacts) {
+                            onTabSelected(ContactBookTab.Contacts)
+                        }
                     }
                 }
 
@@ -171,12 +173,14 @@ fun ContactBookScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
-                        selectedTab = ContactBookTab.Groups
-                        onTabSelected(ContactBookTab.Groups)
+                        if (selectedTab != ContactBookTab.Groups) {
+                            onTabSelected(ContactBookTab.Groups)
+                        }
                     }
                     TabChip("전체", selectedTab == ContactBookTab.Contacts) {
-                        selectedTab = ContactBookTab.Contacts
-                        onTabSelected(ContactBookTab.Contacts)
+                        if (selectedTab != ContactBookTab.Contacts) {
+                            onTabSelected(ContactBookTab.Contacts)
+                        }
                     }
                 }
 

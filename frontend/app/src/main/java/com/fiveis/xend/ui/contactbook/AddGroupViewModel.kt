@@ -29,7 +29,12 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
         getAllPromptOptions()
     }
 
-    fun addGroup(name: String, description: String, options: List<PromptOption>) {
+    fun addGroup(
+        name: String,
+        description: String,
+        options: List<PromptOption>,
+        members: List<com.fiveis.xend.data.model.Contact> = emptyList()
+    ) {
         if (name.isBlank()) {
             _uiState.update { it.copy(isLoading = false, error = "그룹 이름을 입력해 주세요.") }
             return
@@ -39,15 +44,30 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
 
         viewModelScope.launch {
             try {
+                // 1. 그룹 생성
+                android.util.Log.d("AddGroupViewModel", "Creating group: $name")
                 val res = repository.addGroup(name, description, options)
+                android.util.Log.d("AddGroupViewModel", "Group created with ID: ${res.id}")
+
+                // 2. 멤버들의 group_id 업데이트
+                if (members.isNotEmpty()) {
+                    android.util.Log.d("AddGroupViewModel", "Updating ${members.size} members")
+                    members.forEach { contact ->
+                        android.util.Log.d("AddGroupViewModel", "Updating contact ${contact.id} to group ${res.id}")
+                        repository.updateContactGroup(contact.id, res.id)
+                    }
+                    android.util.Log.d("AddGroupViewModel", "All members updated")
+                }
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        lastSuccessMsg = "추가 성공(그룹 ID: ${res.id})",
+                        lastSuccessMsg = "추가 성공(그룹 ID: ${res.id}, 멤버 ${members.size}명)",
                         error = null
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("AddGroupViewModel", "Error adding group", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,

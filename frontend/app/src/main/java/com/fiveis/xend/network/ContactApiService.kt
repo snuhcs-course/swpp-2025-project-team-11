@@ -10,6 +10,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 
@@ -26,6 +27,9 @@ interface ContactApiService {
 
     @DELETE("api/contact/{id}/")
     suspend fun deleteContact(@Path("id") contactId: Long): Response<Void>
+
+    @PATCH("api/contact/{id}/")
+    suspend fun updateContact(@Path("id") contactId: Long, @Body payload: Map<String, Long>): Response<ContactResponse>
 
     // 그룹 관련
     @POST("api/contact/groups/")

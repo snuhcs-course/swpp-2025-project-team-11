@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +44,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -232,6 +234,7 @@ fun AddGroupScreen(
 
             // ===== 멤버 헤더 =====
             item {
+                android.util.Log.d("AddGroupScreen", "Rendering members header: ${members.size} members")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -368,5 +371,157 @@ private fun FormBlock(label: String, content: @Composable ColumnScope.() -> Unit
         )
         Spacer(Modifier.height(8.dp))
         content()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ContactSelectDialog(
+    contacts: List<Contact>,
+    selectedContacts: List<Contact>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<Contact>) -> Unit
+) {
+    // ID만 저장해서 Set 비교 문제 해결
+    var tempSelectedIds by remember { mutableStateOf(selectedContacts.map { it.id }.toSet()) }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    "연락처 선택",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "그룹에 추가할 연락처를 선택하세요",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                if (contacts.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "등록된 연락처가 없습니다",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) {
+                        itemsIndexed(contacts) { _, contact ->
+                            val isSelected = tempSelectedIds.contains(contact.id)
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        tempSelectedIds = if (isSelected) {
+                                            tempSelectedIds - contact.id
+                                        } else {
+                                            tempSelectedIds + contact.id
+                                        }
+                                    },
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                } else {
+                                    Color.Transparent
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(contact.color),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = contact.name.firstOrNull()?.uppercase() ?: "?",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Spacer(Modifier.width(12.dp))
+
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            text = contact.name,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = contact.email,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = "선택됨",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("취소")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            val selected = contacts.filter { tempSelectedIds.contains(it.id) }
+                            onConfirm(selected)
+                        }
+                    ) {
+                        Text("확인 (${tempSelectedIds.size})")
+                    }
+                }
+            }
+        }
     }
 }
