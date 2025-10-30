@@ -64,23 +64,13 @@ class ReplyComposeActivity : ComponentActivity() {
                     }
                 }
 
-                // ViewModel의 ReplyOptionState를 UI 모델로 변환
-                val replyOptions = uiState.options.map { optionState ->
-                    ReplyOption(
-                        id = optionState.id.toString(),
-                        title = optionState.type,
-                        subject = optionState.title,
-                        bodyPreview = optionState.bodyRendered
-                    )
-                }
-
                 ReplyComposeScreen(
                     senderEmail = senderEmail,
                     date = date,
                     subject = subject,
                     body = body,
                     attachments = emptyList(),
-                    replyOptions = replyOptions,
+                    replyOptions = uiState.options,
                     isLoadingOptions = uiState.isLoading,
                     isStreamingOptions = uiState.isStreaming,
                     onBack = {
@@ -116,7 +106,7 @@ class ReplyComposeActivity : ComponentActivity() {
                             putExtra("date", date)
                             putExtra("original_body", body)
                             // 생성된 본문을 초기값으로 전달
-                            putExtra("generated_body", selectedOption.bodyPreview)
+                            putExtra("generated_body", selectedOption.body)
                         }
                         startActivity(intent)
                     }

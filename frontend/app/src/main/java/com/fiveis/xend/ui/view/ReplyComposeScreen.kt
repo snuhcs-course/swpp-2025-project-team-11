@@ -51,6 +51,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -106,7 +107,7 @@ fun ReplyComposeScreen(
     subject: String,
     body: String,
     attachments: List<AttachmentFile> = emptyList(),
-    replyOptions: List<ReplyOption> = emptyList(),
+    replyOptions: List<ReplyOptionState> = emptyList(),
     isLoadingOptions: Boolean = false,
     isStreamingOptions: Boolean = false,
     onBack: () -> Unit = {},
@@ -115,8 +116,12 @@ fun ReplyComposeScreen(
     onSend: () -> Unit = {},
     onDirectCompose: () -> Unit = {},
     onGenerateMore: () -> Unit = {},
-    onUseOption: (ReplyOption) -> Unit = {}
+    onUseOption: (ReplyOptionState) -> Unit = {}
 ) {
+    android.util.Log.d(
+        "ReplyComposeScreen",
+        "렌더링: isLoading=$isLoadingOptions, isStreaming=$isStreamingOptions, options=${replyOptions.size}"
+    )
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = BackgroundWhite,
@@ -233,13 +238,14 @@ private fun ReplyComposeContent(
     subject: String,
     body: String,
     attachments: List<AttachmentFile>,
-    replyOptions: List<ReplyOption>,
+    replyOptions: List<ReplyOptionState>,
     isLoadingOptions: Boolean,
     isStreamingOptions: Boolean,
     onDirectCompose: () -> Unit,
     onGenerateMore: () -> Unit,
-    onUseOption: (ReplyOption) -> Unit
+    onUseOption: (ReplyOptionState) -> Unit
 ) {
+    android.util.Log.d("ReplyComposeContent", "렌더링: isLoading=$isLoadingOptions, options=${replyOptions.size}")
     val scrollState = rememberScrollState()
     var isMailContentExpanded by remember { mutableStateOf(true) }
 
@@ -272,12 +278,20 @@ private fun ReplyComposeContent(
         }
 
         // 답장 옵션 추천 섹션
-        ReplyOptionsSection(
-            replyOptions = replyOptions,
-            isLoading = isLoadingOptions,
-            isStreaming = isStreamingOptions,
-            onUseOption = onUseOption
+        android.util.Log.d(
+            "ReplyComposeContent",
+            "ReplyOptionsSection 호출 직전: isLoading=$isLoadingOptions, options=${replyOptions.size}"
         )
+        val totalBodyLength = replyOptions.sumOf { it.body.length }
+        android.util.Log.d("ReplyComposeContent", "totalBodyLength=$totalBodyLength")
+        key(replyOptions.size, isLoadingOptions, totalBodyLength) {
+            ReplyOptionsSection(
+                replyOptions = replyOptions,
+                isLoading = isLoadingOptions,
+                isStreaming = isStreamingOptions,
+                onUseOption = onUseOption
+            )
+        }
 
         // 하단 버튼들
         BottomActionButtons(
@@ -463,11 +477,17 @@ private fun AttachmentItem(attachment: AttachmentFile) {
 
 @Composable
 private fun ReplyOptionsSection(
-    replyOptions: List<ReplyOption>,
+    replyOptions: List<ReplyOptionState>,
     isLoading: Boolean,
     isStreaming: Boolean,
-    onUseOption: (ReplyOption) -> Unit
+    onUseOption: (ReplyOptionState) -> Unit
 ) {
+    // 상태 로깅
+    android.util.Log.d(
+        "ReplyOptionsSection",
+        "isLoading=$isLoading, isStreaming=$isStreaming, options=${replyOptions.size}"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -486,6 +506,7 @@ private fun ReplyOptionsSection(
 
         // 로딩 중일 때 표시
         if (isLoading && replyOptions.isEmpty()) {
+            android.util.Log.d("ReplyOptionsSection", "로딩 스피너 표시 중")
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -565,12 +586,18 @@ private fun ReplyOptionsSection(
         }
 
         // 답장 내용 카드 (스와이프 가능)
+        android.util.Log.d(
+            "ReplyOptionsSection",
+            "HorizontalPager 생성: pageCount=${replyOptions.size}, currentPage=${pagerState.currentPage}"
+        )
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 20.dp),
+            key = { page -> "${replyOptions[page].id}_${replyOptions[page].body.length}" }
         ) { page ->
+            android.util.Log.d("ReplyOptionsSection", "HorizontalPager page=$page 렌더링 중")
             ReplyContentCard(
                 replyOption = replyOptions[page],
                 onNext = {
@@ -602,7 +629,11 @@ private fun OptionTab(title: String, isSelected: Boolean, onClick: () -> Unit) {
         Text(
             text = title,
             fontSize = if (isSelected) 13.sp else 11.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            fontWeight = if (isSelected) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Normal
+            },
             color = if (isSelected) Green50 else Gray600,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
         )
@@ -610,7 +641,13 @@ private fun OptionTab(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ReplyContentCard(replyOption: ReplyOption, onNext: () -> Unit, onUse: () -> Unit) {
+private fun ReplyContentCard(replyOption: ReplyOptionState, onNext: () -> Unit, onUse: () -> Unit) {
+    android.util.Log.d(
+        "ReplyContentCard",
+        "id=${replyOption.id}, type=${replyOption.type}, " +
+            "title=${replyOption.title}, body length=${replyOption.body.length}"
+    )
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -637,15 +674,23 @@ private fun ReplyContentCard(replyOption: ReplyOption, onNext: () -> Unit, onUse
 
             // 옵션 타입 (예: 상세 보고형, 간결형)
             Text(
-                text = replyOption.title,
+                text = replyOption.type,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = Green50,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // 본문 미리보기 섹션 (원본 메시지 포함)
-            CollapsibleBodyPreview(bodyPreview = replyOption.bodyPreview)
+            // 본문 미리보기 섹션
+            Text(
+                text = replyOption.body,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = TextPrimary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
 
             // 하단 버튼들
             Row(
@@ -794,29 +839,33 @@ private fun ReplyComposeScreenPreview() {
     )
 
     val sampleReplyOptions = listOf(
-        ReplyOption(
-            id = "1",
-            title = "상세 보고형",
-            subject = "Re: Q4 실적 보고서 검토 완료 - 상세 분석 포함",
-            bodyPreview = "안녕하세요, 대표님.\n\nQ4 실적 보고서를 상세히 검토하였습니다.\n\n📊 주요 성과:\n• 마케팅 비용 12% 초과 → Q1 전략 재검토 필요"
+        ReplyOptionState(
+            id = 1,
+            type = "상세 보고형",
+            title = "Re: Q4 실적 보고서 검토 완료 - 상세 분석 포함",
+            body = "안녕하세요, 대표님.\n\nQ4 실적 보고서를 상세히 검토하였습니다.\n\n📊 주요 성과:\n• 마케팅 비용 12% 초과 → Q1 전략 재검토 필요",
+            isComplete = true
         ),
-        ReplyOption(
-            id = "2",
-            title = "간결형",
-            subject = "Re: Q4 실적 보고서 검토 완료",
-            bodyPreview = "검토 완료했습니다. 내일 회의에서 피드백 드리겠습니다."
+        ReplyOptionState(
+            id = 2,
+            type = "간결형",
+            title = "Re: Q4 실적 보고서 검토 완료",
+            body = "검토 완료했습니다. 내일 회의에서 피드백 드리겠습니다.",
+            isComplete = true
         ),
-        ReplyOption(
-            id = "3",
-            title = "긍정형",
-            subject = "Re: Q4 실적 보고서 검토 완료 - 훌륭합니다!",
-            bodyPreview = "안녕하세요! 보고서 잘 받았습니다. 전반적으로 매우 잘 작성되었습니다."
+        ReplyOptionState(
+            id = 3,
+            type = "긍정형",
+            title = "Re: Q4 실적 보고서 검토 완료 - 훌륭합니다!",
+            body = "안녕하세요! 보고서 잘 받았습니다. 전반적으로 매우 잘 작성되었습니다.",
+            isComplete = true
         ),
-        ReplyOption(
-            id = "4",
-            title = "직접작성",
-            subject = "",
-            bodyPreview = ""
+        ReplyOptionState(
+            id = 4,
+            type = "직접작성",
+            title = "",
+            body = "",
+            isComplete = true
         )
     )
 

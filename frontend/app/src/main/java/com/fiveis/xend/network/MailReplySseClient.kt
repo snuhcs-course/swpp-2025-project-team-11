@@ -119,11 +119,16 @@ class MailReplySseClient(
                         parseSseStream(
                             source,
                             onEvent = { event, data ->
+                                Log.d("SSE_EVENT", "event='$event', data='${data.take(100)}'")
                                 try {
                                     val obj = JSONObject(data)
                                     when (event) {
-                                        "ready" -> onReady()
+                                        "ready" -> {
+                                            Log.d("SSE_READY", "Ready event received")
+                                            onReady()
+                                        }
                                         "options" -> {
+                                            Log.d("SSE_OPTIONS", "Options event: $data")
                                             val count = obj.getInt("count")
                                             val items = obj.getJSONArray("items")
                                             val options = mutableListOf<ReplyOptionInfo>()
@@ -143,23 +148,28 @@ class MailReplySseClient(
                                             val id = obj.getInt("id")
                                             val seq = obj.getInt("seq")
                                             val text = obj.getString("text")
+                                            Log.d("SSE_DELTA", "id=$id, seq=$seq, text='${text.take(20)}'")
                                             onOptionDelta(id, seq, text)
                                         }
                                         "option.done" -> {
                                             val id = obj.getInt("id")
                                             val totalSeq = obj.getInt("total_seq")
+                                            Log.d("SSE_DONE", "Option $id done, totalSeq=$totalSeq")
                                             onOptionDone(id, totalSeq)
                                         }
                                         "option.error" -> {
                                             val id = obj.getInt("id")
                                             val message = obj.optString("message", "Unknown error")
+                                            Log.e("SSE_ERROR", "Option $id error: $message")
                                             onOptionError(id, message)
                                         }
                                         "done" -> {
                                             val reason = obj.optString("reason", "finished")
+                                            Log.d("SSE_DONE_ALL", "All done: $reason")
                                             onDone(reason)
                                         }
                                         "ping" -> {
+                                            Log.d("SSE_PING", "Ping received")
                                             // Heartbeat - 무시
                                         }
                                     }
