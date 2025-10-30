@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -10,9 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.ui.theme.StableColor
@@ -48,8 +49,8 @@ class GroupDetailActivity : ComponentActivity() {
                 val groupColor = StableColor.forId(groupId)
 
                 val vm: GroupDetailViewModel = viewModel()
-                LaunchedEffect(groupId) { vm.load(groupId) }
-                val state by vm.uiState.collectAsState()
+                LaunchedEffect(groupId) { vm.load(groupId, force = true) }
+                val state by vm.uiState.collectAsStateWithLifecycle()
 
                 GroupDetailScreen(
                     themeColor = groupColor,
@@ -58,11 +59,13 @@ class GroupDetailActivity : ComponentActivity() {
                         finish()
                         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                     },
-                    onRefresh = { vm.load(groupId, force = true) },
+                    onRefresh = { vm.refresh() },
                     onMemberClick = { contact ->
                         // TODO: link to ContactDetail
-                        // startActivity(Intent(this, ContactDetailActivity::class.java)
-                        //   .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id))
+                        startActivity(
+                            Intent(this, ContactDetailActivity::class.java)
+                                .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
+                        )
                     }
                 )
 

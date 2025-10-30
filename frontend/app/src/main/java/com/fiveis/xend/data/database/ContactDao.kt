@@ -6,6 +6,7 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import com.fiveis.xend.data.database.entity.ContactContextEntity
 import com.fiveis.xend.data.database.entity.ContactEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContactDao {
@@ -19,8 +20,16 @@ interface ContactDao {
     suspend fun getAllContacts(): List<ContactEntity>
 
     @Transaction
+    @Query("SELECT * FROM contacts")
+    fun observeAllWithContext(): Flow<List<ContactWithContext>>
+
+    @Transaction
     @Query("SELECT * FROM contacts WHERE groupId = :groupId")
     suspend fun getContactsByGroupIdWithContext(groupId: Long): List<ContactWithContext>
+
+    @Transaction
+    @Query("SELECT * FROM contacts WHERE groupId = :groupId")
+    fun observeByGroupIdWithContext(groupId: Long): Flow<List<ContactWithContext>>
 
     @Transaction
     @Query("SELECT * FROM contacts WHERE id = :contactId")
@@ -31,4 +40,7 @@ interface ContactDao {
 
     @Query("DELETE FROM contact_contexts")
     suspend fun deleteAllContexts()
+
+    @Query("DELETE FROM contacts WHERE id = :contactId")
+    suspend fun deleteById(contactId: Long)
 }

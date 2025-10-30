@@ -1,7 +1,14 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
-import androidx.compose.ui.graphics.Color
+import androidx.room.withTransaction
+import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.database.asDomain
+import com.fiveis.xend.data.database.entity.ContactContextEntity
+import com.fiveis.xend.data.database.entity.ContactEntity
+import com.fiveis.xend.data.database.entity.GroupEntity
+import com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef
+import com.fiveis.xend.data.database.entity.PromptOptionEntity
 import com.fiveis.xend.data.model.AddContactRequest
 import com.fiveis.xend.data.model.AddContactRequestContext
 import com.fiveis.xend.data.model.AddGroupRequest
@@ -14,7 +21,8 @@ import com.fiveis.xend.data.model.PromptOptionRequest
 import com.fiveis.xend.data.model.toDomain
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
-import kotlin.random.Random
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 enum class ContactBookTab { Groups, Contacts }
 
@@ -22,75 +30,247 @@ sealed interface ContactBookData
 data class GroupData(val groups: List<Group>) : ContactBookData
 data class ContactData(val contacts: List<Contact>) : ContactBookData
 
-private var contactColorRandomSeed: Long = 5L
-private var groupColorRandomSeed: Long = 10L
-private var contactRnd: Random = Random(contactColorRandomSeed)
-private var groupRnd: Random = Random(groupColorRandomSeed)
-fun randomNotTooLightColor(rnd: Random = Random.Default): Color {
-    val hue = rnd.nextFloat() * 360f
-    val saturation = 0.65f + rnd.nextFloat() * 0.35f // 0.65 ~ 1.00
-    val value = 0.45f + rnd.nextFloat() * 0.40f // 0.45 ~ 0.85
-    return Color.hsv(hue, saturation, value)
-}
+// private var contactColorRandomSeed: Long = 5L
+// private var groupColorRandomSeed: Long = 10L
+// private var contactRnd: Random = Random(contactColorRandomSeed)
+// private var groupRnd: Random = Random(groupColorRandomSeed)
+// fun randomNotTooLightColor(rnd: Random = Random.Default): Color {
+//     val hue = rnd.nextFloat() * 360f
+//     val saturation = 0.65f + rnd.nextFloat() * 0.35f // 0.65 ~ 1.00
+//     val value = 0.45f + rnd.nextFloat() * 0.40f // 0.45 ~ 0.85
+//     return Color.hsv(hue, saturation, value)
+// }
 
 class ContactBookRepository(context: Context) {
-    private val contactApiService: ContactApiService = RetrofitClient.getContactApiService(context)
 
-    // call either getGroups() or getContacts()
-    suspend fun getContactInfo(tab: ContactBookTab): ContactBookData = when (tab) {
-        ContactBookTab.Groups -> GroupData(getAllGroups())
-        ContactBookTab.Contacts -> ContactData(getAllContacts())
+    private val api: ContactApiService = RetrofitClient.getContactApiService(context)
+
+    // ★ Room 주입
+    private val db = AppDatabase.getDatabase(context)
+    private val groupDao = db.groupDao()
+    private val contactDao = db.contactDao()
+    private val optionDao = db.promptOptionDao()
+
+    fun observeGroups(): Flow<List<Group>> = groupDao.observeGroupsWithMembersAndOptions()
+        .map { list -> list.map { it.asDomain() } }
+
+    fun observeGroup(groupId: Long): Flow<Group?> = groupDao.observeGroup(groupId).map { it?.asDomain() }
+
+    fun observeContacts(): Flow<List<Contact>> = contactDao.observeAllWithContext()
+        .map { list -> list.map { it.asDomain(null) } }
+
+    fun observePromptOptions(): Flow<List<PromptOption>> = optionDao.observeAllOptions()
+        .map { list -> list.map { it.asDomain() } }
+
+    // ----- 네트워크 → DB 동기화 -----
+
+    suspend fun refreshGroups() {
+        val res = api.getAllGroups()
+        if (!res.isSuccessful) error("HTTP ${res.code()} ${res.message()}")
+        val body = res.body().orEmpty()
+
+        db.withTransaction {
+            optionDao.deleteAllCrossRefs()
+            groupDao.deleteAllGroups()
+
+            val groups = mutableListOf<GroupEntity>()
+            val optionSet = linkedSetOf<PromptOptionEntity>()
+            val refs = mutableListOf<GroupPromptOptionCrossRef>()
+
+            body.forEach { gr ->
+                val (g, opts, rfs) = gr.toEntities()
+                groups += g
+                optionSet += opts
+                refs += rfs
+            }
+            groupDao.upsertGroups(groups)
+            if (optionSet.isNotEmpty()) optionDao.upsertOptions(optionSet.toList())
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
+        }
     }
 
-    // 그룹 목록 화면용
-//    fun getDummyGroups(): List<Group> {
-//        return listOf(
-//            Group(
-//                id = 1L,
-//                name = "VIP",
-//                description = "중요한 고객과 상급자들",
-//                members = listOf(
-//                    Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 1L),
-//                    Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 1L)
-//                ),
-//                color = Color(0xFFFF5C5C)
-//            ),
-//            Group(
-//                id = 2L,
-//                name = "업무 동료",
-//                description = "같은 회사 팀원들과 협업 파트너",
-//                members = listOf(
-//                    Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 2L),
-//                    Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 2L)
-//                ),
-//                color = Color(0xFFFFA500)
-//            ),
-//            Group(
-//                id = 3L,
-//                name = "학술 관계",
-//                description = "교수님, 연구진과의 학문적 소통",
-//                members = listOf(
-//                    Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 3L),
-//                    Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 3L),
-//                    Contact(id = 3L, name = "이영희", email = "lee@snu.ac.kr", groupId = 2L),
-//                    Contact(id = 4L, name = "박민수", email = "park@snu.ac.kr", groupId = 3L),
-//                    Contact(id = 5L, name = "정수진", email = "jung@snu.ac.kr", groupId = 3L)
-//                ),
-//                color = Color(0xFF8A2BE2)
-//            )
-//        )
-//    }
-//
-//    // 전체 연락처 화면용
-//    fun getDummyContacts(): List<Contact> {
-//        return listOf(
-//            Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 1L),
-//            Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 1L),
-//            Contact(id = 3L, name = "이영희", email = "lee@snu.ac.kr", groupId = 2L),
-//            Contact(id = 4L, name = "박민수", email = "park@snu.ac.kr", groupId = 3L),
-//            Contact(id = 5L, name = "정수진", email = "jung@snu.ac.kr", groupId = 3L)
-//        )
-//    }
+    suspend fun refreshGroup(groupId: Long) {
+        val res = api.getGroup(groupId)
+        if (!res.isSuccessful) error("HTTP ${res.code()} ${res.message()}")
+        val r = res.body() ?: error("Group body null")
+
+        db.withTransaction {
+            val (g, opts, refs) = r.toEntities()
+            groupDao.upsertGroups(listOf(g))
+            if (opts.isNotEmpty()) optionDao.upsertOptions(opts)
+            optionDao.deleteCrossRefsByGroup(r.id)
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
+        }
+    }
+
+    suspend fun refreshContacts() {
+        val res = api.getAllContacts()
+        if (!res.isSuccessful) error("HTTP ${res.code()} ${res.message()}")
+        val body = res.body().orEmpty()
+
+        db.withTransaction {
+            contactDao.deleteAllContexts()
+            contactDao.deleteAllContacts()
+            val contacts = mutableListOf<ContactEntity>()
+            val contexts = mutableListOf<ContactContextEntity>()
+            body.forEach { cr ->
+                val (c, ctx) = cr.toEntities()
+                contacts += c
+                ctx?.let { contexts += it }
+            }
+            contactDao.upsertContacts(contacts)
+            if (contexts.isNotEmpty()) contactDao.upsertContexts(contexts)
+        }
+    }
+
+    suspend fun refreshGroupAndMembers(groupId: Long) {
+        refreshGroup(groupId)
+        refreshContacts() // fresh 멤버 목록 확보
+    }
+
+    suspend fun refreshPromptOptions() {
+        val res = api.getAllPromptOptions()
+        if (!res.isSuccessful) error("HTTP ${res.code()} ${res.message()}")
+        val all = res.body().orEmpty()
+        optionDao.upsertOptions(all.map { it.toEntity() })
+    }
+
+    // ======================
+    // 읽기 API
+    // ======================
+
+    suspend fun getAllContacts(): List<Contact> {
+        val res = api.getAllContacts()
+        if (!res.isSuccessful) {
+            throw IllegalStateException("Failed to get all contacts: HTTP ${res.code()} ${res.message()}")
+        }
+        val body = res.body().orEmpty()
+
+        // ★ 로컬 동기화
+        db.withTransaction {
+            contactDao.deleteAllContexts()
+            contactDao.deleteAllContacts()
+            val contacts = mutableListOf<ContactEntity>()
+            val contexts = mutableListOf<ContactContextEntity>()
+            body.forEach { cr ->
+                val (c, ctx) = cr.toEntities()
+                contacts += c
+                ctx?.let { contexts += it }
+            }
+            contactDao.upsertContacts(contacts)
+            if (contexts.isNotEmpty()) contactDao.upsertContexts(contexts)
+        }
+
+        // 도메인으로 반환(서버 or 로컬 아무거나 가능)
+        return body.map { r ->
+            Contact(
+                id = r.id,
+                group = r.group?.toDomain(),
+                name = r.name,
+                email = r.email,
+                context = r.context?.toDomain(),
+                createdAt = r.createdAt,
+                updatedAt = r.updatedAt
+            )
+        }
+    }
+
+    suspend fun getAllGroups(): List<Group> {
+        val res = api.getAllGroups()
+        if (!res.isSuccessful) {
+            throw IllegalStateException("Failed to get all groups: HTTP ${res.code()} ${res.message()}")
+        }
+        val body = res.body().orEmpty()
+
+        // ★ 로컬 동기화
+        db.withTransaction {
+            // 그룹은 전량 교체 (필요하면 diff upsert로 바꿔도 됨)
+            // crossRef 전체 삭제 → 다시 생성
+            optionDao.deleteAllCrossRefs()
+            groupDao.deleteAllGroups()
+
+            val groups = mutableListOf<GroupEntity>()
+            val optionSet = linkedSetOf<PromptOptionEntity>() // 중복 제거
+            val refs = mutableListOf<GroupPromptOptionCrossRef>()
+
+            body.forEach { gr ->
+                val (g, opts, rfs) = gr.toEntities()
+                groups += g
+                optionSet.addAll(opts)
+                refs += rfs
+            }
+            groupDao.upsertGroups(groups)
+            if (optionSet.isNotEmpty()) optionDao.upsertOptions(optionSet.toList())
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
+        }
+
+        return body.map {
+            Group(
+                id = it.id,
+                name = it.name,
+                description = it.description,
+                options = it.options ?: emptyList(),
+                members = emptyList(),
+                createdAt = it.createdAt,
+                updatedAt = it.updatedAt
+            )
+        }
+    }
+
+    suspend fun getContact(id: Long): Contact {
+        val res = api.getContact(id)
+        if (!res.isSuccessful) {
+            val errorBody = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Get contact failed: HTTP ${res.code()} ${res.message()} | body=$errorBody")
+        }
+        val r = res.body() ?: error("Contact body null")
+        // 로컬 반영
+        db.withTransaction {
+            val (c, ctx) = r.toEntities()
+            contactDao.upsertContacts(listOf(c))
+            ctx?.let { contactDao.upsertContexts(listOf(it)) }
+        }
+        return Contact(
+            id = r.id,
+            group = r.group?.toDomain(),
+            name = r.name,
+            email = r.email,
+            context = r.context?.toDomain(),
+            createdAt = r.createdAt,
+            updatedAt = r.updatedAt
+        )
+    }
+
+    suspend fun getGroup(id: Long): Group {
+        val res = api.getGroup(id)
+        if (!res.isSuccessful) {
+            val errorBody = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Get group failed: HTTP ${res.code()} ${res.message()} | body=$errorBody")
+        }
+        val r = res.body() ?: error("Group body null")
+        // 로컬 반영
+        db.withTransaction {
+            val (g, opts, refs) = r.toEntities()
+            groupDao.upsertGroups(listOf(g))
+            if (opts.isNotEmpty()) optionDao.upsertOptions(opts)
+            // 기존 매핑 정리 후 재삽입(그룹 하나만)
+            optionDao.deleteCrossRefsByGroup(r.id)
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
+        }
+        return Group(
+            id = r.id,
+            name = r.name,
+            description = r.description,
+            options = r.options ?: emptyList(),
+            members = emptyList(),
+            createdAt = r.createdAt,
+            updatedAt = r.updatedAt
+        )
+    }
+
+    // ======================
+    // 쓰기 API (성공 시 로컬 갱신)
+    // ======================
 
     suspend fun addContact(
         name: String,
@@ -105,87 +285,29 @@ class ContactBookRepository(context: Context) {
             recipientRole = recipientRole,
             personalPrompt = personalPrompt ?: ""
         )
-
-        val request = AddContactRequest(
-            name = name,
-            email = email,
-            groupId = groupId,
-            context = requestContext
-        )
-
-        val response = contactApiService.addContact(
-            payload = request
-        )
-
-        if (response.isSuccessful) {
-            return response.body()
-                ?: throw IllegalStateException("Success response but body is null")
-        } else {
-            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException(
-                "Add contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
-            )
+        val request = AddContactRequest(name = name, email = email, groupId = groupId, context = requestContext)
+        val res = api.addContact(request)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Add contact failed: HTTP ${res.code()} ${res.message()} | body=$body")
         }
-    }
-
-    suspend fun getContact(id: Long): Contact {
-        val response = contactApiService.getContact(id)
-        if (response.isSuccessful) {
-            val contact = Contact(
-                id = response.body()?.id ?: throw IllegalStateException("Contact id is null"),
-                group = response.body()?.group?.toDomain(),
-                name = response.body()?.name ?: throw IllegalStateException("Contact name is null"),
-                email = response.body()?.email ?: throw IllegalStateException("Contact email is null"),
-                context = response.body()?.context?.toDomain(),
-                createdAt = response.body()?.createdAt,
-                updatedAt = response.body()?.updatedAt
-            )
-
-            return contact
-        } else {
-            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException(
-                "Get contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
-            )
+        val r = res.body() ?: error("Success but body null")
+        // 로컬 반영
+        db.withTransaction {
+            val (c, ctx) = r.toEntities()
+            contactDao.upsertContacts(listOf(c))
+            ctx?.let { contactDao.upsertContexts(listOf(it)) }
         }
-    }
-
-    suspend fun getAllContacts(): List<Contact> {
-        contactRnd = Random(contactColorRandomSeed)
-        android.util.Log.d("ContactBookRepository", "Calling getAllContacts API...")
-        val response = contactApiService.getAllContacts()
-        android.util.Log.d("ContactBookRepository", "getAllContacts response code: ${response.code()}")
-        if (response.isSuccessful) {
-            try {
-                val body = response.body()
-                android.util.Log.d("ContactBookRepository", "Response body size: ${body?.size}")
-                val contacts = body?.map { contactData ->
-                    android.util.Log.d("ContactBookRepository", "Parsing contact: ${contactData.name}")
-                    Contact(
-                        id = contactData.id,
-                        group = contactData.group?.toDomain(),
-                        name = contactData.name,
-                        email = contactData.email,
-                        context = contactData.context?.toDomain(),
-                        createdAt = contactData.createdAt,
-                        updatedAt = contactData.updatedAt
-                    )
-                } ?: emptyList()
-                android.util.Log.d("ContactBookRepository", "Parsed ${contacts.size} contacts")
-                return contacts
-            } catch (e: Exception) {
-                android.util.Log.e("ContactBookRepository", "Error parsing contacts", e)
-                throw e
-            }
-        }
-        throw IllegalStateException("Failed to get all contacts: HTTP ${response.code()} ${response.message()}")
+        return r
     }
 
     suspend fun deleteContact(contactId: Long) {
-        val response = contactApiService.deleteContact(contactId)
-        if (!response.isSuccessful) {
-            throw IllegalStateException("Failed to delete contact: HTTP ${response.code()} ${response.message()}")
+        val res = api.deleteContact(contactId)
+        if (!res.isSuccessful) {
+            throw IllegalStateException("Failed to delete contact: HTTP ${res.code()} ${res.message()}")
         }
+        // ★ 로컬 반영
+        contactDao.deleteById(contactId)
     }
 
     suspend fun updateContactGroup(contactId: Long, groupId: Long) {
@@ -200,115 +322,109 @@ class ContactBookRepository(context: Context) {
     }
 
     suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
-        val request = AddGroupRequest(
-            name = name,
-            description = description,
-            optionIds = options.map { it.id }
-        )
-
-        val response = contactApiService.addGroup(
-            payload = request
-        )
-
-        if (response.isSuccessful) {
-            return response.body()
-                ?: throw IllegalStateException("Success response but body is null")
-        } else {
-            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException(
-                "Add group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
-            )
+        val request = AddGroupRequest(name = name, description = description, optionIds = options.map { it.id })
+        val res = api.addGroup(request)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Add group failed: HTTP ${res.code()} ${res.message()} | body=$body")
         }
-    }
-
-    suspend fun getGroup(id: Long): Group {
-        val response = contactApiService.getGroup(id)
-        if (response.isSuccessful) {
-            return Group(
-                id = response.body()?.id ?: throw IllegalStateException("Group id is null"),
-                name = response.body()?.name ?: throw IllegalStateException("Group name is null"),
-                description = response.body()?.description,
-                options = response.body()?.options ?: emptyList(),
-                createdAt = response.body()?.createdAt,
-                updatedAt = response.body()?.updatedAt
-            )
-        } else {
-            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException(
-                "Get group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
-            )
+        val r = res.body() ?: error("Success but body null")
+        // ★ 로컬 반영
+        db.withTransaction {
+            val (g, opts, refs) = r.toEntities()
+            groupDao.upsertGroups(listOf(g))
+            if (opts.isNotEmpty()) optionDao.upsertOptions(opts)
+            optionDao.deleteCrossRefsByGroup(r.id)
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
         }
-    }
-
-    suspend fun getAllGroups(): List<Group> {
-        groupRnd = Random(groupColorRandomSeed)
-        contactRnd = Random(contactColorRandomSeed)
-        android.util.Log.d("ContactBookRepository", "Calling getAllGroups API...")
-        val response = contactApiService.getAllGroups()
-        android.util.Log.d("ContactBookRepository", "getAllGroups response code: ${response.code()}")
-        if (response.isSuccessful) {
-            try {
-                val body = response.body()
-                android.util.Log.d("ContactBookRepository", "Response body size: ${body?.size}")
-                val groups = body?.map { groupResponse ->
-                    android.util.Log.d(
-                        "ContactBookRepository",
-                        "Parsing group: ${groupResponse.name} with ${groupResponse.contacts?.size ?: 0} contacts"
-                    )
-                    Group(
-                        id = groupResponse.id,
-                        name = groupResponse.name,
-                        description = groupResponse.description,
-                        options = groupResponse.options,
-                        members = emptyList(),
-                        createdAt = groupResponse.createdAt,
-                        updatedAt = groupResponse.updatedAt
-                    )
-                } ?: emptyList()
-                android.util.Log.d("ContactBookRepository", "Parsed ${groups.size} groups")
-                return groups
-            } catch (e: Exception) {
-                android.util.Log.e("ContactBookRepository", "Error parsing groups", e)
-                throw e
-            }
-        }
-        throw IllegalStateException("Failed to get all groups: HTTP ${response.code()} ${response.message()}")
+        return r
     }
 
     suspend fun deleteGroup(groupId: Long) {
-        val response = contactApiService.deleteGroup(groupId)
-        if (!response.isSuccessful) {
-            throw IllegalStateException("Failed to delete group: HTTP ${response.code()} ${response.message()}")
+        val res = api.deleteGroup(groupId)
+        if (!res.isSuccessful) {
+            throw IllegalStateException("Failed to delete group: HTTP ${res.code()} ${res.message()}")
         }
+        // ★ 로컬 반영 (crossRef는 FK onDelete에 따라 정리되지만, 안전하게 그룹만 지워도 OK)
+        groupDao.deleteById(groupId)
     }
 
     suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
-        val request = PromptOptionRequest(
-            key = key,
-            name = name,
-            prompt = prompt
-        )
-
-        val response = contactApiService.addPromptOption(request)
-        if (response.isSuccessful) {
-            return response.body()
-                ?: throw IllegalStateException("Success response but body is null")
-        } else {
-            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException(
-                "Add prompt option failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
-            )
+        val req = PromptOptionRequest(key = key, name = name, prompt = prompt)
+        val res = api.addPromptOption(req)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Add prompt option failed: HTTP ${res.code()} ${res.message()} | body=$body")
         }
+        val r = res.body() ?: error("Success but body null")
+        // ★ 로컬 반영 (옵션 테이블만)
+        optionDao.upsertOptions(listOf(r.toEntity()))
+        return r
     }
 
     suspend fun getAllPromptOptions(): Pair<List<PromptOption>, List<PromptOption>> {
-        val response = contactApiService.getAllPromptOptions()
-        if (response.isSuccessful) {
-            val allOptions = response.body() ?: emptyList()
-            val toneOptions = allOptions.filter { it.key == "tone" }
-            val formatOptions = allOptions.filter { it.key == "format" }
-            return Pair(toneOptions, formatOptions)
+        val res = api.getAllPromptOptions()
+        if (!res.isSuccessful) {
+            throw IllegalStateException("Failed to get all prompt options: HTTP ${res.code()} ${res.message()}")
         }
-        throw IllegalStateException("Failed to get all prompt options: HTTP ${response.code()} ${response.message()}")
+        val all = res.body().orEmpty()
+        // ★ 로컬 반영
+        optionDao.upsertOptions(all.map { it.toEntity() })
+
+        val tone = all.filter { it.key == "tone" }
+        val format = all.filter { it.key == "format" }
+        return tone to format
     }
+}
+
+private fun ContactResponse.toEntities(): Pair<ContactEntity, ContactContextEntity?> {
+    val contact = ContactEntity(
+        id = id,
+        // groupResponse가 있다면 그 id
+        groupId = group?.id,
+        name = name,
+        email = email,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+    val ctx = context?.let {
+        ContactContextEntity(
+            // 1:1 PK = contactId
+            contactId = id,
+            senderRole = it.senderRole,
+            recipientRole = it.recipientRole,
+            relationshipDetails = it.relationshipDetails,
+            personalPrompt = it.personalPrompt,
+            languagePreference = it.languagePreference,
+            createdAt = it.createdAt,
+            updatedAt = it.updatedAt
+        )
+    }
+    return contact to ctx
+}
+
+private fun PromptOption.toEntity(): PromptOptionEntity {
+    return PromptOptionEntity(
+        id = id,
+        key = key,
+        name = name,
+        prompt = prompt,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+}
+
+private fun GroupResponse.toEntities(): Triple<GroupEntity, List<PromptOptionEntity>, List<GroupPromptOptionCrossRef>> {
+    val g = GroupEntity(
+        id = id,
+        name = name,
+        description = description,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+    val optionEntities = (options ?: emptyList()).map { it.toEntity() }
+    val refs = (options ?: emptyList()).map { opt ->
+        GroupPromptOptionCrossRef(groupId = id, optionId = opt.id)
+    }
+    return Triple(g, optionEntities, refs)
 }

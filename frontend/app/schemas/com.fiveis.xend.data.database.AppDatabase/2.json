@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "2a6fd39a74a75e3c9360b4d7c51d7226",
+    "identityHash": "ad0be8119bfa1f02c26c8c2791d82c77",
     "entities": [
       {
         "tableName": "emails",
@@ -124,7 +124,7 @@
       },
       {
         "tableName": "contacts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `groupId` INTEGER, `name` TEXT NOT NULL, `email` TEXT NOT NULL, `createdAt` TEXT, `updatedAt` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`groupId`) REFERENCES `groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `groupId` INTEGER, `name` TEXT NOT NULL, `email` TEXT NOT NULL, `createdAt` TEXT, `updatedAt` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`groupId`) REFERENCES `groups`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -183,7 +183,7 @@
         "foreignKeys": [
           {
             "table": "groups",
-            "onDelete": "CASCADE",
+            "onDelete": "SET NULL",
             "onUpdate": "NO ACTION",
             "columns": [
               "groupId"
@@ -379,7 +379,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2a6fd39a74a75e3c9360b4d7c51d7226')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ad0be8119bfa1f02c26c8c2791d82c77')"
     ]
   }
 }

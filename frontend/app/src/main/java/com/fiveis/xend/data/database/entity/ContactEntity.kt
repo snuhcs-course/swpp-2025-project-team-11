@@ -16,7 +16,7 @@ import androidx.room.PrimaryKey
             entity = GroupEntity::class,
             parentColumns = ["id"],
             childColumns = ["groupId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [Index("groupId")]

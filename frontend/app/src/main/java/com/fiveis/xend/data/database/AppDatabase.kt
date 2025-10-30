@@ -47,7 +47,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "xend_database"
-                ).build()
+                )
+//                    .fallbackToDestructiveMigration()
+                    .build()
                 instance = newInstance
                 newInstance
             }

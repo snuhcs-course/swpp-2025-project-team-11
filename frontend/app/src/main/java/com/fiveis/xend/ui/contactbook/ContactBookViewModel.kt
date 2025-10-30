@@ -31,11 +31,44 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     val uiState: StateFlow<ContactBookUiState> = _uiState.asStateFlow()
 
     init {
-        loadContactInfo(ContactBookTab.Groups)
+        viewModelScope.launch {
+            repository.observeGroups().collect { groups ->
+                if (_uiState.value.selectedTab == ContactBookTab.Groups) {
+                    _uiState.update { it.copy(groups = groups) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.observeContacts().collect { contacts ->
+                if (_uiState.value.selectedTab == ContactBookTab.Contacts) {
+                    _uiState.update { it.copy(contacts = contacts) }
+                }
+            }
+        }
+        // 초기 동기화(네트워크 → DB)
+        refreshCurrentTab()
     }
 
     fun onTabSelected(tab: ContactBookTab) {
-        loadContactInfo(tab)
+        _uiState.update { it.copy(selectedTab = tab) }
+        refreshCurrentTab()
+    }
+
+    fun refreshCurrentTab() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+//                when (_uiState.value.selectedTab) {
+//                    ContactBookTab.Groups -> repository.refreshGroups()
+//                    ContactBookTab.Contacts -> repository.refreshContacts()
+//                }
+                repository.refreshGroups()
+                repository.refreshContacts()
+                _uiState.update { it.copy(isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "동기화 실패") }
+            }
+        }
     }
 
     private fun loadContactInfo(tab: ContactBookTab) {
