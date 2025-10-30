@@ -38,7 +38,7 @@ class MailComposeViewModel(
         throttleJob = viewModelScope.launch {
             while (isActive) {
                 delay(80)
-                val text = bodyBuffer.toString()
+                val text = bodyBuffer.toString().replace("\n", "<br>")
                 _ui.update { it.copy(bodyRendered = text) }
             }
         }
@@ -53,7 +53,7 @@ class MailComposeViewModel(
             },
             onDone = {
                 throttleJob?.cancel()
-                _ui.update { it.copy(isStreaming = false, bodyRendered = bodyBuffer.toString()) }
+                _ui.update { it.copy(isStreaming = false, bodyRendered = bodyBuffer.toString().replace("\n", "<br>")) }
             },
             onError = { msg ->
                 throttleJob?.cancel()
