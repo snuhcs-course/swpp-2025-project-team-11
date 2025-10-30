@@ -1,14 +1,10 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
-import com.fiveis.xend.data.model.AddContactRequest
-import com.fiveis.xend.data.model.AddContactRequestContext
-import com.fiveis.xend.data.model.AddGroupRequest
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.ContactResponseContext
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
-import com.fiveis.xend.data.model.PromptOptionRequest
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import io.mockk.coEvery
