@@ -78,6 +78,12 @@ android {
         compose = true
         buildConfig = true // Ensure BuildConfig is generated
     }
+    packaging {
+        resources {
+            excludes += "/META-INF/LICENSE.md"
+            excludes += "/META-INF/LICENSE-notice.md"
+        }
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -100,6 +106,7 @@ dependencies {
     testImplementation("app.cash.turbine:turbine:1.2.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.robolectric:robolectric:4.11.1")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
