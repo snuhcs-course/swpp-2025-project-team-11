@@ -75,7 +75,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         onSend = { bodyText ->
                             // 이메일 전송
                             sendVm.sendEmail(
-                                to = recipientEmail,
+                                to = listOf(recipientEmail),
                                 subject = currentSubject,
                                 body = bodyText
                             )
