@@ -223,9 +223,7 @@ class GmailServiceIntegrationTest(TestCase):
         result = service.list_messages(max_results=10, label_ids=["INBOX"])
 
         # Verify API was called correctly
-        mock_messages.list.assert_called_once_with(
-            userId="me", maxResults=10, pageToken=None, labelIds=["INBOX"]
-        )
+        mock_messages.list.assert_called_once_with(userId="me", maxResults=10, pageToken=None, labelIds=["INBOX"])
         self.assertEqual(len(result["messages"]), 1)
         self.assertEqual(result["messages"][0]["id"], "123")
 
@@ -273,9 +271,7 @@ class GmailServiceIntegrationTest(TestCase):
         service.mark_as_read("msg123")
 
         # Verify API was called correctly
-        mock_messages.modify.assert_called_once_with(
-            userId="me", id="msg123", body={"removeLabelIds": ["UNREAD"]}
-        )
+        mock_messages.modify.assert_called_once_with(userId="me", id="msg123", body={"removeLabelIds": ["UNREAD"]})
 
     @patch("googleapiclient.discovery.build")
     def test_mark_as_unread_api_call(self, mock_build):
@@ -292,6 +288,4 @@ class GmailServiceIntegrationTest(TestCase):
         service.mark_as_unread("msg123")
 
         # Verify API was called correctly
-        mock_messages.modify.assert_called_once_with(
-            userId="me", id="msg123", body={"addLabelIds": ["UNREAD"]}
-        )
+        mock_messages.modify.assert_called_once_with(userId="me", id="msg123", body={"addLabelIds": ["UNREAD"]})

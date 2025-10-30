@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
@@ -56,12 +57,33 @@ class ContactBookActivity : ComponentActivity() {
                         viewModel.onTabSelected(ContactBookTab.Contacts)
                     }
                 }
+                val addGroupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == RESULT_OK) {
+                        viewModel.onTabSelected(ContactBookTab.Groups)
+                    }
+                }
 
                 ContactBookScreen(
                     uiState = uiState,
                     onTabSelected = viewModel::onTabSelected,
-                    onGroupClick = viewModel::onGroupClick,
-                    onContactClick = viewModel::onContactClick,
+                    onGroupClick = { group ->
+                        startActivity(
+                            Intent(this, GroupDetailActivity::class.java)
+                                .putExtra(GroupDetailActivity.EXTRA_GROUP_ID, group.id)
+                                .putExtra(GroupDetailActivity.EXTRA_GROUP_COLOR, group.color.toArgb())
+                        )
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
+                    onContactClick = { contact ->
+                        startActivity(
+                            Intent(this, ContactDetailActivity::class.java)
+                                .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
+                                .putExtra(ContactDetailActivity.EXTRA_CONTACT_COLOR, contact.color.toArgb())
+                        )
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
                     onBottomNavChange = {
                         if (it == "inbox") {
                             startActivity(Intent(this, InboxActivity::class.java))
@@ -69,12 +91,18 @@ class ContactBookActivity : ComponentActivity() {
                         }
                     },
                     onAddGroupClick = {
-                        startActivity(Intent(this, AddGroupActivity::class.java))
+                        addGroupLauncher.launch(Intent(this, AddGroupActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
+                    onDeleteGroupClick = {
+                        viewModel.onGroupDelete(it.id)
                     },
                     onAddContactClick = {
                         addContactLauncher.launch(Intent(this, AddContactActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
+                    onDeleteContactClick = {
+                        viewModel.onContactDelete(it.id)
                     }
                 )
             }

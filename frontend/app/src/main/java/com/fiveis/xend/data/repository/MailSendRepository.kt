@@ -9,7 +9,7 @@ import com.fiveis.xend.network.RetrofitClient
 class MailSendRepository(context: Context) {
     private val mailApiService: MailApiService = RetrofitClient.getMailApiService(context)
 
-    suspend fun sendEmail(to: String, subject: String, body: String): SendResponse {
+    suspend fun sendEmail(to: List<String>, subject: String, body: String): SendResponse {
         val request = MailSendRequest(to = to, subject = subject, body = body)
 
         val response = mailApiService.sendEmail(

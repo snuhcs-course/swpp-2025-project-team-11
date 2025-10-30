@@ -13,8 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="promptoption",
             name="key",
-            field=models.CharField(
-                choices=[("tone", "tone"), ("format", "format"), ("other", "other")], max_length=30
-            ),
+            field=models.CharField(choices=[("tone", "tone"), ("format", "format"), ("other", "other")], max_length=30),
         ),
     ]

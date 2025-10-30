@@ -7,17 +7,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.model.PromptOption
@@ -50,36 +47,56 @@ class AddGroupActivity : ComponentActivity() {
                 )
                 val bookUiState by bookViewModel.uiState.collectAsState()
 
+                // 연락처 목록 로드
+                LaunchedEffect(Unit) {
+                    bookViewModel.onTabSelected(com.fiveis.xend.data.repository.ContactBookTab.Contacts)
+                }
+
                 // AddGroupScreen 입력값들 보관
                 var name by rememberSaveable { mutableStateOf("") }
                 var description by rememberSaveable { mutableStateOf("") }
                 var options by rememberSaveable { mutableStateOf(emptyList<PromptOption>()) }
+                var members by remember { mutableStateOf(emptyList<com.fiveis.xend.data.model.Contact>()) }
+                var showContactSelectDialog by remember { mutableStateOf(false) }
 
                 AddGroupScreen(
+                    uiState = addUiState,
                     onBack = {
                         finish()
                         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                     },
                     onAdd = {
+                        android.util.Log.d(
+                            "AddGroupActivity",
+                            "Saving group - name: $name, options: ${options.size}, members: ${members.size}"
+                        )
                         addViewModel.addGroup(
                             name = name,
-                            description = description
+                            description = description,
+                            options = options,
+                            members = members
                         )
-                        finish()
-                        startActivity(Intent(this, ContactBookActivity::class.java))
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                     },
                     onGroupNameChange = { name = it },
                     onGroupDescriptionChange = { description = it },
                     onPromptOptionsChange = {
-                        options = it.selectedContext.toList() + it.selectedStyle.toList() + it.selectedFormat.toList()
+                        options = it.selectedTone.toList() + it.selectedFormat.toList()
                     },
-                    members = emptyList(),
+                    onAddPromptOption = { key, nm, pr, onSuccess, onError ->
+                        addViewModel.addPromptOption(
+                            key = key,
+                            name = nm,
+                            prompt = pr,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
+                    },
+                    members = members,
                     onAddMember = {
-                        // TODO
+                        showContactSelectDialog = true
                     },
                     onMemberClick = {
-                        // TODO
+                        // TODO: 멤버 상세 또는 삭제
                     },
                     onBottomNavChange = { tab ->
                         if (tab == "inbox") {
@@ -89,10 +106,26 @@ class AddGroupActivity : ComponentActivity() {
                     }
                 )
 
+                // 연락처 선택 다이얼로그
+                if (showContactSelectDialog) {
+                    android.util.Log.d("AddGroupActivity", "Showing dialog with ${bookUiState.contacts.size} contacts")
+                    ContactSelectDialog(
+                        contacts = bookUiState.contacts,
+                        selectedContacts = members,
+                        onDismiss = { showContactSelectDialog = false },
+                        onConfirm = { selected ->
+                            android.util.Log.d("AddGroupActivity", "Selected contacts: ${selected.size}")
+                            members = selected
+                            android.util.Log.d("AddGroupActivity", "Members after update: ${members.size}")
+                            showContactSelectDialog = false
+                        }
+                    )
+                }
+
                 // 결과 피드백
                 LaunchedEffect(addUiState.error, addUiState.lastSuccessMsg) {
                     addUiState.error?.let {
-                        Toast.makeText(this@AddGroupActivity, it, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@AddGroupActivity, it, Toast.LENGTH_LONG).show()
                     }
                     addUiState.lastSuccessMsg?.let {
                         Toast.makeText(this@AddGroupActivity, it, Toast.LENGTH_SHORT).show()
@@ -102,9 +135,8 @@ class AddGroupActivity : ComponentActivity() {
                     }
                 }
 
-                if (addUiState.isLoading) {
-                    Box(Modifier.fillMaxSize()) { CircularProgressIndicator() }
-                }
+                // 프롬프트 옵션 로딩 중일 때만 로딩 표시 (화면은 그대로 보임)
+                // 그룹 추가 중에는 전체 화면 로딩
             }
         }
     }

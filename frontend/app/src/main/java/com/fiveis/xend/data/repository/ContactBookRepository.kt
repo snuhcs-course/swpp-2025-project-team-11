@@ -6,10 +6,12 @@ import com.fiveis.xend.data.model.AddContactRequest
 import com.fiveis.xend.data.model.AddContactRequestContext
 import com.fiveis.xend.data.model.AddGroupRequest
 import com.fiveis.xend.data.model.Contact
-import com.fiveis.xend.data.model.ContactContext
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
+import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.data.model.PromptOptionRequest
+import com.fiveis.xend.data.model.toDomain
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import kotlin.random.Random
@@ -20,83 +22,94 @@ sealed interface ContactBookData
 data class GroupData(val groups: List<Group>) : ContactBookData
 data class ContactData(val contacts: List<Contact>) : ContactBookData
 
-private var seed: Long = 2025L
-private var seed2: Long = -2025L
-private var rnd: Random = Random(seed)
+private var contactColorRandomSeed: Long = 5L
+private var groupColorRandomSeed: Long = 10L
+private var contactRnd: Random = Random(contactColorRandomSeed)
+private var groupRnd: Random = Random(groupColorRandomSeed)
+fun randomNotTooLightColor(rnd: Random = Random.Default): Color {
+    val hue = rnd.nextFloat() * 360f
+    val saturation = 0.65f + rnd.nextFloat() * 0.35f // 0.65 ~ 1.00
+    val value = 0.45f + rnd.nextFloat() * 0.40f // 0.45 ~ 0.85
+    return Color.hsv(hue, saturation, value)
+}
 
 class ContactBookRepository(context: Context) {
     private val contactApiService: ContactApiService = RetrofitClient.getContactApiService(context)
 
     // call either getGroups() or getContacts()
     suspend fun getContactInfo(tab: ContactBookTab): ContactBookData = when (tab) {
-        ContactBookTab.Groups -> GroupData(getDummyGroups())
+        ContactBookTab.Groups -> GroupData(getAllGroups())
         ContactBookTab.Contacts -> ContactData(getAllContacts())
     }
 
     // 그룹 목록 화면용
-    fun getDummyGroups(): List<Group> {
-        return listOf(
-            Group(
-                id = 1,
-                name = "VIP",
-                description = "중요한 고객과 상급자들",
-                members = listOf(
-                    Contact(id = 1, name = "김철수", email = "kim@snu.ac.kr", groupId = 1),
-                    Contact(id = 2, name = "최철수", email = "choi@snu.ac.kr", groupId = 1)
-                ),
-                color = Color(0xFFFF5C5C)
-            ),
-            Group(
-                id = 2,
-                name = "업무 동료",
-                description = "같은 회사 팀원들과 협업 파트너",
-                members = listOf(
-                    Contact(id = 1, name = "김철수", email = "kim@snu.ac.kr", groupId = 2),
-                    Contact(id = 2, name = "최철수", email = "choi@snu.ac.kr", groupId = 2)
-                ),
-                color = Color(0xFFFFA500)
-            ),
-            Group(
-                id = 3,
-                name = "학술 관계",
-                description = "교수님, 연구진과의 학문적 소통",
-                members = listOf(
-                    Contact(id = 1, name = "김철수", email = "kim@snu.ac.kr", groupId = 3),
-                    Contact(id = 2, name = "최철수", email = "choi@snu.ac.kr", groupId = 3),
-                    Contact(id = 3, name = "이영희", email = "lee@snu.ac.kr", groupId = 2),
-                    Contact(id = 4, name = "박민수", email = "park@snu.ac.kr", groupId = 3),
-                    Contact(id = 5, name = "정수진", email = "jung@snu.ac.kr", groupId = 3)
-                ),
-                color = Color(0xFF8A2BE2)
-            )
-        )
-    }
-
-    // 전체 연락처 화면용
-    fun getDummyContacts(): List<Contact> {
-        return listOf(
-            Contact(id = 1, name = "김철수", email = "kim@snu.ac.kr", groupId = 1),
-            Contact(id = 2, name = "최철수", email = "choi@snu.ac.kr", groupId = 1),
-            Contact(id = 3, name = "이영희", email = "lee@snu.ac.kr", groupId = 2),
-            Contact(id = 4, name = "박민수", email = "park@snu.ac.kr", groupId = 3),
-            Contact(id = 5, name = "정수진", email = "jung@snu.ac.kr", groupId = 3)
-        )
-    }
+//    fun getDummyGroups(): List<Group> {
+//        return listOf(
+//            Group(
+//                id = 1L,
+//                name = "VIP",
+//                description = "중요한 고객과 상급자들",
+//                members = listOf(
+//                    Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 1L),
+//                    Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 1L)
+//                ),
+//                color = Color(0xFFFF5C5C)
+//            ),
+//            Group(
+//                id = 2L,
+//                name = "업무 동료",
+//                description = "같은 회사 팀원들과 협업 파트너",
+//                members = listOf(
+//                    Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 2L),
+//                    Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 2L)
+//                ),
+//                color = Color(0xFFFFA500)
+//            ),
+//            Group(
+//                id = 3L,
+//                name = "학술 관계",
+//                description = "교수님, 연구진과의 학문적 소통",
+//                members = listOf(
+//                    Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 3L),
+//                    Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 3L),
+//                    Contact(id = 3L, name = "이영희", email = "lee@snu.ac.kr", groupId = 2L),
+//                    Contact(id = 4L, name = "박민수", email = "park@snu.ac.kr", groupId = 3L),
+//                    Contact(id = 5L, name = "정수진", email = "jung@snu.ac.kr", groupId = 3L)
+//                ),
+//                color = Color(0xFF8A2BE2)
+//            )
+//        )
+//    }
+//
+//    // 전체 연락처 화면용
+//    fun getDummyContacts(): List<Contact> {
+//        return listOf(
+//            Contact(id = 1L, name = "김철수", email = "kim@snu.ac.kr", groupId = 1L),
+//            Contact(id = 2L, name = "최철수", email = "choi@snu.ac.kr", groupId = 1L),
+//            Contact(id = 3L, name = "이영희", email = "lee@snu.ac.kr", groupId = 2L),
+//            Contact(id = 4L, name = "박민수", email = "park@snu.ac.kr", groupId = 3L),
+//            Contact(id = 5L, name = "정수진", email = "jung@snu.ac.kr", groupId = 3L)
+//        )
+//    }
 
     suspend fun addContact(
         name: String,
         email: String,
-        relationshipRole: String,
+        groupId: Long?,
+        senderRole: String?,
+        recipientRole: String,
         personalPrompt: String?
     ): ContactResponse {
         val requestContext = AddContactRequestContext(
-            relationshipRole = relationshipRole,
-            personalPrompt = personalPrompt
+            senderRole = senderRole ?: "Mail writer",
+            recipientRole = recipientRole,
+            personalPrompt = personalPrompt ?: ""
         )
 
         val request = AddContactRequest(
             name = name,
             email = email,
+            groupId = groupId,
             context = requestContext
         )
 
@@ -115,41 +128,83 @@ class ContactBookRepository(context: Context) {
         }
     }
 
-    suspend fun getAllContacts(): List<Contact> {
-        rnd = Random(seed)
-
-        val response = contactApiService.getAllContacts()
+    suspend fun getContact(id: Long): Contact {
+        val response = contactApiService.getContact(id)
         if (response.isSuccessful) {
-            return response.body()?.map { contactData ->
-                Contact(
-                    id = contactData.id,
-                    groupId = contactData.groupId,
-                    name = contactData.name,
-                    email = contactData.email,
-                    context = contactData.context?.let { contextData ->
-                        ContactContext(
-                            id = contextData.id,
-                            relationshipRole = contextData.relationshipRole,
-                            relationshipDetails = contextData.relationshipDetails,
-                            personalPrompt = contextData.personalPrompt,
-                            languagePreference = contextData.languagePreference,
-                            createdAt = contextData.createdAt,
-                            updatedAt = contextData.updatedAt
-                        )
-                    },
-                    createdAt = contactData.createdAt,
-                    updatedAt = contactData.updatedAt,
-                    color = Color(rnd.nextInt(), rnd.nextInt(), rnd.nextInt())
-                )
-            } ?: emptyList()
+            val contact = Contact(
+                id = response.body()?.id ?: throw IllegalStateException("Contact id is null"),
+                group = response.body()?.group?.toDomain(),
+                name = response.body()?.name ?: throw IllegalStateException("Contact name is null"),
+                email = response.body()?.email ?: throw IllegalStateException("Contact email is null"),
+                context = response.body()?.context?.toDomain(),
+                createdAt = response.body()?.createdAt,
+                updatedAt = response.body()?.updatedAt
+            )
+
+            return contact
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Get contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun getAllContacts(): List<Contact> {
+        contactRnd = Random(contactColorRandomSeed)
+        android.util.Log.d("ContactBookRepository", "Calling getAllContacts API...")
+        val response = contactApiService.getAllContacts()
+        android.util.Log.d("ContactBookRepository", "getAllContacts response code: ${response.code()}")
+        if (response.isSuccessful) {
+            try {
+                val body = response.body()
+                android.util.Log.d("ContactBookRepository", "Response body size: ${body?.size}")
+                val contacts = body?.map { contactData ->
+                    android.util.Log.d("ContactBookRepository", "Parsing contact: ${contactData.name}")
+                    Contact(
+                        id = contactData.id,
+                        group = contactData.group?.toDomain(),
+                        name = contactData.name,
+                        email = contactData.email,
+                        context = contactData.context?.toDomain(),
+                        createdAt = contactData.createdAt,
+                        updatedAt = contactData.updatedAt,
+                        color = randomNotTooLightColor(contactRnd)
+                    )
+                } ?: emptyList()
+                android.util.Log.d("ContactBookRepository", "Parsed ${contacts.size} contacts")
+                return contacts
+            } catch (e: Exception) {
+                android.util.Log.e("ContactBookRepository", "Error parsing contacts", e)
+                throw e
+            }
         }
         throw IllegalStateException("Failed to get all contacts: HTTP ${response.code()} ${response.message()}")
     }
 
-    suspend fun addGroup(name: String, description: String): GroupResponse {
+    suspend fun deleteContact(contactId: Long) {
+        val response = contactApiService.deleteContact(contactId)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete contact: HTTP ${response.code()} ${response.message()}")
+        }
+    }
+
+    suspend fun updateContactGroup(contactId: Long, groupId: Long) {
+        val payload = mapOf("group_id" to groupId)
+        val response = contactApiService.updateContact(contactId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update contact group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
         val request = AddGroupRequest(
             name = name,
-            description = description
+            description = description,
+            optionIds = options.map { it.id }
         )
 
         val response = contactApiService.addGroup(
@@ -167,23 +222,107 @@ class ContactBookRepository(context: Context) {
         }
     }
 
-    suspend fun getAllGroups(): List<Group> {
-        rnd = Random(seed2)
-
-        val response = contactApiService.getAllGroups()
+    suspend fun getGroup(id: Long): Group {
+        val response = contactApiService.getGroup(id)
         if (response.isSuccessful) {
-            return response.body()?.map {
-                Group(
-                    id = it.id,
-                    name = it.name,
-                    description = it.description,
-                    members = emptyList(),
-                    createdAt = it.createdAt,
-                    updatedAt = it.updatedAt,
-                    color = Color(rnd.nextInt(), rnd.nextInt(), rnd.nextInt())
-                )
-            } ?: emptyList()
+            return Group(
+                id = response.body()?.id ?: throw IllegalStateException("Group id is null"),
+                name = response.body()?.name ?: throw IllegalStateException("Group name is null"),
+                description = response.body()?.description,
+                options = response.body()?.options ?: emptyList(),
+                createdAt = response.body()?.createdAt,
+                updatedAt = response.body()?.updatedAt
+            )
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Get group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun getAllGroups(): List<Group> {
+        groupRnd = Random(groupColorRandomSeed)
+        contactRnd = Random(contactColorRandomSeed)
+        android.util.Log.d("ContactBookRepository", "Calling getAllGroups API...")
+        val response = contactApiService.getAllGroups()
+        android.util.Log.d("ContactBookRepository", "getAllGroups response code: ${response.code()}")
+        if (response.isSuccessful) {
+            try {
+                val body = response.body()
+                android.util.Log.d("ContactBookRepository", "Response body size: ${body?.size}")
+                val groups = body?.map { groupResponse ->
+                    android.util.Log.d(
+                        "ContactBookRepository",
+                        "Parsing group: ${groupResponse.name} with ${groupResponse.contacts?.size ?: 0} contacts"
+                    )
+                    Group(
+                        id = groupResponse.id,
+                        name = groupResponse.name,
+                        description = groupResponse.description,
+                        options = groupResponse.options,
+                        members = groupResponse.contacts?.map { contactResponse ->
+                            Contact(
+                                id = contactResponse.id,
+                                // 순환 참조 방지
+                                group = null,
+                                name = contactResponse.name,
+                                email = contactResponse.email,
+                                context = contactResponse.context?.toDomain(),
+                                createdAt = contactResponse.createdAt,
+                                updatedAt = contactResponse.updatedAt,
+                                color = randomNotTooLightColor(contactRnd)
+                            )
+                        } ?: emptyList(),
+                        createdAt = groupResponse.createdAt,
+                        updatedAt = groupResponse.updatedAt,
+                        color = randomNotTooLightColor(groupRnd)
+                    )
+                } ?: emptyList()
+                android.util.Log.d("ContactBookRepository", "Parsed ${groups.size} groups")
+                return groups
+            } catch (e: Exception) {
+                android.util.Log.e("ContactBookRepository", "Error parsing groups", e)
+                throw e
+            }
         }
         throw IllegalStateException("Failed to get all groups: HTTP ${response.code()} ${response.message()}")
+    }
+
+    suspend fun deleteGroup(groupId: Long) {
+        val response = contactApiService.deleteGroup(groupId)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete group: HTTP ${response.code()} ${response.message()}")
+        }
+    }
+
+    suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
+        val request = PromptOptionRequest(
+            key = key,
+            name = name,
+            prompt = prompt
+        )
+
+        val response = contactApiService.addPromptOption(request)
+        if (response.isSuccessful) {
+            return response.body()
+                ?: throw IllegalStateException("Success response but body is null")
+        } else {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Add prompt option failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+    }
+
+    suspend fun getAllPromptOptions(): Pair<List<PromptOption>, List<PromptOption>> {
+        val response = contactApiService.getAllPromptOptions()
+        if (response.isSuccessful) {
+            val allOptions = response.body() ?: emptyList()
+            val toneOptions = allOptions.filter { it.key == "tone" }
+            val formatOptions = allOptions.filter { it.key == "format" }
+            return Pair(toneOptions, formatOptions)
+        }
+        throw IllegalStateException("Failed to get all prompt options: HTTP ${response.code()} ${response.message()}")
     }
 }
