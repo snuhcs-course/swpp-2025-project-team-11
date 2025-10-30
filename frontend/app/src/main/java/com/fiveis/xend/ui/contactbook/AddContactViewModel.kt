@@ -56,4 +56,14 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+
+    class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(AddContactViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return AddContactViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
 }

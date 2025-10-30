@@ -21,6 +21,10 @@ android {
     namespace = "com.fiveis.xend"
     compileSdk = 36
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     defaultConfig {
         applicationId = "com.fiveis.xend"
         minSdk = 24
@@ -46,6 +50,11 @@ android {
             "String",
             "BASE_URL",
             "\"${localProperties.getProperty("base_url", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "WS_URL",
+            "\"${localProperties.getProperty("ws.url", "")}\""
         )
     }
 

@@ -41,7 +41,17 @@ class MainActivity : ComponentActivity() {
             handleSignInResult(account)
         } catch (e: ApiException) {
             Log.e("GoogleAuth", "Sign-in failed: ${e.statusCode}", e)
-            Toast.makeText(this, "로그인 실패: ${e.statusCode}", Toast.LENGTH_LONG).show()
+            Log.e("GoogleAuth", "Status message: ${e.statusMessage}")
+            Log.e("GoogleAuth", "Error details: ${e.message}")
+
+            val errorMsg = when (e.statusCode) {
+                7 -> "로그인 실패 (코드 7)\n\n가능한 원인:\n• SHA-1 인증서 미등록\n• 패키지명 불일치\n• OAuth Client ID 설정 오류"
+                10 -> "개발자 오류: OAuth 설정 확인 필요"
+                12501 -> "로그인이 취소되었습니다"
+                else -> "로그인 실패: ${e.statusCode}\n${e.statusMessage}"
+            }
+
+            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
         }
     }
 
