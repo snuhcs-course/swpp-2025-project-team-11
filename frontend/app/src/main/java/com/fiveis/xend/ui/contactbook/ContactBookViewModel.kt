@@ -94,4 +94,14 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
     }
+
+    class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(ContactBookViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return ContactBookViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
 }

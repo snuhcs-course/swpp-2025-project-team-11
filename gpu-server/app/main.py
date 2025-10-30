@@ -1,15 +1,13 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from app.models import PredictRequest
-from app.llm import generate_reply
+from app.llm import generate_and_publish
 
 app = FastAPI(title="GPU Server for EXAONE")
 
 @app.post("/predict")
-async def predict(req: PredictRequest):
+async def predict(req: PredictRequest, bg: BackgroundTasks):
     try:
-        reply = generate_reply(req.system_prompt, req.user_input, req.max_tokens)
-        return {"response": reply}
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        bg.add_task(generate_and_publish, req.user_id, req.system_prompt, req.user_input, req.max_tokens)
+        return {"status": "started"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail="예측 중 알 수 없는 오류가 발생했습니다")
+        raise HTTPException(status_code=500, detail=str(e))

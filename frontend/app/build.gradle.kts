@@ -21,6 +21,10 @@ android {
     namespace = "com.fiveis.xend"
     compileSdk = 36
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     defaultConfig {
         applicationId = "com.fiveis.xend"
         minSdk = 24
@@ -46,6 +50,11 @@ android {
             "String",
             "BASE_URL",
             "\"${localProperties.getProperty("base_url", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "WS_URL",
+            "\"${localProperties.getProperty("ws.url", "")}\""
         )
     }
 
@@ -95,6 +104,8 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation("io.mockk:mockk-android:1.13.12")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 

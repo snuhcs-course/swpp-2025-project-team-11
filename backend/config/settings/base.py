@@ -53,7 +53,24 @@ THIRD_PARTY_APPS = [
     "rest_framework_simplejwt.token_blacklist",
 ]
 
-INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
+INSTALLED_APPS = (
+    DJANGO_APPS
+    + PROJECT_APPS
+    + THIRD_PARTY_APPS
+    + [
+        "channels",
+    ]
+)
+ASGI_APPLICATION = "config.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": ["redis://redis:6379"],
+        },
+    },
+}
 
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
@@ -177,5 +194,6 @@ ENCRYPTION_KEY = env("ENCRYPTION_KEY")
 
 AUTH_USER_MODEL = "user.User"
 SERVER_BASEURL = env("SERVER_BASEURL")
+GPU_SERVER_BASEURL = env("GPU_SERVER_BASEURL")
 
 PII_MASKING_SECRET = bytes.fromhex(env("PII_MASKING_SECRET"))

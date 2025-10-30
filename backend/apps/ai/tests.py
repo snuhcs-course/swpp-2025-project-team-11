@@ -4,6 +4,7 @@ AI 앱 스트리밍 뷰 테스트
 """
 
 import json
+import re
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -21,70 +22,52 @@ class MailGenerateStreamViewTest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.url = reverse("mail-generate-stream")  # URL name에 맞게 수정 필요
+        self.url = reverse("mail-generate-stream")
 
-        # 테스트 사용자 생성 및 인증
         self.user = User.objects.create(email="test@example.com", name="Test User")
         refresh = RefreshToken.for_user(self.user)
         self.access_token = str(refresh.access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
 
-        # 테스트 데이터
         self.valid_payload = {
             "subject": "Meeting Request",
             "body": "I would like to schedule a meeting",
-            "relationship": "colleague",
-            "situational_prompt": "formal business meeting",
-            "style_prompt": "professional and concise",
-            "format_prompt": "structured email",
-            "language": "en",
+            "to_emails": ["alice@example.com", "bob@example.com"],
         }
 
     @patch("apps.ai.views.stream_mail_generation")
     def test_mail_generate_stream_success(self, mock_stream):
-        """메일 생성 스트리밍 성공 테스트"""
-
-        # Mock SSE 이벤트 생성
         def mock_generator():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
-            yield 'event: subject\nid: 0\ndata: {"title":"Meeting Request","text":"Meeting Request\\n\\n"}\n\n'  # noqa: E501
+            yield 'event: subject\nid: 0\ndata: {"title":"Meeting Request","text":"Meeting Request\\n\\n"}\n\n'
             yield 'event: body.delta\nid: 1\ndata: {"seq":0,"text":"Dear colleague, "}\n\n'
-            yield 'event: body.delta\nid: 2\ndata: {"seq":1,"text":"I would like to schedule a meeting. "}\n\n'  # noqa: E501
+            yield 'event: body.delta\nid: 2\ndata: {"seq":1,"text":"I would like to schedule a meeting. "}\n\n'
             yield 'event: done\nid: 3\ndata: {"reason":"stop"}\n\n'
 
         mock_stream.return_value = mock_generator()
 
         response = self.client.post(self.url, self.valid_payload, format="json")
 
-        # 응답 확인
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "text/event-stream; charset=utf-8")
         self.assertEqual(response["Cache-Control"], "no-cache")
         self.assertEqual(response["X-Accel-Buffering"], "no")
 
-        # 스트리밍 데이터 확인
         content = b"".join(response.streaming_content).decode("utf-8")
         self.assertIn("event: ready", content)
         self.assertIn("event: subject", content)
         self.assertIn("event: body.delta", content)
         self.assertIn("event: done", content)
-        self.assertIn('"reason":"stop"', content)
 
-        # stream_mail_generation이 올바른 인자로 호출되었는지 확인
-        mock_stream.assert_called_once_with(
-            subject=self.valid_payload["subject"],
-            body=self.valid_payload["body"],
-            relationship=self.valid_payload["relationship"],
-            situational_prompt=self.valid_payload["situational_prompt"],
-            style_prompt=self.valid_payload["style_prompt"],
-            format_prompt=self.valid_payload["format_prompt"],
-            language=self.valid_payload["language"],
-        )
+        # 호출 인자 검증
+        kwargs = mock_stream.call_args.kwargs
+        self.assertEqual(kwargs.get("user"), self.user)
+        self.assertEqual(kwargs.get("subject"), self.valid_payload["subject"])
+        self.assertEqual(kwargs.get("body"), self.valid_payload["body"])
+        self.assertEqual(kwargs.get("to_emails"), self.valid_payload["to_emails"])
 
     @patch("apps.ai.views.stream_mail_generation")
     def test_mail_generate_stream_with_error(self, mock_stream):
-        """스트리밍 중 에러 발생 테스트"""
-
         def mock_error_generator():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
             yield 'event: subject\nid: 0\ndata: {"title":"","text":""}\n\n'
@@ -94,7 +77,6 @@ class MailGenerateStreamViewTest(TestCase):
         mock_stream.return_value = mock_error_generator()
 
         response = self.client.post(self.url, self.valid_payload, format="json")
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         content = b"".join(response.streaming_content).decode("utf-8")
@@ -103,8 +85,6 @@ class MailGenerateStreamViewTest(TestCase):
 
     @patch("apps.ai.views.stream_mail_generation")
     def test_mail_generate_stream_with_ping(self, mock_stream):
-        """ping 이벤트 포함 테스트"""
-
         def mock_generator_with_ping():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
             yield 'event: subject\nid: 0\ndata: {"title":"Test","text":"Test\\n\\n"}\n\n'
@@ -116,84 +96,48 @@ class MailGenerateStreamViewTest(TestCase):
         mock_stream.return_value = mock_generator_with_ping()
 
         response = self.client.post(self.url, self.valid_payload, format="json")
-
         content = b"".join(response.streaming_content).decode("utf-8")
         self.assertIn("event: ping", content)
 
-    def test_mail_generate_stream_missing_required_fields(self):
-        """필수 필드 누락 테스트"""
-        invalid_payload = {}  # 모든 필드 누락
+    def test_mail_generate_stream_missing_to_emails(self):
+        """to_emails 누락 → 400"""
+        payload = {"subject": "S", "body": "B"}  # to_emails 없음
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        response = self.client.post(self.url, invalid_payload, format="json")
-
-        # serializer에서 필수 필드 검증하는 경우에만 400
-        # 모든 필드가 optional이면 200이 반환될 수 있음
-        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST])
-
-    def test_mail_generate_stream_without_authentication(self):
-        """인증 없이 요청 테스트"""
-        # 인증 제거
-        self.client.credentials()
-
-        response = self.client.post(self.url, self.valid_payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    def test_mail_generate_stream_empty_to_emails(self):
+        """to_emails 빈 배열 → 400"""
+        payload = {"subject": "S", "body": "B", "to_emails": []}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @patch("apps.ai.views.stream_mail_generation")
-    def test_mail_generate_stream_optional_fields(self, mock_stream):
-        """선택적 필드만으로 요청 테스트"""
+    def test_mail_generate_stream_blank_subject_body_allowed(self, mock_stream):
+        """subject/body는 optional + blank 허용 → 200"""
 
         def mock_generator():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
-            yield 'event: subject\nid: 0\ndata: {"title":"Test","text":"Test\\n\\n"}\n\n'
+            yield 'event: subject\nid: 0\ndata: {"title":"","text":""}\n\n'
             yield 'event: done\nid: 1\ndata: {"reason":"stop"}\n\n'
 
         mock_stream.return_value = mock_generator()
 
-        minimal_payload = {"subject": "Test Subject", "body": "Test Body"}
-
-        response = self.client.post(self.url, minimal_payload, format="json")
-
+        payload = {"subject": "", "body": "", "to_emails": ["x@example.com"]}
+        response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # None 값들이 전달되었는지 확인
-        mock_stream.assert_called_once()
-        call_kwargs = mock_stream.call_args.kwargs
-        self.assertEqual(call_kwargs["subject"], "Test Subject")
-        self.assertEqual(call_kwargs["body"], "Test Body")
-        self.assertIsNone(call_kwargs.get("relationship"))
-        self.assertIsNone(call_kwargs.get("situational_prompt"))
+        kwargs = mock_stream.call_args.kwargs
+        self.assertEqual(kwargs["subject"], "")
+        self.assertEqual(kwargs["body"], "")
+        self.assertEqual(kwargs["to_emails"], ["x@example.com"])
 
-    @patch("apps.ai.views.stream_mail_generation")
-    def test_mail_generate_stream_sequence_order(self, mock_stream):
-        """body.delta 시퀀스 순서 확인 테스트"""
-
-        def mock_generator():
-            yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
-            yield 'event: subject\nid: 0\ndata: {"title":"Test","text":"Test\\n\\n"}\n\n'
-            yield 'event: body.delta\nid: 1\ndata: {"seq": 0, "text": "First "}\n\n'
-            yield 'event: body.delta\nid: 2\ndata: {"seq": 1, "text": "Second "}\n\n'
-            yield 'event: body.delta\nid: 3\ndata: {"seq": 2, "text": "Third"}\n\n'
-            yield 'event: done\nid: 4\ndata: {"reason":"stop"}\n\n'
-
-        mock_stream.return_value = mock_generator()
-
+    def test_mail_generate_stream_without_authentication(self):
+        self.client.credentials()
         response = self.client.post(self.url, self.valid_payload, format="json")
-
-        content = b"".join(response.streaming_content).decode("utf-8")
-
-        # 시퀀스 순서 확인 (공백 포함)
-        seq0_pos = content.find('"seq": 0')
-        seq1_pos = content.find('"seq": 1')
-        seq2_pos = content.find('"seq": 2')
-
-        self.assertGreater(seq1_pos, seq0_pos)
-        self.assertGreater(seq2_pos, seq1_pos)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     @patch("apps.ai.views.stream_mail_generation")
     def test_mail_generate_stream_id_increments(self, mock_stream):
-        """SSE 이벤트 ID 증가 확인 테스트"""
-
         def mock_generator():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
             yield 'event: subject\nid: 0\ndata: {"title":"Test","text":"Test\\n\\n"}\n\n'
@@ -204,57 +148,11 @@ class MailGenerateStreamViewTest(TestCase):
         mock_stream.return_value = mock_generator()
 
         response = self.client.post(self.url, self.valid_payload, format="json")
-
         content = b"".join(response.streaming_content).decode("utf-8")
-
-        # ID가 순차적으로 증가하는지 확인
         self.assertIn("id: 0", content)
         self.assertIn("id: 1", content)
         self.assertIn("id: 2", content)
         self.assertIn("id: 3", content)
-
-    @patch("apps.ai.views.stream_mail_generation")
-    def test_mail_generate_stream_different_languages(self, mock_stream):
-        """다양한 언어 지원 테스트"""
-        languages = ["en", "ko", "ja", "zh"]
-
-        for lang in languages:
-            with self.subTest(language=lang):
-
-                def mock_generator():
-                    yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
-                    yield 'event: subject\nid: 0\ndata: {"title":"Test","text":"Test\\n\\n"}\n\n'
-                    yield 'event: done\nid: 1\ndata: {"reason":"stop"}\n\n'
-
-                mock_stream.return_value = mock_generator()
-                mock_stream.reset_mock()  # 각 서브테스트마다 리셋
-
-                payload = self.valid_payload.copy()
-                payload["language"] = lang
-
-                response = self.client.post(self.url, payload, format="json")
-
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                self.assertTrue(mock_stream.called)
-
-    @patch("apps.ai.views.stream_mail_generation")
-    def test_mail_generate_stream_empty_subject_body(self, mock_stream):
-        """빈 subject와 body로 요청 테스트"""
-
-        def mock_generator():
-            yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
-            yield 'event: subject\nid: 0\ndata: {"title":"","text":""}\n\n'
-            yield 'event: done\nid: 1\ndata: {"reason":"stop"}\n\n'
-
-        mock_stream.return_value = mock_generator()
-
-        empty_payload = {"subject": "", "body": ""}
-
-        response = self.client.post(self.url, empty_payload, format="json")
-
-        # serializer 검증에 따라 성공 또는 실패할 수 있음
-        # 만약 빈 문자열이 허용된다면:
-        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST])
 
 
 class MailGenerateStreamParsingTest(TestCase):
@@ -269,15 +167,13 @@ class MailGenerateStreamParsingTest(TestCase):
         self.access_token = str(refresh.access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
 
-        self.valid_payload = {"subject": "Test", "body": "Test body"}
+        self.valid_payload = {"subject": "Test", "body": "Test body", "to_emails": ["x@example.com"]}
 
     @patch("apps.ai.views.stream_mail_generation")
     def test_parse_sse_events(self, mock_stream):
-        """SSE 이벤트 파싱 테스트"""
-
         def mock_generator():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
-            yield 'event: subject\nid: 0\ndata: {"title":"Test Title","text":"Test Title\\n\\n"}\n\n'  # noqa: E501
+            yield 'event: subject\nid: 0\ndata: {"title":"Test Title","text":"Test Title\\n\\n"}\n\n'
             yield 'event: body.delta\nid: 1\ndata: {"seq": 0, "text": "Hello"}\n\n'
             yield 'event: done\nid: 2\ndata: {"reason":"stop"}\n\n'
 
@@ -286,32 +182,19 @@ class MailGenerateStreamParsingTest(TestCase):
         response = self.client.post(self.url, self.valid_payload, format="json")
         content = b"".join(response.streaming_content).decode("utf-8")
 
-        # 이벤트 분리
         events = [e.strip() for e in content.split("\n\n") if e.strip()]
-
-        # 각 이벤트 검증
         self.assertGreaterEqual(len(events), 4)
-
-        # ready 이벤트
         self.assertIn("event: ready", events[0])
         self.assertIn("retry: 5000", events[0])
-
-        # subject 이벤트
         self.assertIn("event: subject", events[1])
         self.assertIn("id: 0", events[1])
-
-        # body.delta 이벤트 (공백 포함 형태)
         self.assertIn("event: body.delta", events[2])
         self.assertIn('"seq": 0', events[2])
-
-        # done 이벤트
         self.assertIn("event: done", events[3])
         self.assertIn('"reason":"stop"', events[3])
 
     @patch("apps.ai.views.stream_mail_generation")
     def test_json_data_validity(self, mock_stream):
-        """JSON 데이터 유효성 테스트"""
-
         def mock_generator():
             yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
             yield 'event: subject\nid: 0\ndata: {"title":"Test","text":"Test\\n\\n"}\n\n'
@@ -323,9 +206,6 @@ class MailGenerateStreamParsingTest(TestCase):
         response = self.client.post(self.url, self.valid_payload, format="json")
         content = b"".join(response.streaming_content).decode("utf-8")
 
-        # 각 이벤트의 data 필드에서 JSON 추출 및 검증
-        import re
-
         data_pattern = re.compile(r"data: ({.*?})\n", re.DOTALL)
         matches = data_pattern.findall(content)
 
@@ -335,3 +215,103 @@ class MailGenerateStreamParsingTest(TestCase):
                 self.assertIsInstance(parsed, dict)
             except json.JSONDecodeError:
                 self.fail(f"Invalid JSON in data field: {match}")
+
+
+class ReplyOptionsStreamViewTest(TestCase):
+    """답장 선택지 스트리밍 뷰 테스트"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("mail-reply-stream")
+
+        self.user = User.objects.create(email="test@example.com", name="Test User")
+        refresh = RefreshToken.for_user(self.user)
+        self.access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+        self.valid_payload = {
+            "subject": "Re: Meeting",
+            "body": "Thanks for reaching out. Let's coordinate.",
+            "to_email": "origin@example.com",
+        }
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_stream_success(self, mock_stream):
+        def mock_generator():
+            yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
+            yield (
+                "event: options\nid: 1\n"
+                'data: {"count":2,"items":[{"id":0,"type":"긍정형","title":"네, 가능합니다"},'
+                '{"id":1,"type":"일정조율형","title":"대체 시간 제안"}]}\n\n'
+            )
+            yield 'event: option.delta\nid: 2\ndata: {"id":0,"seq":0,"text":"안녕하세요, "} \n\n'
+            yield 'event: option.delta\nid: 3\ndata: {"id":1,"seq":0,"text":"안녕하세요. 메일 확인했습니다. "} \n\n'
+            yield 'event: option.done\nid: 4\ndata: {"id":0,"total_seq":10}\n\n'
+            yield 'event: option.done\nid: 5\ndata: {"id":1,"total_seq":12}\n\n'
+            yield 'event: done\nid: 6\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        response = self.client.post(self.url, self.valid_payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "text/event-stream; charset=utf-8")
+        self.assertEqual(response["Cache-Control"], "no-cache")
+        self.assertEqual(response["X-Accel-Buffering"], "no")
+
+        content = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn("event: options", content)
+        self.assertIn("event: option.delta", content)
+        self.assertIn("event: option.done", content)
+        self.assertIn("event: done", content)
+
+        kwargs = mock_stream.call_args.kwargs
+        self.assertEqual(kwargs.get("user"), self.user)
+        self.assertEqual(kwargs.get("subject"), self.valid_payload["subject"])
+        self.assertEqual(kwargs.get("body"), self.valid_payload["body"])
+        self.assertEqual(kwargs.get("to_email"), self.valid_payload["to_email"])
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_stream_with_ping(self, mock_stream):
+        def mock_generator():
+            yield 'event: ready\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
+            yield 'event: options\nid: 1\ndata: {"count":1,"items":[{"id":0,"type":"정보요청","title":"정보 요청"}]}\n\n'
+            yield 'event: option.delta\nid: 2\ndata: {"id":0,"seq":0,"text":"문의 주셔서 감사합니다. "} \n\n'
+            yield "event: ping\nid: 3\ndata: {}\n\n"
+            yield 'event: option.done\nid: 4\ndata: {"id":0,"total_seq":5}\n\n'
+            yield 'event: done\nid: 5\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn("event: ping", content)
+
+    def test_reply_options_stream_without_authentication(self):
+        self.client.credentials()
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_reply_options_stream_missing_required_fields(self):
+        """subject/body/to_email 모두 required → 누락 시 400"""
+        invalid_payload = {}
+        response = self.client.post(self.url, invalid_payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_stream_id_increments(self, mock_stream):
+        def mock_generator():
+            yield 'event: ready\nid: 0\ndata: {"ts":1731234567890}\nretry: 5000\n\n'
+            yield 'event: options\nid: 1\ndata: {"count":1,"items":[{"id":0,"type":"긍정형","title":"수락"}]}\n\n'
+            yield 'event: option.delta\nid: 2\ndata: {"id":0,"seq":0,"text":"네, 가능합니다."}\n\n'
+            yield 'event: option.done\nid: 3\ndata: {"id":0,"total_seq":1}\n\n'
+            yield 'event: done\nid: 4\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn("id: 1", content)
+        self.assertIn("id: 2", content)
+        self.assertIn("id: 3", content)
+        self.assertIn("id: 4", content)
