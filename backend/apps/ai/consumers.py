@@ -9,7 +9,18 @@ from django.conf import settings
 
 class MailGenerateConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        if self.scope.get("token_invalid", False):
+            await self.accept()
+            await self.send(text_data=json.dumps({"type": "error", "message": "token_invalid"}))
+            await self.close()
+            return
+
+        if not self.scope["user"].is_authenticated:
+            await self.close()
+            return
+
         self.user = self.scope["user"]
+        print(f"[DEBUG] {self.user} authorized")
         self.room_group_name = f"user_{self.user.id}_mail"
 
         # WebSocket 연결 허용
