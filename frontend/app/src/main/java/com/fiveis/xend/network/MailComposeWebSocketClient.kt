@@ -82,11 +82,11 @@ class MailComposeWebSocketClient(
 
             Log.d(TAG, "Building WebSocket request...")
             Log.d(TAG, "  URL: $wsUrl")
-            Log.d(TAG, "  Authorization: ${accessToken.take(20)}... (without Bearer prefix)")
+            Log.d(TAG, "  Authorization: Bearer ${accessToken.take(20)}...")
 
             val request = Request.Builder()
                 .url(wsUrl)
-                .addHeader("Authorization", accessToken) // Bearer 접두사 없이 토큰만 전달
+                .addHeader("Authorization", "Bearer $accessToken")
                 .build()
 
             Log.d(TAG, "✅ Request built, initiating WebSocket connection...")
