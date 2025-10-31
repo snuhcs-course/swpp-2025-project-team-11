@@ -1,6 +1,7 @@
 """Gmail API integration service"""
 
 import base64
+import datetime
 import logging
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
@@ -10,8 +11,9 @@ from email.utils import parsedate_to_datetime
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import BatchHttpRequest
 
-from apps.mail.utils import html_to_text, text_to_html
+from apps.mail.utils import compare_iso_datetimes, html_to_text, text_to_html
 from apps.user.utils import google_token_required
 
 logger = logging.getLogger(__name__)
@@ -30,7 +32,65 @@ class GmailService:
         credentials = Credentials(token=access_token)
         self.service = build("gmail", "v1", credentials=credentials)
 
-    def list_messages(self, max_results: int = 20, page_token: str = None, label_ids: list = None):
+    def get_messages_batch(self, message_ids: list[str]) -> list[dict]:
+        """
+        Fetch multiple messages in a single batch HTTP request.
+
+        Args:
+            message_ids (list[str]): Gmail message IDs.
+
+        Returns:
+            list[dict]: List of parsed message dicts (same shape as get_message()).
+        """
+
+        results: list[dict] = []
+
+        # callback will be called once per each sub-request added to the batch
+        def _callback(request_id, response, exception):
+            """
+            request_id: internal ID we assign per subrequest
+            response: raw Gmail message resource (if success)
+            exception: HttpError (if failed)
+            """
+            if exception is not None:
+                logger.warning(f"Failed to fetch message in batch [{request_id}]: {exception}")
+                return
+
+            try:
+                parsed = self._parse_message(response)
+                results.append(parsed)
+            except Exception as e:
+                logger.warning(f"Failed to parse message in batch [{request_id}]: {e}")
+
+        batch = BatchHttpRequest(
+            callback=_callback,
+            batch_uri="https://gmail.googleapis.com/batch/gmail/v1",
+        )
+
+        for mid in message_ids:
+            batch.add(
+                self.service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=mid,
+                    format="full",  # full so we can parse headers/body like before
+                ),
+                request_id=mid,
+            )
+
+        # execute the whole batch in one HTTP roundtrip
+        batch.execute()
+
+        return results
+
+    def list_messages(
+        self,
+        max_results: int = 20,
+        page_token: str = None,
+        label_ids: list = None,
+        q: str | None = None,
+    ):
         """
         List messages from Gmail
 
@@ -38,6 +98,7 @@ class GmailService:
             max_results: Maximum number of results
             page_token: Pagination token
             label_ids: Label filters (default: ['INBOX'])
+            q: Gmail search query (ex: 'after:1730379248 label:INBOX')
 
         Returns:
             dict: {
@@ -53,7 +114,18 @@ class GmailService:
             label_ids = ["INBOX"]
 
         try:
-            results = self.service.users().messages().list(userId="me", maxResults=max_results, pageToken=page_token, labelIds=label_ids).execute()
+            results = (
+                self.service.users()
+                .messages()
+                .list(
+                    userId="me",
+                    maxResults=max_results,
+                    pageToken=page_token,
+                    labelIds=label_ids,
+                    q=q,
+                )
+                .execute()
+            )
             return results
         except HttpError:
             raise
@@ -273,17 +345,69 @@ def list_emails_logic(access_token, max_results, page_token, label_ids):
     result = gmail_service.list_messages(max_results=max_results, page_token=page_token, label_ids=label_ids)
 
     # Fetch detailed info for each message
-    messages = []
-    for msg in result.get("messages", []):
-        try:
-            message_detail = gmail_service.get_message(msg["id"])
-            messages.append(message_detail)
-        except Exception as e:
-            # Skip individual message fetch failures
-            logger.warning(f"Failed to fetch message {msg['id']}: {str(e)}")
-            continue
+    msg_refs = result.get("messages", [])
+    message_ids = [m["id"] for m in msg_refs if "id" in m]
+
+    # 2. batch get full details
+    if message_ids:
+        messages = gmail_service.get_messages_batch(message_ids)
+    else:
+        messages = []
 
     return result, messages
+
+
+@google_token_required
+def list_newer_emails_logic(access_token, max_results, label_ids, since_date):
+    """
+    Incremental refresh mode:
+    - since_date: tz-aware datetime (the newest email timestamp the client ALREADY has)
+    - Fetch ALL emails after that timestamp (via `after:<epochSeconds>` query),
+      across ALL pages.
+    """
+    gmail_service = GmailService(access_token)
+
+    since_utc = since_date.astimezone(datetime.UTC)
+    epoch_seconds = int(since_utc.timestamp())
+
+    q = f"after:{epoch_seconds}"
+
+    page_token = None
+    collected_ids: list[str] = []
+
+    while True:
+        try:
+            resp = gmail_service.list_messages(
+                max_results=100,
+                page_token=page_token,
+                label_ids=label_ids,
+                q=q,
+            )
+        except HttpError as e:
+            logger.warning(f"Gmail list_messages failed: {e}")
+            break
+
+        raw_refs = resp.get("messages", [])
+        if not raw_refs:
+            break
+
+        for ref in raw_refs:
+            mid = ref.get("id")
+            if mid:
+                collected_ids.append(mid)
+
+        page_token = resp.get("nextPageToken")
+        if not page_token:
+            break
+
+    if collected_ids:
+        all_full_msgs = gmail_service.get_messages_batch(collected_ids)
+    else:
+        all_full_msgs = []
+
+    newer_only = [m for m in all_full_msgs if m.get("date") and compare_iso_datetimes(m["date"], since_date) == 1]
+
+    return newer_only
 
 
 @google_token_required
