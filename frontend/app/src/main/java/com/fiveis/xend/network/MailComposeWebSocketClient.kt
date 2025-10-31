@@ -78,7 +78,7 @@ class MailComposeWebSocketClient(
 
             Log.d(TAG, "Creating WebSocket OkHttpClient...")
             val client = RetrofitClient.getWebSocketClient(context)
-            Log.d(TAG, "✅ WebSocket OkHttpClient created (without Bearer interceptor)")
+            Log.d(TAG, "✅ WebSocket OkHttpClient created (auth interceptor 없음)")
 
             Log.d(TAG, "Building WebSocket request...")
             Log.d(TAG, "  URL: $wsUrl")

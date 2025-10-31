@@ -90,7 +90,7 @@ object RetrofitClient {
             .build()
     }
 
-    // WebSocket 전용 OkHttpClient (Bearer 접두사 없이 토큰만 전달)
+    // WebSocket 전용 OkHttpClient (Bearer 토큰을 수동으로 추가)
     fun getWebSocketClient(context: Context): OkHttpClient {
         return OkHttpClient.Builder()
             .dns(customDns)
@@ -98,7 +98,7 @@ object RetrofitClient {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(loggingInterceptor)
-            // WebSocket은 수동으로 헤더 추가하므로 인터셉터 없음
+            // WebSocket은 수동으로 Authorization 헤더 추가하므로 인터셉터 없음
             .build()
     }
 
