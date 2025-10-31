@@ -20,6 +20,7 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
             return
 
         self.user = self.scope["user"]
+        print(f"[DEBUG] {self.user} authorized")
         self.room_group_name = f"user_{self.user.id}_mail"
 
         # WebSocket 연결 허용
