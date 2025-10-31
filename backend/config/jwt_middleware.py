@@ -1,3 +1,4 @@
+from asgiref.sync import sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -11,6 +12,10 @@ class JWTAuthMiddleware(BaseMiddleware):
     만료된 경우 scope["user"]는 AnonymousUser 로 유지하고,
     consumer가 클라이언트에게 "token_invalid" 이벤트 전송하도록 처리 -> 클라이언트는 REST API로 refresh token 보내 access token 재발급 로직 수행
     """
+
+    @sync_to_async
+    def get_user_from_token(self, validated_token):
+        return jwt_auth.get_user(validated_token)
 
     async def __call__(self, scope, receive, send):
 
@@ -26,10 +31,11 @@ class JWTAuthMiddleware(BaseMiddleware):
                 token = token[7:]
             try:
                 validated_token = jwt_auth.get_validated_token(token)
-                user = jwt_auth.get_user(validated_token)
+                user = await self.get_user_from_token(validated_token)
                 scope["user"] = user
 
             except Exception:
                 scope["token_invalid"] = True
+                # print(f"[ERROR] Exception details: {e.__class__.__name__}: {e}")
 
         return await super().__call__(scope, receive, send)

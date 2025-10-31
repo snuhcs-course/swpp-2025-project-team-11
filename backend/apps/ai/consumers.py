@@ -20,7 +20,6 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
             return
 
         self.user = self.scope["user"]
-        print(f"[DEBUG] {self.user} authorized")
         self.room_group_name = f"user_{self.user.id}_mail"
 
         # WebSocket 연결 허용
@@ -49,6 +48,10 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         Django는 이 요청을 GPU 서버에 중계함.
         """
         data = json.loads(text_data)
+
+        # TODO: json parsing하여 system prompt 구성
+        # - SentMail 저장소로부터 few shot 불러오는 과정이 필요함
+        # - 답장 / 초안 생성 케이스 분리 필요?
 
         try:
             print("[DEBUG] Sending GPU request:", settings.GPU_SERVER_BASEURL + "predict")
