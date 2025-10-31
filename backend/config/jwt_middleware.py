@@ -19,9 +19,11 @@ class JWTAuthMiddleware(BaseMiddleware):
 
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
 
-        token = headers.get("sec-websocket-protocol")
+        token = headers.get("authorization")
 
         if token:
+            if token.startswith("Bearer "):
+                token = token[7:]
             try:
                 validated_token = jwt_auth.get_validated_token(token)
                 user = jwt_auth.get_user(validated_token)
