@@ -11,7 +11,7 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         if self.scope.get("token_invalid", False):
             await self.accept()
-            await self.send_json({"type": "error", "message": "token_invalid"})
+            await self.send(text_data=json.dumps({"type": "error", "message": "token_invalid"}))
             await self.close()
             return
 
