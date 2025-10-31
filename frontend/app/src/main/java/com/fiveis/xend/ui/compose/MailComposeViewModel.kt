@@ -131,6 +131,29 @@ class MailComposeViewModel(
         }
     }
 
+    fun acceptNextWord(): String? {
+        val suggestion = _ui.value.suggestionText
+        if (suggestion.isEmpty()) return null
+
+        // 공백 기준으로 단어 분리
+        val words = suggestion.trim().split("\\s+".toRegex())
+        if (words.isEmpty()) return null
+
+        // 첫 번째 단어 가져오기
+        val firstWord = words.first()
+
+        // 남은 단어들로 업데이트
+        val remainingText = words.drop(1).joinToString(" ")
+
+        // suggestionBuffer도 업데이트
+        suggestionBuffer.clear()
+        suggestionBuffer.append(remainingText)
+
+        _ui.update { it.copy(suggestionText = remainingText) }
+
+        return firstWord
+    }
+
     fun acceptSuggestion() {
         val suggestion = _ui.value.suggestionText
         if (suggestion.isNotEmpty()) {

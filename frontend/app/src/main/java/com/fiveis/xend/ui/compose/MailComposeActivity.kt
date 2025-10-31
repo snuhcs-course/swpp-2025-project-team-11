@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FormatBold
@@ -857,8 +858,38 @@ private fun RichTextEditorCard(
                         ),
                         modifier = Modifier
                             .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
-                            .clickable { onAcceptSuggestion() }
                     )
+                }
+
+                // 제안 수락 플로팅 버튼
+                if (suggestionText.isNotEmpty()) {
+                    androidx.compose.material3.FloatingActionButton(
+                        onClick = onAcceptSuggestion,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp),
+                        containerColor = Blue60,
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "제안 수락",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "수락",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1035,9 +1066,14 @@ class MailComposeActivity : ComponentActivity() {
                             onUndo = { /* TODO */ },
                             suggestionText = composeUi.suggestionText,
                             onAcceptSuggestion = {
-                                val currentText = richTextState.toHtml()
-                                richTextState.setHtml(currentText + composeUi.suggestionText)
-                                composeVm.acceptSuggestion()
+                                // 다음 단어 하나만 가져오기
+                                val nextWord = composeVm.acceptNextWord()
+                                if (nextWord != null) {
+                                    val currentText = richTextState.toHtml()
+                                    // 현재 텍스트가 공백으로 끝나지 않으면 공백 추가
+                                    val separator = if (currentText.endsWith(" ") || currentText.isEmpty()) "" else " "
+                                    richTextState.setHtml(currentText + separator + nextWord)
+                                }
                             },
                             aiRealtime = aiRealtime,
                             onAiRealtimeToggle = { aiRealtime = it },

@@ -90,6 +90,18 @@ object RetrofitClient {
             .build()
     }
 
+    // WebSocket 전용 OkHttpClient (Bearer 접두사 없이 토큰만 전달)
+    fun getWebSocketClient(context: Context): OkHttpClient {
+        return OkHttpClient.Builder()
+            .dns(customDns)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(loggingInterceptor)
+            // WebSocket은 수동으로 헤더 추가하므로 인터셉터 없음
+            .build()
+    }
+
     // Retrofit 인스턴스 생성
     private fun getRetrofit(client: OkHttpClient): Retrofit {
         val gson = GsonBuilder()
