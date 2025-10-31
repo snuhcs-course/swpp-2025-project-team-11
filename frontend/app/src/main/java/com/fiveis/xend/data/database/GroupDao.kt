@@ -20,6 +20,10 @@ interface GroupDao {
     suspend fun getGroupsWithMembersAndOptions(): List<GroupWithMembersAndOptions>
 
     @Transaction
+    @Query("SELECT * FROM `groups` WHERE id = :groupId")
+    suspend fun getGroupWithMembersAndOptions(groupId: Long): GroupWithMembersAndOptions?
+
+    @Transaction
     @Query("SELECT * FROM `groups`")
     fun observeGroupsWithMembersAndOptions(): Flow<List<GroupWithMembersAndOptions>>
 

@@ -35,6 +35,30 @@ fun ContactWithContext.asDomain(group: Group?): Contact = Contact(
     updatedAt = contact.updatedAt
 )
 
+fun ContactWithGroupAndContext.asDomain(): Contact {
+    val groupDomain: Group? = group?.let { g ->
+        Group(
+            id = g.id,
+            name = g.name,
+            description = g.description,
+            options = emptyList(),
+            members = emptyList(),
+            createdAt = g.createdAt,
+            updatedAt = g.updatedAt
+        )
+    }
+
+    return Contact(
+        id = contact.id,
+        group = groupDomain,
+        name = contact.name,
+        email = contact.email,
+        context = context?.asDomain(),
+        createdAt = contact.createdAt,
+        updatedAt = contact.updatedAt
+    )
+}
+
 fun PromptOptionEntity.asDomain(): PromptOption = PromptOption(
     id = id,
     key = key,

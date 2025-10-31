@@ -8,6 +8,7 @@ import com.fiveis.xend.data.repository.ContactBookRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -27,7 +28,21 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<AddGroupUiState> = _uiState.asStateFlow()
 
     init {
-        getAllPromptOptions()
+        viewModelScope.launch {
+            repository.observePromptOptions().collectLatest { all ->
+                _uiState.update {
+                    it.copy(
+                        tonePromptOptions = all.filter { o -> o.key == "tone" },
+                        formatPromptOptions = all.filter { o -> o.key == "format" }
+                    )
+                }
+            }
+        }
+        // 서버 → DB 동기화
+        viewModelScope.launch {
+            runCatching { repository.refreshPromptOptions() }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
     }
 
     fun addGroup(

@@ -18,6 +18,36 @@ data class ContactWithContext(
     val context: ContactContextEntity?
 )
 
+data class ContactWithGroupAndContext(
+    @Embedded val contact: ContactEntity,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "contactId"
+    )
+    val context: ContactContextEntity?,
+
+    // 연락처의 groupId → GroupEntity
+    @Relation(
+        parentColumn = "groupId",
+        entityColumn = "id",
+        entity = GroupEntity::class
+    )
+    val group: GroupEntity?
+
+//    // 그룹 옵션
+//    @Relation(
+//        parentColumn = "groupId",
+//        entityColumn = "id",
+//        entity = PromptOptionEntity::class,
+//        associateBy = Junction(
+//            value = GroupPromptOptionCrossRef::class,
+//            parentColumn = "groupId",
+//            entityColumn = "optionId"
+//        )
+//    )
+//    val groupOptions: List<PromptOptionEntity> = emptyList()
+)
+
 /** Group + (Members, Options) 1:N + 1:N */
 data class GroupWithMembersAndOptions(
     @Embedded val group: GroupEntity,

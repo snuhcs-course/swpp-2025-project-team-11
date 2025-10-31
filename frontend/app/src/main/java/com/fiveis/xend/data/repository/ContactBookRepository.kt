@@ -18,7 +18,6 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.data.model.PromptOptionRequest
-import com.fiveis.xend.data.model.toDomain
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import kotlinx.coroutines.flow.Flow
@@ -42,14 +41,27 @@ data class ContactData(val contacts: List<Contact>) : ContactBookData
 // }
 
 class ContactBookRepository(context: Context) {
-
     private val api: ContactApiService = RetrofitClient.getContactApiService(context)
 
-    // ★ Room 주입
+    // Room 주입
     private val db = AppDatabase.getDatabase(context)
     private val groupDao = db.groupDao()
     private val contactDao = db.contactDao()
     private val optionDao = db.promptOptionDao()
+
+    suspend fun localGroups(): List<Group> = groupDao.getGroupsWithMembersAndOptions().map { it.asDomain() }
+
+    suspend fun localGroup(id: Long): Group? = groupDao.getGroupWithMembersAndOptions(id)?.asDomain()
+
+    suspend fun localContacts(): List<Contact> = contactDao.getAllWithContext().map { it.asDomain(null) }
+
+    suspend fun localContact(id: Long): Contact? = contactDao.getContactWithContext(id)?.asDomain(null)
+
+    // 필요 시: 특정 그룹 멤버만
+    suspend fun localContactsByGroup(groupId: Long): List<Contact> =
+        contactDao.getContactsByGroupIdWithContext(groupId).map { it.asDomain(null) }
+
+    suspend fun localContactWithGroup(id: Long): Contact? = contactDao.getByIdWithGroup(id)?.asDomain()
 
     fun observeGroups(): Flow<List<Group>> = groupDao.observeGroupsWithMembersAndOptions()
         .map { list -> list.map { it.asDomain() } }
@@ -62,7 +74,9 @@ class ContactBookRepository(context: Context) {
     fun observePromptOptions(): Flow<List<PromptOption>> = optionDao.observeAllOptions()
         .map { list -> list.map { it.asDomain() } }
 
-    // ----- 네트워크 → DB 동기화 -----
+    fun observeContact(id: Long): Flow<Contact?> = contactDao.observeByIdWithGroup(id).map { it?.asDomain() }
+
+    // ----- DB 동기화(refresh) -----
 
     suspend fun refreshGroups() {
         val res = api.getAllGroups()
@@ -123,9 +137,20 @@ class ContactBookRepository(context: Context) {
         }
     }
 
+    suspend fun refreshContact(id: Long) {
+        val res = api.getContact(id)
+        if (!res.isSuccessful) error("HTTP ${res.code()} ${res.message()}")
+        val r = res.body() ?: error("Contact body null")
+        db.withTransaction {
+            val (c, ctx) = r.toEntities()
+            contactDao.upsertContacts(listOf(c))
+            ctx?.let { contactDao.upsertContexts(listOf(it)) }
+        }
+    }
+
     suspend fun refreshGroupAndMembers(groupId: Long) {
         refreshGroup(groupId)
-        refreshContacts() // fresh 멤버 목록 확보
+        refreshContacts()
     }
 
     suspend fun refreshPromptOptions() {
@@ -135,138 +160,17 @@ class ContactBookRepository(context: Context) {
         optionDao.upsertOptions(all.map { it.toEntity() })
     }
 
-    // ======================
-    // 읽기 API
-    // ======================
+    // ----- 읽기(get) API -----
 
-    suspend fun getAllContacts(): List<Contact> {
-        val res = api.getAllContacts()
-        if (!res.isSuccessful) {
-            throw IllegalStateException("Failed to get all contacts: HTTP ${res.code()} ${res.message()}")
-        }
-        val body = res.body().orEmpty()
+    suspend fun getAllContacts(): List<Contact> = localContacts()
 
-        // ★ 로컬 동기화
-        db.withTransaction {
-            contactDao.deleteAllContexts()
-            contactDao.deleteAllContacts()
-            val contacts = mutableListOf<ContactEntity>()
-            val contexts = mutableListOf<ContactContextEntity>()
-            body.forEach { cr ->
-                val (c, ctx) = cr.toEntities()
-                contacts += c
-                ctx?.let { contexts += it }
-            }
-            contactDao.upsertContacts(contacts)
-            if (contexts.isNotEmpty()) contactDao.upsertContexts(contexts)
-        }
+    suspend fun getAllGroups(): List<Group> = localGroups()
 
-        // 도메인으로 반환(서버 or 로컬 아무거나 가능)
-        return body.map { r ->
-            Contact(
-                id = r.id,
-                group = r.group?.toDomain(),
-                name = r.name,
-                email = r.email,
-                context = r.context?.toDomain(),
-                createdAt = r.createdAt,
-                updatedAt = r.updatedAt
-            )
-        }
-    }
+    suspend fun getContact(id: Long): Contact =
+        localContact(id) ?: throw IllegalStateException("Contact($id) not found locally")
 
-    suspend fun getAllGroups(): List<Group> {
-        val res = api.getAllGroups()
-        if (!res.isSuccessful) {
-            throw IllegalStateException("Failed to get all groups: HTTP ${res.code()} ${res.message()}")
-        }
-        val body = res.body().orEmpty()
-
-        // ★ 로컬 동기화
-        db.withTransaction {
-            // 그룹은 전량 교체 (필요하면 diff upsert로 바꿔도 됨)
-            // crossRef 전체 삭제 → 다시 생성
-            optionDao.deleteAllCrossRefs()
-            groupDao.deleteAllGroups()
-
-            val groups = mutableListOf<GroupEntity>()
-            val optionSet = linkedSetOf<PromptOptionEntity>() // 중복 제거
-            val refs = mutableListOf<GroupPromptOptionCrossRef>()
-
-            body.forEach { gr ->
-                val (g, opts, rfs) = gr.toEntities()
-                groups += g
-                optionSet.addAll(opts)
-                refs += rfs
-            }
-            groupDao.upsertGroups(groups)
-            if (optionSet.isNotEmpty()) optionDao.upsertOptions(optionSet.toList())
-            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
-        }
-
-        return body.map {
-            Group(
-                id = it.id,
-                name = it.name,
-                description = it.description,
-                options = it.options ?: emptyList(),
-                members = emptyList(),
-                createdAt = it.createdAt,
-                updatedAt = it.updatedAt
-            )
-        }
-    }
-
-    suspend fun getContact(id: Long): Contact {
-        val res = api.getContact(id)
-        if (!res.isSuccessful) {
-            val errorBody = res.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException("Get contact failed: HTTP ${res.code()} ${res.message()} | body=$errorBody")
-        }
-        val r = res.body() ?: error("Contact body null")
-        // 로컬 반영
-        db.withTransaction {
-            val (c, ctx) = r.toEntities()
-            contactDao.upsertContacts(listOf(c))
-            ctx?.let { contactDao.upsertContexts(listOf(it)) }
-        }
-        return Contact(
-            id = r.id,
-            group = r.group?.toDomain(),
-            name = r.name,
-            email = r.email,
-            context = r.context?.toDomain(),
-            createdAt = r.createdAt,
-            updatedAt = r.updatedAt
-        )
-    }
-
-    suspend fun getGroup(id: Long): Group {
-        val res = api.getGroup(id)
-        if (!res.isSuccessful) {
-            val errorBody = res.errorBody()?.string()?.take(500) ?: "Unknown error"
-            throw IllegalStateException("Get group failed: HTTP ${res.code()} ${res.message()} | body=$errorBody")
-        }
-        val r = res.body() ?: error("Group body null")
-        // 로컬 반영
-        db.withTransaction {
-            val (g, opts, refs) = r.toEntities()
-            groupDao.upsertGroups(listOf(g))
-            if (opts.isNotEmpty()) optionDao.upsertOptions(opts)
-            // 기존 매핑 정리 후 재삽입(그룹 하나만)
-            optionDao.deleteCrossRefsByGroup(r.id)
-            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
-        }
-        return Group(
-            id = r.id,
-            name = r.name,
-            description = r.description,
-            options = r.options ?: emptyList(),
-            members = emptyList(),
-            createdAt = r.createdAt,
-            updatedAt = r.updatedAt
-        )
-    }
+    suspend fun getGroup(id: Long): Group =
+        localGroup(id) ?: throw IllegalStateException("Group($id) not found locally")
 
     // ======================
     // 쓰기 API (성공 시 로컬 갱신)
@@ -306,19 +210,21 @@ class ContactBookRepository(context: Context) {
         if (!res.isSuccessful) {
             throw IllegalStateException("Failed to delete contact: HTTP ${res.code()} ${res.message()}")
         }
-        // ★ 로컬 반영
+        // 로컬 반영
         contactDao.deleteById(contactId)
     }
 
     suspend fun updateContactGroup(contactId: Long, groupId: Long) {
         val payload = mapOf("group_id" to groupId)
-        val response = contactApiService.updateContact(contactId, payload)
+        val response = api.updateContact(contactId, payload)
         if (!response.isSuccessful) {
             val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
             throw IllegalStateException(
                 "Update contact group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
             )
         }
+        // 로컬 반영
+        contactDao.updateGroupId(contactId, groupId)
     }
 
     suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
@@ -345,7 +251,7 @@ class ContactBookRepository(context: Context) {
         if (!res.isSuccessful) {
             throw IllegalStateException("Failed to delete group: HTTP ${res.code()} ${res.message()}")
         }
-        // ★ 로컬 반영 (crossRef는 FK onDelete에 따라 정리되지만, 안전하게 그룹만 지워도 OK)
+        // 로컬 반영 (crossRef는 FK onDelete에 따라 정리되지만, 안전하게 그룹만 지우기)
         groupDao.deleteById(groupId)
     }
 
@@ -357,7 +263,7 @@ class ContactBookRepository(context: Context) {
             throw IllegalStateException("Add prompt option failed: HTTP ${res.code()} ${res.message()} | body=$body")
         }
         val r = res.body() ?: error("Success but body null")
-        // ★ 로컬 반영 (옵션 테이블만)
+        // 로컬 반영 (옵션 테이블만)
         optionDao.upsertOptions(listOf(r.toEntity()))
         return r
     }
@@ -368,7 +274,7 @@ class ContactBookRepository(context: Context) {
             throw IllegalStateException("Failed to get all prompt options: HTTP ${res.code()} ${res.message()}")
         }
         val all = res.body().orEmpty()
-        // ★ 로컬 반영
+        // 로컬 반영
         optionDao.upsertOptions(all.map { it.toEntity() })
 
         val tone = all.filter { it.key == "tone" }

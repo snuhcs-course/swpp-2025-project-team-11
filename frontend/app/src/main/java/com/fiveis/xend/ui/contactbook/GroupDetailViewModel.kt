@@ -29,8 +29,7 @@ class GroupDetailViewModel(app: Application) : AndroidViewModel(app) {
     private var observeJob: Job? = null
 
     /**
-     * 화면 진입 시/탭 재선택 시 호출.
-     * - DB Flow를 구독해서 즉시 캐시 표시
+     * - DB Flow로 즉시 캐시 표시
      * - 동시에 서버에서 새로고침 → Room 갱신 → UI 자동 갱신
      */
     fun load(id: Long, force: Boolean = false) {
@@ -39,15 +38,15 @@ class GroupDetailViewModel(app: Application) : AndroidViewModel(app) {
 
         ui.update { it.copy(isLoading = true, error = null) }
 
-        // 1) DB Flow 구독
+        // 1) DB Flow
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             repo.observeGroup(id).collectLatest { group ->
-                ui.update { it.copy(group = group) } // null일 수 있으니 UI에서 처리
+                ui.update { it.copy(group = group) }
             }
         }
 
-        // 2) 서버 → DB 동기화 트리거
+        // 2) 서버 → DB 동기화
         viewModelScope.launch {
             try {
                 repo.refreshGroupAndMembers(id)

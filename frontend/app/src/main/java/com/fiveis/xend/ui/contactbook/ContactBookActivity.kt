@@ -2,6 +2,7 @@ package com.fiveis.xend.ui.contactbook
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -66,6 +67,7 @@ class ContactBookActivity : ComponentActivity() {
 
                 ContactBookScreen(
                     uiState = uiState,
+                    onRefresh = { viewModel.refreshAll() },
                     onTabSelected = viewModel::onTabSelected,
                     onGroupClick = { group ->
                         startActivity(
@@ -102,6 +104,12 @@ class ContactBookActivity : ComponentActivity() {
                         viewModel.onContactDelete(it.id)
                     }
                 )
+
+                LaunchedEffect(uiState.error) {
+                    uiState.error?.let {
+                        Toast.makeText(this@ContactBookActivity, it, Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
     }

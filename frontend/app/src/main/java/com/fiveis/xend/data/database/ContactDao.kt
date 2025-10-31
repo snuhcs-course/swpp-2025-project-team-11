@@ -21,11 +21,23 @@ interface ContactDao {
 
     @Transaction
     @Query("SELECT * FROM contacts")
-    fun observeAllWithContext(): Flow<List<ContactWithContext>>
+    suspend fun getAllWithContext(): List<ContactWithContext>
+
+    @Transaction
+    @Query("SELECT * FROM contacts WHERE id = :contactId")
+    suspend fun getContactWithContext(contactId: Long): ContactWithContext?
+
+    @Transaction
+    @Query("SELECT * FROM contacts WHERE id = :contactId")
+    suspend fun getByIdWithGroup(contactId: Long): ContactWithGroupAndContext?
 
     @Transaction
     @Query("SELECT * FROM contacts WHERE groupId = :groupId")
     suspend fun getContactsByGroupIdWithContext(groupId: Long): List<ContactWithContext>
+
+    @Transaction
+    @Query("SELECT * FROM contacts")
+    fun observeAllWithContext(): Flow<List<ContactWithContext>>
 
     @Transaction
     @Query("SELECT * FROM contacts WHERE groupId = :groupId")
@@ -33,7 +45,7 @@ interface ContactDao {
 
     @Transaction
     @Query("SELECT * FROM contacts WHERE id = :contactId")
-    suspend fun getContactWithContext(contactId: Long): ContactWithContext?
+    fun observeByIdWithGroup(contactId: Long): Flow<ContactWithGroupAndContext?>
 
     @Query("DELETE FROM contacts")
     suspend fun deleteAllContacts()
@@ -43,4 +55,7 @@ interface ContactDao {
 
     @Query("DELETE FROM contacts WHERE id = :contactId")
     suspend fun deleteById(contactId: Long)
+
+    @Query("UPDATE contacts SET groupId = :groupId WHERE id = :contactId")
+    suspend fun updateGroupId(contactId: Long, groupId: Long?)
 }
