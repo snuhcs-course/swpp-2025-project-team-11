@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 2,
-    "identityHash": "a50d51e27801f9cd685130e63600c61e",
+    "version": 3,
+    "identityHash": "a75eb16b8d30a718ed7be21224b42e0c",
     "entities": [
       {
         "tableName": "emails",
@@ -386,7 +386,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a50d51e27801f9cd685130e63600c61e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a75eb16b8d30a718ed7be21224b42e0c')"
     ]
   }
 }
