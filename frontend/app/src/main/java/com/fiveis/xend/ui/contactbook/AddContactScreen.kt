@@ -83,7 +83,8 @@ val senderRoleOptionExamples = listOf(
     "직장 부하 직원",
     "직장 동료",
     "직장 상사",
-    "친한 친구"
+    "친한 친구",
+    "새로운 친구"
 )
 
 val recipientRoleOptionExamples = listOf(
@@ -93,7 +94,8 @@ val recipientRoleOptionExamples = listOf(
     "직장 부하 직원",
     "직장 동료",
     "직장 상사",
-    "친한 친구"
+    "친한 친구",
+    "새로운 친구"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -451,11 +453,11 @@ fun AddContactScreen(
                                         focusedBorderColor = Purple60
                                     )
                                 )
+                            } else {
+                                Spacer(Modifier.weight(1f))
                             }
 
-                            if (senderMode == RoleInputMode.MANUAL && recipientMode == RoleInputMode.MANUAL) {
-                                Spacer(Modifier.width(12.dp))
-                            }
+                            Spacer(Modifier.width(12.dp))
 
                             if (recipientMode == RoleInputMode.MANUAL) {
                                 OutlinedTextField(
@@ -469,7 +471,7 @@ fun AddContactScreen(
                                         .height(48.dp),
                                     placeholder = {
                                         Text(
-                                            text = "상대방의 역할을 적어주세요",
+                                            text = "상대방 역할을 적어주세요",
                                             style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                                             color = Gray400
                                         )
@@ -483,6 +485,8 @@ fun AddContactScreen(
                                         focusedBorderColor = Purple60
                                     )
                                 )
+                            } else {
+                                Spacer(Modifier.weight(1f))
                             }
                         }
                     }
