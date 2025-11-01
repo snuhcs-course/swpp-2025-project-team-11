@@ -3,7 +3,6 @@ package com.fiveis.xend.ui.view
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.fiveis.xend.network.MailReplySseClient
 import com.fiveis.xend.network.ReplyOptionInfo
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -330,5 +329,4 @@ class ReplyComposeViewModelTest {
         assertFalse(viewModel.uiState.value.isStreaming)
         assertFalse(viewModel.uiState.value.isLoading)
     }
-
 }

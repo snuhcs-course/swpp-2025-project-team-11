@@ -1,7 +1,6 @@
 package com.fiveis.xend.network
 
 import android.content.Context
-import android.content.Intent
 import com.fiveis.xend.data.model.TokenRefreshRequest
 import com.fiveis.xend.data.model.TokenRefreshResponse
 import com.fiveis.xend.data.source.AuthApiService
@@ -10,7 +9,6 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
-import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
 import okhttp3.Request
