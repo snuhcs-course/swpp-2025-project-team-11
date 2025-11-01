@@ -847,68 +847,73 @@ private fun RichTextEditorCard(
     ) {
         Column {
             RichTextEditorControls(state = richTextState)
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 240.dp)
                     .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
             ) {
-                RichTextEditor(
-                    state = richTextState,
-                    enabled = !isStreaming,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = "내용을 입력하세요",
-                            style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                        )
-                    }
-                )
-
-                if (suggestionText.isNotEmpty()) {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = richTextState.annotatedString.text,
-                            style = MaterialTheme.typography.bodyLarge.copy(color = Color.Transparent),
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Text(
-                            text = suggestionText,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = TextSecondary.copy(alpha = 0.4f)
+                Box {
+                    RichTextEditor(
+                        state = richTextState,
+                        enabled = !isStreaming,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text(
+                                text = "내용을 입력하세요",
+                                style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
                             )
-                        )
+                        }
+                    )
+
+                    if (suggestionText.isNotEmpty()) {
+                        androidx.compose.material3.FloatingActionButton(
+                            onClick = onAcceptSuggestion,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp),
+                            containerColor = Blue60,
+                            contentColor = Color.White,
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "제안 수락",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "탭 완성",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
 
                 if (suggestionText.isNotEmpty()) {
-                    androidx.compose.material3.FloatingActionButton(
-                        onClick = onAcceptSuggestion,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(16.dp),
-                        containerColor = Blue60,
-                        contentColor = Color.White,
-                        shape = RoundedCornerShape(16.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = TextSecondary.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.2f))
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "제안 수락",
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "수락",
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            )
-                        }
+                        Text(
+                            text = suggestionText,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = TextSecondary.copy(alpha = 0.7f),
+                                fontStyle = FontStyle.Italic
+                            ),
+                            modifier = Modifier.padding(12.dp)
+                        )
                     }
                 }
             }
@@ -1110,10 +1115,13 @@ class MailComposeActivity : ComponentActivity() {
                                 // 다음 단어 하나만 가져오기
                                 val nextWord = composeVm.acceptNextWord()
                                 if (nextWord != null) {
-                                    val currentText = richTextState.toHtml()
-                                    // 현재 텍스트가 공백으로 끝나지 않으면 공백 추가
+                                    // RichTextState에 직접 텍스트 추가
+                                    val currentText = richTextState.annotatedString.text
                                     val separator = if (currentText.endsWith(" ") || currentText.isEmpty()) "" else " "
-                                    richTextState.setHtml(currentText + separator + nextWord)
+
+                                    // 기존 HTML + 새 단어를 조합
+                                    val currentHtml = richTextState.toHtml()
+                                    richTextState.setHtml(currentHtml + separator + nextWord)
                                 }
                             },
                             aiRealtime = aiRealtime,
