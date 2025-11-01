@@ -847,15 +847,17 @@ private fun RichTextEditorCard(
     ) {
         Column {
             RichTextEditorControls(state = richTextState)
-            Box {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 240.dp)
+                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
+            ) {
                 RichTextEditor(
                     state = richTextState,
                     enabled = !isStreaming,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 240.dp)
-                        .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
                             text = "내용을 입력하세요",
@@ -863,18 +865,23 @@ private fun RichTextEditorCard(
                         )
                     }
                 )
+
                 if (suggestionText.isNotEmpty()) {
-                    Text(
-                        text = suggestionText,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = TextSecondary.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier
-                            .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
-                    )
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = richTextState.annotatedString.text,
+                            style = MaterialTheme.typography.bodyLarge.copy(color = Color.Transparent),
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Text(
+                            text = suggestionText,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = TextSecondary.copy(alpha = 0.4f)
+                            )
+                        )
+                    }
                 }
 
-                // 제안 수락 플로팅 버튼
                 if (suggestionText.isNotEmpty()) {
                     androidx.compose.material3.FloatingActionButton(
                         onClick = onAcceptSuggestion,

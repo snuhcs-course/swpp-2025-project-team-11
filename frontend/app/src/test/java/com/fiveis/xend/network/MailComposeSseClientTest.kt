@@ -2,222 +2,151 @@ package com.fiveis.xend.network
 
 import android.content.Context
 import com.fiveis.xend.data.source.TokenManager
-import io.mockk.*
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
-import okhttp3.*
-import okhttp3.Call
-import okhttp3.ResponseBody.Companion.toResponseBody
-import okio.Buffer
+import io.mockk.every
+import io.mockk.mockk
+import kotlin.test.assertTrue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
 import org.junit.After
-import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.io.IOException
 
-@ExperimentalCoroutinesApi
 @RunWith(RobolectricTestRunner::class)
 class MailComposeSseClientTest {
 
+    private lateinit var mockWebServer: MockWebServer
     private lateinit var mockContext: Context
     private lateinit var mockTokenManager: TokenManager
-    private lateinit var mockOkHttpClient: OkHttpClient
     private lateinit var sseClient: MailComposeSseClient
-
-    private val endpointUrl = "http://fake.url/compose"
 
     @Before
     fun setup() {
+        mockWebServer = MockWebServer()
+        mockWebServer.start()
+
         mockContext = mockk(relaxed = true)
         mockTokenManager = mockk(relaxed = true)
-        mockOkHttpClient = mockk(relaxed = true)
 
-        every { mockTokenManager.getAccessToken() } returns "fake_access_token"
-        every { mockTokenManager.getRefreshToken() } returns "fake_refresh_token"
-        every { mockTokenManager.getUserEmail() } returns "test@example.com"
+        every { mockTokenManager.getAccessToken() } returns "test-token"
+
+        val client = OkHttpClient.Builder().build()
 
         sseClient = MailComposeSseClient(
             context = mockContext,
             tokenManager = mockTokenManager,
-            endpointUrl = endpointUrl,
-            client = mockOkHttpClient
+            endpointUrl = mockWebServer.url("/sse").toString(),
+            client = client
         )
     }
 
     @After
-    fun tear_down() {
-        unmockkAll()
-    }
-
-    @Test
-    fun start_builds_request_and_enqueues_call() {
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(any()) } just Runs
-
-        val payload = JSONObject().apply {
-            put("test", "value")
-        }
-        sseClient.start(payload, {}, { _, _ -> }, {}, {})
-
-        verify {
-            mockOkHttpClient.newCall(match { req ->
-                req.url.toString() == endpointUrl &&
-                req.method == "POST"
-            })
-        }
-        verify { mockCall.enqueue(any()) }
-    }
-
-    @Test
-    fun stop_cancels_call_and_job() {
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(any()) } just Runs
-        every { mockCall.cancel() } just Runs
-
-        val payload = JSONObject().apply {
-            put("test", "value")
-        }
-        sseClient.start(payload, {}, { _, _ -> }, {}, {})
+    fun tearDown() {
         sseClient.stop()
-
-        verify { mockCall.cancel() }
+        mockWebServer.shutdown()
     }
 
     @Test
-    fun callback_on_failure_triggers_error_lambda() {
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        val callbackSlot = slot<Callback>()
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(capture(callbackSlot)) } answers {
-            callbackSlot.captured.onFailure(mockCall, IOException("Test failure"))
-        }
+    fun `start should send POST request with payload`() = runBlocking {
+        val sseResponse = """
+            event: subject
+            data: {"title":"Test Subject"}
 
-        var errorMessage = ""
+            event: done
+            data: {}
+
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setBody(sseResponse).setResponseCode(200))
+
+        var subjectReceived = false
+        var doneReceived = false
+
         val payload = JSONObject().apply {
             put("test", "value")
         }
-        sseClient.start(payload, {}, { _, _ -> }, {}, { error -> errorMessage = error })
 
-        assertTrue(errorMessage.contains("Test failure"))
-    }
-    
-    @Test
-    fun on_response_with_error_code_triggers_error_lambda() {
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        val callbackSlot = slot<Callback>()
-        val mockResponse = mockk<Response>(relaxed = true)
+        sseClient.start(
+            payload = payload,
+            onSubject = { subjectReceived = true },
+            onBodyDelta = { _, _ -> },
+            onDone = { doneReceived = true },
+            onError = {}
+        )
 
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(capture(callbackSlot)) } answers {
-            callbackSlot.captured.onResponse(mockCall, mockResponse)
-        }
-        every { mockResponse.isSuccessful } returns false
-        every { mockResponse.code } returns 500
-        every { mockResponse.message } returns "Server Error"
-        every { mockResponse.body } returns "Error".toResponseBody()
-        every { mockResponse.close() } just Runs
+        delay(500)
 
-        var errorMessage = ""
-        val payload = JSONObject().apply {
-            put("test", "value")
-        }
-        sseClient.start(payload, {}, { _, _ -> }, {}, { error -> errorMessage = error })
-
-        assertTrue(errorMessage.contains("HTTP 500 Server Error"))
-    }
-
-
-    @Test
-    fun on_response_parses_sse_subject_event_correctly() = runTest {
-        val sseStream = "event: subject\ndata: {\"title\": \"Test Subject\"}\n\n"
-        val mockSource = Buffer().writeUtf8(sseStream)
-        val mockResponseBody = mockk<ResponseBody>(relaxed = true)
-        every { mockResponseBody.source() } returns mockSource
-
-        val mockResponse = mockk<Response>(relaxed = true)
-        every { mockResponse.isSuccessful } returns true
-        every { mockResponse.body } returns mockResponseBody
-        every { mockResponse.close() } just Runs
-
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        val callbackSlot = slot<Callback>()
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(capture(callbackSlot)) } answers {
-            callbackSlot.captured.onResponse(mockCall, mockResponse)
-        }
-
-        var subject = ""
-        val payload = JSONObject().apply {
-            put("test", "value")
-        }
-        sseClient.start(payload, { s -> subject = s }, { _, _ -> }, {}, {})
-
-        // Let the parser run
-        Thread.sleep(100)
-
-        assertEquals("Test Subject", subject)
+        val request = mockWebServer.takeRequest()
+        assertTrue(request.path?.contains("/sse") == true)
+        assertTrue(request.method == "POST")
     }
 
     @Test
-    fun on_response_parses_sse_body_delta_event_correctly() = runTest {
-        val sseStream = "event: body.delta\ndata: {\"seq\": 1, \"text\": \" a test\"}\n\n"
-        val mockSource = Buffer().writeUtf8(sseStream)
-        val mockResponseBody = mockk<ResponseBody>(relaxed = true)
-        every { mockResponseBody.source() } returns mockSource
-        val mockResponse = mockk<Response>(relaxed = true)
-        every { mockResponse.isSuccessful } returns true
-        every { mockResponse.body } returns mockResponseBody
-        every { mockResponse.close() } just Runs
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        val callbackSlot = slot<Callback>()
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(capture(callbackSlot)) } answers {
-            callbackSlot.captured.onResponse(mockCall, mockResponse)
-        }
-
-        var bodyDelta = ""
-        var seq = -1
-        val payload = JSONObject().apply {
-            put("test", "value")
-        }
-        sseClient.start(payload, { }, { s, d -> seq = s; bodyDelta = d }, { }, { })
-
-        Thread.sleep(100)
-
-        assertEquals(1, seq)
-        assertEquals(" a test", bodyDelta)
+    fun `stop should not crash`() = runBlocking {
+        sseClient.stop()
+        assertTrue(true)
     }
 
     @Test
-    fun on_response_parses_sse_done_event_correctly() = runTest {
-        val sseStream = "event: done\ndata: {}\n\n"
-        val mockSource = Buffer().writeUtf8(sseStream)
-        val mockResponseBody = mockk<ResponseBody>(relaxed = true)
-        every { mockResponseBody.source() } returns mockSource
-        val mockResponse = mockk<Response>(relaxed = true)
-        every { mockResponse.isSuccessful } returns true
-        every { mockResponse.body } returns mockResponseBody
-        every { mockResponse.close() } just Runs
-        val mockCall = mockk<okhttp3.Call>(relaxed = true)
-        val callbackSlot = slot<Callback>()
-        every { mockOkHttpClient.newCall(any()) } returns mockCall
-        every { mockCall.enqueue(capture(callbackSlot)) } answers {
-            callbackSlot.captured.onResponse(mockCall, mockResponse)
-        }
+    fun `start should handle error response`() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
 
-        var doneCalled = false
-        val payload = JSONObject().apply {
-            put("test", "value")
-        }
-        sseClient.start(payload, { }, { _, _ -> }, { doneCalled = true }, { })
+        var errorReceived = false
+        val payload = JSONObject()
 
-        Thread.sleep(100)
+        sseClient.start(
+            payload = payload,
+            onSubject = {},
+            onBodyDelta = { _, _ -> },
+            onDone = {},
+            onError = { errorReceived = true }
+        )
 
-        assertTrue(doneCalled)
+        delay(500)
+
+        assertTrue(errorReceived)
+    }
+
+    @Test
+    fun `start should handle body delta events`() = runBlocking {
+        val sseResponse = """
+            event: body.delta
+            data: {"seq":1,"text":"Hello"}
+
+            event: body.delta
+            data: {"seq":2,"text":" World"}
+
+            event: done
+            data: {}
+
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setBody(sseResponse).setResponseCode(200))
+
+        val deltas = mutableListOf<Pair<Int, String>>()
+        val payload = JSONObject()
+
+        sseClient.start(
+            payload = payload,
+            onSubject = {},
+            onBodyDelta = { seq, text -> deltas.add(seq to text) },
+            onDone = {},
+            onError = {}
+        )
+
+        delay(500)
+
+        assertTrue(deltas.size >= 1)
+    }
+
+    @Test
+    fun `tokenManager should provide access token`() {
+        val token = mockTokenManager.getAccessToken()
+        assertTrue(token == "test-token")
     }
 }

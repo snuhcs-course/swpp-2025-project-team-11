@@ -1,107 +1,202 @@
 package com.fiveis.xend.network
 
 import android.content.Context
+import com.fiveis.xend.data.model.TokenRefreshRequest
 import com.fiveis.xend.data.model.TokenRefreshResponse
+import com.fiveis.xend.data.source.AuthApiService
 import com.fiveis.xend.data.source.TokenManager
-import io.mockk.*
-import kotlinx.coroutines.runBlocking
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkAll
+import io.mockk.verify
 import okhttp3.Request
 import okhttp3.Response
-import okhttp3.Route
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import retrofit2.Response as RetrofitResponse
 
-@RunWith(RobolectricTestRunner::class)
 class TokenRefreshAuthenticatorTest {
 
-    private lateinit var mockContext: Context
-    private lateinit var mockTokenManager: TokenManager
+    private lateinit var context: Context
+    private lateinit var tokenManager: TokenManager
     private lateinit var authenticator: TokenRefreshAuthenticator
+    private lateinit var authApiService: AuthApiService
 
     @Before
     fun setup() {
-        mockContext = mockk(relaxed = true)
-        mockTokenManager = mockk(relaxed = true)
-        authenticator = TokenRefreshAuthenticator(mockContext, mockTokenManager)
+        context = mockk(relaxed = true)
+        tokenManager = mockk(relaxed = true)
+        authApiService = mockk()
+
+        mockkObject(RetrofitClient)
+        every { RetrofitClient.authApiService } returns authApiService
+
+        authenticator = TokenRefreshAuthenticator(context, tokenManager)
     }
 
     @After
-    fun tear_down() {
+    fun tearDown() {
         unmockkAll()
     }
 
     @Test
-    fun authenticate_returns_null_when_no_refresh_token() {
-        every { mockTokenManager.getRefreshToken() } returns null
+    fun authenticate_with_valid_refresh_token_returns_new_request() {
+        val refreshToken = "valid_refresh_token"
+        val newAccessToken = "new_access_token"
+        val newRefreshToken = "new_refresh_token"
+        val userEmail = "test@example.com"
 
-        val mockResponse = mockk<Response>(relaxed = true)
-        val mockRoute = mockk<Route>(relaxed = true)
+        every { tokenManager.getRefreshToken() } returns refreshToken
+        every { tokenManager.getUserEmail() } returns userEmail
+        every { tokenManager.saveTokens(any(), any(), any()) } returns Unit
 
-        val result = authenticator.authenticate(mockRoute, mockResponse)
+        coEvery {
+            authApiService.refreshToken(TokenRefreshRequest(refreshToken))
+        } returns RetrofitResponse.success(
+            TokenRefreshResponse(accessToken = newAccessToken, refreshToken = newRefreshToken)
+        )
 
-        assertNull(result)
+        val originalRequest = Request.Builder()
+            .url("https://example.com/api/test")
+            .build()
+        val response = Response.Builder()
+            .request(originalRequest)
+            .protocol(okhttp3.Protocol.HTTP_1_1)
+            .code(401)
+            .message("Unauthorized")
+            .body("".toResponseBody())
+            .build()
+
+        val newRequest = authenticator.authenticate(null, response)
+
+        assertNotNull(newRequest)
+        assertEquals("Bearer $newAccessToken", newRequest?.header("Authorization"))
+        verify { tokenManager.saveTokens(newAccessToken, newRefreshToken, userEmail) }
     }
 
     @Test
-    fun authenticate_returns_null_when_refresh_token_exists_but_no_email() = runBlocking {
-        every { mockTokenManager.getRefreshToken() } returns "refresh-token"
-        every { mockTokenManager.getUserEmail() } returns null
+    fun authenticate_with_legacy_token_format_returns_new_request() {
+        val refreshToken = "valid_refresh_token"
+        val newAccessToken = "new_access_token"
+        val newRefreshToken = "new_refresh_token"
+        val userEmail = "test@example.com"
 
-        mockkObject(RetrofitClient)
-        val mockAuthService = mockk<com.fiveis.xend.data.source.AuthApiService>(relaxed = true)
-        every { RetrofitClient.authApiService } returns mockAuthService
+        every { tokenManager.getRefreshToken() } returns refreshToken
+        every { tokenManager.getUserEmail() } returns userEmail
+        every { tokenManager.saveTokens(any(), any(), any()) } returns Unit
 
-        val mockRetrofitResponse = mockk<RetrofitResponse<TokenRefreshResponse>>(relaxed = true)
-        every { mockRetrofitResponse.isSuccessful } returns true
-        every { mockRetrofitResponse.body() } returns TokenRefreshResponse("new-access", "new-refresh")
-        coEvery { mockAuthService.refreshToken(any()) } returns mockRetrofitResponse
+        coEvery {
+            authApiService.refreshToken(TokenRefreshRequest(refreshToken))
+        } returns RetrofitResponse.success(
+            TokenRefreshResponse(accessToken = newAccessToken, refreshToken = newRefreshToken)
+        )
 
-        val mockResponse = mockk<Response>(relaxed = true)
-        val mockRequest = mockk<Request>(relaxed = true)
-        every { mockResponse.request } returns mockRequest
-        every { mockRequest.newBuilder() } returns mockk(relaxed = true) {
-            every { header(any(), any()) } returns this
-            every { build() } returns mockk(relaxed = true)
-        }
+        val originalRequest = Request.Builder()
+            .url("https://example.com/api/test")
+            .build()
+        val response = Response.Builder()
+            .request(originalRequest)
+            .protocol(okhttp3.Protocol.HTTP_1_1)
+            .code(401)
+            .message("Unauthorized")
+            .body("".toResponseBody())
+            .build()
 
-        val mockRoute = mockk<Route>(relaxed = true)
+        val newRequest = authenticator.authenticate(null, response)
 
-        // This will fail because getUserEmail returns null
-        val result = try {
-            authenticator.authenticate(mockRoute, mockResponse)
-        } catch (e: Exception) {
-            null
-        }
-
-        // When email is null, saveTokens will throw NPE, resulting in null
-        assertTrue(result == null || result != null)
+        assertNotNull(newRequest)
+        assertEquals("Bearer $newAccessToken", newRequest?.header("Authorization"))
     }
 
     @Test
-    fun authenticate_clears_tokens_on_refresh_failure() = runBlocking {
-        every { mockTokenManager.getRefreshToken() } returns "refresh-token"
-        every { mockTokenManager.clearTokens() } just Runs
+    fun authenticate_with_null_refresh_token_returns_null() {
+        every { tokenManager.getRefreshToken() } returns null
 
-        mockkObject(RetrofitClient)
-        val mockAuthService = mockk<com.fiveis.xend.data.source.AuthApiService>(relaxed = true)
-        every { RetrofitClient.authApiService } returns mockAuthService
+        val originalRequest = Request.Builder()
+            .url("https://example.com/api/test")
+            .build()
+        val response = Response.Builder()
+            .request(originalRequest)
+            .protocol(okhttp3.Protocol.HTTP_1_1)
+            .code(401)
+            .message("Unauthorized")
+            .body("".toResponseBody())
+            .build()
 
-        val mockRetrofitResponse = mockk<RetrofitResponse<TokenRefreshResponse>>(relaxed = true)
-        every { mockRetrofitResponse.isSuccessful } returns false
-        coEvery { mockAuthService.refreshToken(any()) } returns mockRetrofitResponse
+        val newRequest = authenticator.authenticate(null, response)
 
-        val mockResponse = mockk<Response>(relaxed = true)
-        val mockRoute = mockk<Route>(relaxed = true)
+        assertNull(newRequest)
+    }
 
-        val result = authenticator.authenticate(mockRoute, mockResponse)
+    @Test
+    fun authenticate_with_failed_token_refresh_clears_tokens_and_returns_null() {
+        val refreshToken = "invalid_refresh_token"
 
-        assertNull(result)
-        verify { mockTokenManager.clearTokens() }
-        verify { mockContext.startActivity(any()) }
+        every { tokenManager.getRefreshToken() } returns refreshToken
+        every { tokenManager.clearTokens() } returns Unit
+
+        coEvery {
+            authApiService.refreshToken(TokenRefreshRequest(refreshToken))
+        } returns RetrofitResponse.error(
+            401,
+            "Invalid refresh token".toResponseBody()
+        )
+
+        every { context.startActivity(any()) } returns Unit
+
+        val originalRequest = Request.Builder()
+            .url("https://example.com/api/test")
+            .build()
+        val response = Response.Builder()
+            .request(originalRequest)
+            .protocol(okhttp3.Protocol.HTTP_1_1)
+            .code(401)
+            .message("Unauthorized")
+            .body("".toResponseBody())
+            .build()
+
+        val newRequest = authenticator.authenticate(null, response)
+
+        assertNull(newRequest)
+        verify { tokenManager.clearTokens() }
+        verify { context.startActivity(any()) }
+    }
+
+    @Test
+    fun authenticate_with_null_response_body_clears_tokens() {
+        val refreshToken = "refresh_token"
+
+        every { tokenManager.getRefreshToken() } returns refreshToken
+        every { tokenManager.clearTokens() } returns Unit
+
+        coEvery {
+            authApiService.refreshToken(TokenRefreshRequest(refreshToken))
+        } returns RetrofitResponse.success(null)
+
+        every { context.startActivity(any()) } returns Unit
+
+        val originalRequest = Request.Builder()
+            .url("https://example.com/api/test")
+            .build()
+        val response = Response.Builder()
+            .request(originalRequest)
+            .protocol(okhttp3.Protocol.HTTP_1_1)
+            .code(401)
+            .message("Unauthorized")
+            .body("".toResponseBody())
+            .build()
+
+        val newRequest = authenticator.authenticate(null, response)
+
+        assertNull(newRequest)
+        verify { tokenManager.clearTokens() }
+        verify { context.startActivity(any()) }
     }
 }
