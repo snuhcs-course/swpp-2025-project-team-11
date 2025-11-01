@@ -12,8 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.fiveis.xend.data.database.AppDatabase
-import com.fiveis.xend.data.repository.InboxRepository
-import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.theme.XendTheme
 
 class MailDetailActivity : ComponentActivity() {
@@ -45,7 +43,7 @@ class MailDetailActivity : ComponentActivity() {
                     onReply = {
                         uiState.mail?.let { mail ->
                             val intent = Intent(this@MailDetailActivity, ReplyComposeActivity::class.java).apply {
-                                putExtra("sender_email", mail.from_email)
+                                putExtra("sender_email", mail.fromEmail)
                                 putExtra("date", mail.date)
                                 putExtra("subject", addReplyPrefix(mail.subject))
                                 putExtra("body", mail.body)
@@ -66,10 +64,8 @@ class MailDetailViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MailDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            val mailApiService = RetrofitClient.getMailApiService(context)
             val database = AppDatabase.getDatabase(context)
-            val repository = InboxRepository(mailApiService, database.emailDao())
-            return MailDetailViewModel(repository, messageId) as T
+            return MailDetailViewModel(database.emailDao(), messageId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

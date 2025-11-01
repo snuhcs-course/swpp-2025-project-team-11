@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 2,
-    "identityHash": "a50d51e27801f9cd685130e63600c61e",
+    "version": 3,
+    "identityHash": "a75eb16b8d30a718ed7be21224b42e0c",
     "entities": [
       {
         "tableName": "emails",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `threadId` TEXT NOT NULL, `subject` TEXT NOT NULL, `fromEmail` TEXT NOT NULL, `snippet` TEXT NOT NULL, `date` TEXT NOT NULL, `dateRaw` TEXT NOT NULL, `isUnread` INTEGER NOT NULL, `labelIds` TEXT NOT NULL, `body` TEXT NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `threadId` TEXT NOT NULL, `subject` TEXT NOT NULL, `fromEmail` TEXT NOT NULL, `snippet` TEXT NOT NULL, `date` TEXT NOT NULL, `dateRaw` TEXT NOT NULL, `isUnread` INTEGER NOT NULL, `labelIds` TEXT NOT NULL, `body` TEXT NOT NULL DEFAULT '', `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -66,7 +66,8 @@
             "fieldPath": "body",
             "columnName": "body",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "cachedAt",
@@ -385,7 +386,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a50d51e27801f9cd685130e63600c61e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a75eb16b8d30a718ed7be21224b42e0c')"
     ]
   }
 }

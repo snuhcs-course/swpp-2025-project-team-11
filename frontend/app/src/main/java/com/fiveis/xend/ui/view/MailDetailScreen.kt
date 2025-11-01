@@ -50,7 +50,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.ui.theme.BackgroundWhite
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
@@ -196,7 +195,7 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun MailDetailContent(mail: com.fiveis.xend.data.model.MailDetailResponse) {
+private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -207,7 +206,7 @@ private fun MailDetailContent(mail: com.fiveis.xend.data.model.MailDetailRespons
     ) {
         // A. 발신자 정보 섹션
         SenderInfoSection(
-            senderEmail = mail.from_email,
+            senderEmail = mail.fromEmail,
             date = mail.date
         )
         HorizontalDivider(
@@ -421,14 +420,16 @@ private fun parseSenderEmail(senderEmail: String): Pair<String, String> {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun MailDetailScreenPreview() {
-    val sampleMail = MailDetailResponse(
+    val sampleMail = com.fiveis.xend.data.model.EmailItem(
         id = "1",
-        thread_id = "thread_1",
+        threadId = "thread_1",
         subject = "Re: Q4 실적 보고서 검토 부탁드립니다",
-        from_email = "김대표 (대표이사) <kim@company.com>",
-        to = "recipient@example.com",
+        fromEmail = "김대표 (대표이사) <kim@company.com>",
+        snippet = "첨부된 Q4 실적 보고서를 검토해 주시고...",
         date = "2024.12.19 오전 9:30",
-        date_raw = "2024-12-19T09:30:00Z",
+        dateRaw = "2024-12-19T09:30:00Z",
+        isUnread = false,
+        labelIds = listOf("INBOX"),
         body = """
             첨부된 Q4 실적 보고서를 검토해 주시고, 내일 오전 10시 정영진 회의에서 발표할 예정이니 오늘 오후 6시까지 피드백 부탁드립니다.
 
@@ -438,10 +439,7 @@ private fun MailDetailScreenPreview() {
             • 내년도 목표 설정
 
             감사합니다.
-        """.trimIndent(),
-        snippet = "첨부된 Q4 실적 보고서를 검토해 주시고...",
-        is_unread = false,
-        label_ids = listOf("INBOX")
+        """.trimIndent()
     )
 
     val uiState = MailDetailUiState(

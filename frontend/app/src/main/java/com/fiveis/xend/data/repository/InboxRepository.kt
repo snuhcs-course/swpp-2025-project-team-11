@@ -7,7 +7,6 @@ import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.network.MailApiService
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
 import retrofit2.Response
 
 class InboxRepository(
@@ -23,20 +22,21 @@ class InboxRepository(
     suspend fun getMails(
         labels: String? = "INBOX",
         maxResults: Int? = 20,
-        pageToken: String? = null
+        pageToken: String? = null,
+        sinceDate: String? = null
     ): Response<MailListResponse> {
-        return mailApiService.getEmails(labels, maxResults, pageToken)
+        return mailApiService.getEmails(labels, maxResults, pageToken, sinceDate)
     }
 
     suspend fun refreshEmails(labels: String? = "INBOX", maxResults: Int? = 20): Result<String?> {
         return try {
-            val existingEmails = emailDao.getAllEmails().firstOrNull() ?: emptyList()
-            val existingEmailIds = existingEmails.map { it.id }.toSet()
+            // 가장 최신 메일의 날짜 가져오기
+            val latestDate = emailDao.getLatestEmailDate()
 
-            // DB가 비어있으면 첫 페이지만 가져오기
-            if (existingEmailIds.isEmpty()) {
+            if (latestDate == null) {
+                // DB가 비어있으면 첫 페이지만 가져오기
                 Log.d("InboxRepository", "DB is empty, fetching first page")
-                val response = mailApiService.getEmails(labels, maxResults, null)
+                val response = mailApiService.getEmails(labels, maxResults, null, null)
                 Log.d("InboxRepository", "API response: isSuccessful=${response.isSuccessful}, code=${response.code()}")
 
                 if (response.isSuccessful) {
@@ -66,60 +66,35 @@ class InboxRepository(
                 }
             }
 
-            // DB에 메일이 있으면 겹치는 메일이 나올 때까지 가져오기
-            Log.d("InboxRepository", "DB has ${existingEmailIds.size} existing emails, fetching new ones")
-            val allNewEmails = mutableListOf<EmailItem>()
-            var pageToken: String? = null
-            var lastNextPageToken: String? = null
-            var hasOverlap = false
+            // DB에 메일이 있으면 since_date를 사용해서 최신 메일만 가져오기
+            Log.d("InboxRepository", "Fetching new emails since: $latestDate")
+            val response = mailApiService.getEmails(labels, maxResults, null, latestDate)
 
-            while (!hasOverlap) {
-                val response = mailApiService.getEmails(labels, maxResults, pageToken)
-                if (!response.isSuccessful) {
-                    Log.e("InboxRepository", "API request failed with code: ${response.code()}")
-                    return Result.failure(Exception("Failed to fetch emails: ${response.code()}"))
-                }
-
-                val mailListResponse = response.body()
-                if (mailListResponse == null) {
-                    Log.w("InboxRepository", "Response body is null, breaking loop")
-                    break
-                }
-
-                val fetchedEmails = mailListResponse.messages
-
-                if (fetchedEmails.isEmpty()) {
-                    Log.d("InboxRepository", "No more emails to fetch")
-                    break
-                }
-
-                val newEmailsInBatch = fetchedEmails.filter { it.id !in existingEmailIds }
-                allNewEmails.addAll(newEmailsInBatch)
-                Log.d("InboxRepository", "Found ${newEmailsInBatch.size} new emails in this batch")
-
-                if (newEmailsInBatch.size < fetchedEmails.size) {
-                    hasOverlap = true
-                }
-
-                lastNextPageToken = mailListResponse.nextPageToken
-                pageToken = lastNextPageToken
-                if (pageToken == null) {
-                    Log.d("InboxRepository", "No more pages to fetch")
-                    break
-                }
+            if (!response.isSuccessful) {
+                Log.e("InboxRepository", "API request failed with code: ${response.code()}")
+                return Result.failure(Exception("Failed to fetch emails: ${response.code()}"))
             }
 
-            if (allNewEmails.isNotEmpty()) {
-                emailDao.insertEmails(allNewEmails)
+            val mailListResponse = response.body()
+            if (mailListResponse == null) {
+                Log.w("InboxRepository", "Response body is null")
+                return Result.failure(Exception("Response body is null"))
+            }
+
+            val newEmails = mailListResponse.messages
+            Log.d("InboxRepository", "Received ${newEmails.size} new emails")
+
+            if (newEmails.isNotEmpty()) {
+                emailDao.insertEmails(newEmails)
                 val count = emailDao.getEmailCount()
-                Log.d("InboxRepository", "Successfully inserted ${allNewEmails.size} new emails into DB")
+                Log.d("InboxRepository", "Successfully inserted ${newEmails.size} new emails into DB")
                 Log.d("InboxRepository", "Total emails in DB: $count")
             } else {
                 Log.d("InboxRepository", "No new emails to insert")
             }
 
-            Log.d("InboxRepository", "nextPageToken after refresh: $lastNextPageToken")
-            Result.success(lastNextPageToken)
+            Log.d("InboxRepository", "nextPageToken after refresh: ${mailListResponse.nextPageToken}")
+            Result.success(mailListResponse.nextPageToken)
         } catch (e: Exception) {
             Log.e("InboxRepository", "Exception during refreshEmails", e)
             Result.failure(e)

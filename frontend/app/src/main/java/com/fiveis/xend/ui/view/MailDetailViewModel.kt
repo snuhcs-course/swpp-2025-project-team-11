@@ -1,9 +1,10 @@
 package com.fiveis.xend.ui.view
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.fiveis.xend.data.model.MailDetailResponse
-import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.model.EmailItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,13 +12,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class MailDetailUiState(
-    val mail: MailDetailResponse? = null,
+    val mail: EmailItem? = null,
     val isLoading: Boolean = false,
     val error: String? = null
 )
 
 class MailDetailViewModel(
-    private val repository: InboxRepository,
+    private val emailDao: EmailDao,
     private val messageId: String
 ) : ViewModel() {
 
@@ -32,18 +33,22 @@ class MailDetailViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val response = repository.getMail(messageId)
-                if (response.isSuccessful) {
+                Log.d("MailDetailViewModel", "Loading mail from DB: $messageId")
+                val email = emailDao.getEmailById(messageId)
+                if (email != null) {
+                    Log.d("MailDetailViewModel", "Email loaded from DB successfully")
                     _uiState.update {
                         it.copy(
-                            mail = response.body(),
+                            mail = email,
                             isLoading = false
                         )
                     }
                 } else {
-                    _uiState.update { it.copy(error = "Failed to load mail", isLoading = false) }
+                    Log.e("MailDetailViewModel", "Email not found in DB")
+                    _uiState.update { it.copy(error = "Email not found", isLoading = false) }
                 }
             } catch (e: Exception) {
+                Log.e("MailDetailViewModel", "Error loading email from DB", e)
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }

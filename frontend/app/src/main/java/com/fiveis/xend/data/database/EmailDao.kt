@@ -33,6 +33,9 @@ interface EmailDao {
     @Query("SELECT COUNT(*) FROM emails")
     suspend fun getEmailCount(): Int
 
+    @Query("SELECT dateRaw FROM emails ORDER BY dateRaw DESC LIMIT 1")
+    suspend fun getLatestEmailDate(): String?
+
     @Query(
         """
         SELECT * FROM emails

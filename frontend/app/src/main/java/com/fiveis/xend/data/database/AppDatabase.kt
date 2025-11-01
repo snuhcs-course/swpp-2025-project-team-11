@@ -1,7 +1,6 @@
 package com.fiveis.xend.data.database
 
 import android.content.Context
-import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -15,7 +14,7 @@ import com.fiveis.xend.data.model.EmailItem
 
 /**
  * v1 -> v2: Contact/Group 관련 테이블 추가
- * 테이블 추가만 있으므로 AutoMigration
+ * v2 -> v3: EmailItem에 body 필드 추가
  */
 @Database(
     entities = [
@@ -26,9 +25,8 @@ import com.fiveis.xend.data.model.EmailItem
         PromptOptionEntity::class,
         GroupPromptOptionCrossRef::class
     ],
-    version = 2,
-    exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)]
+    version = 3,
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -48,7 +46,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "xend_database"
                 )
-//                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration()
                     .build()
                 instance = newInstance
                 newInstance
