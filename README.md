@@ -19,11 +19,18 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ## Features
 
-- **Streaming Draft Generation**: First sentence appears quickly; content streams until completion.
-- **Relationship-Aware Tone**: Select **Group** (e.g., Manager/Clients) and **Tone** (e.g., Polite/Formal) and see rules applied.
-- **Saved Templates**: Apply a frequently used template (e.g., “Weekly Report”) to prefill structure.
-- **Inline Reply Options**: Positive / Neutral / Firm candidates shown inline; insert with a tap.
-- **Attachment-Aware Reply (mocked)**: If a PDF is attached, the reply references summarized key points.
+### Iteration 3 (Current)
+- **Real-time AI Suggestions**: Live text completion as you type with WebSocket streaming
+- **Smart Reply Options**: Generate multiple reply styles (positive/neutral/firm) with SSE streaming
+- **Contact & Group Management**: Organize contacts by groups with personalized AI prompts
+- **Offline-First Architecture**: Local database caching with incremental sync
+- **Rich Text Editing**: Full formatting support (bold, italic, underline, colors, font sizes)
+- **Template System**: Save and reuse frequently used email templates
+
+### Previous Iterations
+- **Streaming Draft Generation**: First sentence appears quickly; content streams until completion
+- **Relationship-Aware Tone**: Select **Group** (e.g., Manager/Clients) and **Tone** (e.g., Polite/Formal) and see rules applied
+- **Inline Reply Options**: Positive / Neutral / Firm candidates shown inline; insert with a tap
 
 ---
 
@@ -36,49 +43,73 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ### Installation
 
-> **Branch**: `iteration-1-demo`
+#### For Iteration 3 Demo
 
-```
+> **Branch**: `iteration-3-demo`
+
+```bash
 git clone https://github.com/snuhcs-course/swpp-2025-project-team-11.git
 cd swpp-2025-project-team-11
+git switch iteration-3-demo
+```
+
+**Backend Setup**
+```bash
+cd backend
+cp .env.example .env   # Configure environment variables
+poetry install
+python manage.py migrate
+python manage.py runserver
+```
+
+**GPU Server Setup** (Optional, for AI features)
+```bash
+cd gpu-server
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+**Android App Setup**
+1. Open `/frontend` in Android Studio
+2. Create `local.properties` with:
+   ```properties
+   sdk.dir=/path/to/Android/sdk
+   base.url=https://your-backend-url.com
+   ws.url=wss://your-backend-url.com/ws/ai/mail/
+   ```
+3. Sync Gradle
+4. Select an emulator/device (e.g., Pixel 7, API 34)
+5. Run the app (Debug)
+
+#### For Iteration 1 Demo (Legacy)
+
+> **Branch**: `iteration-1-demo`
+
+```bash
 git switch iteration-1-demo
-cp .env.example .env   # keep defaults to use mocked external services for the demo
-```
-
-Backend (Docker + Poetry inside containers)
-Backend runs via Docker Compose (includes nginx).
-
-# Build & start
-```
+cp .env.example .env
 docker compose up -d --build
-```
-
-
-# Stop
-```
-docker compose down
 ```
 
 Default URL: http://localhost/
 
-Android App
-Open /frontend in Android Studio
+## What Iteration 3 Demonstrates
 
-Sync Gradle
+### Core Features
+- **Gmail Integration**: OAuth 2.0 authentication and inbox synchronization
+- **Real-time AI Composition**: Live text suggestions as you type via WebSocket
+- **Smart Reply Generation**: Multiple reply options (positive/neutral/firm) via SSE streaming
+- **Contact Management**: Organize contacts by groups with custom AI prompts
+- **Offline-First**: Local database caching with background sync
+- **Rich Text Editor**: Full formatting toolbar with HTML support
 
-Select an emulator/device (e.g., Pixel 7, API 34)
+### Technical Highlights
+- **Incremental Sync**: Only fetch new emails since last update
+- **Streaming Responses**: SSE/WebSocket for real-time AI feedback
+- **Database Migrations**: Safe schema updates without data loss (v1→v2→v3)
+- **JSON Parsing**: Clean extraction of AI responses from markdown code blocks
 
-Run the app (Debug)
+## Demo Videos
 
-## What This Demo Demonstrates
-- **Google Sign-In**  
-  Sign in with Google to authenticate the user.
-
-- **AI Email Generation**  
-  Generate an email draft using the AI endpoint.
-
-- **Send Email**  
-  Send the composed AI draft through the backend to the mail provider.
-
-Demo Video
-Link: https://drive.google.com/file/d/1to4deCD6jBssx2V_oZgZU5E5Os2PlfP1/view?usp=sharing
+- **Iteration 1 Demo**: https://drive.google.com/file/d/1to4deCD6jBssx2V_oZgZU5E5Os2PlfP1/view?usp=sharing
+- **Iteration 3 Demo**: https://drive.google.com/file/d/1pyC__nYKOaF929-E3t7aAP8oOSFBKUMn/view?usp=sharing
