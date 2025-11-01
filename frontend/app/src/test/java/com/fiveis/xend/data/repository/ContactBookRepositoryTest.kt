@@ -245,7 +245,7 @@ class ContactBookRepositoryTest {
     }
 
     @Test
-    fun get_contact_throws_exception_on_null_id() = runTest {
+    fun get_contact_returns_contact_successfully() = runTest {
         val contactId = 1L
         val mockResponse = ContactResponse(
             id = contactId,

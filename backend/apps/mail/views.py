@@ -31,7 +31,7 @@ from .serializers import (
     EmailSendResponseSerializer,
     EmailSendSerializer,
 )
-from .services import GmailService, get_email_detail_logic, list_emails_logic, mark_read_logic, send_email_logic
+from .services import GmailService, get_email_detail_logic, list_emails_logic, list_newer_emails_logic, mark_read_logic, send_email_logic
 
 
 class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
@@ -68,6 +68,17 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
                 required=False,
                 description='Comma-separated labels (e.g., "INBOX,UNREAD"). Default: "INBOX"',
             ),
+            OpenApiParameter(
+                name="since_date",
+                type=OpenApiTypes.DATETIME,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description=(
+                    "Newest email timestamp the client ALREADY has "
+                    "(e.g. 2025-10-31T19:14:08+09:00). "
+                    "If provided, only newer emails will be returned."
+                ),
+            ),
         ],
         responses={
             200: OpenApiResponse(
@@ -103,10 +114,20 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
         page_token = qs.validated_data.get("page_token")
         labels = qs.validated_data.get("labels") or "INBOX"
         label_ids = [s.strip() for s in labels.split(",")] if labels else ["INBOX"]
+        since_date = qs.validated_data.get("since_date", None)
 
         # Call Gmail API with decorator
         try:
-            result, messages = list_emails_logic(user, max_results, page_token, label_ids)
+            if since_date is not None:
+                result = None
+                messages = list_newer_emails_logic(
+                    user,
+                    max_results=max_results,
+                    label_ids=label_ids,
+                    since_date=since_date,
+                )
+            else:
+                result, messages = list_emails_logic(user, max_results, page_token, label_ids)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
@@ -134,8 +155,8 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
         return Response(
             {
                 "messages": serializer.data,
-                "next_page_token": result.get("nextPageToken"),
-                "result_size_estimate": result.get("resultSizeEstimate", 0),
+                "next_page_token": result.get("nextPageToken") if result else "",
+                "result_size_estimate": result.get("resultSizeEstimate", 0) if result else 0,
             },
             status=status.HTTP_200_OK,
         )

@@ -65,7 +65,9 @@ class AddGroupViewModelTest {
             PromptOption(id = 2L, key = "format", name = "Short", prompt = "Keep it short")
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getAllPromptOptions() } returns Pair(toneOptions, formatOptions)
+        coEvery {
+            anyConstructed<ContactBookRepository>().getAllPromptOptions()
+        } returns Pair(toneOptions, formatOptions)
 
         viewModel = AddGroupViewModel(application)
         advanceUntilIdle()
@@ -179,9 +181,13 @@ class AddGroupViewModelTest {
     @Test
     fun get_all_prompt_options_calls_repository() = runTest {
         val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
-        val formatOptions = listOf(PromptOption(id = 2L, key = "format", name = "Short", prompt = "Keep it short"))
+        val formatOptions = listOf(
+            PromptOption(id = 2L, key = "format", name = "Short", prompt = "Keep it short")
+        )
 
-        coEvery { anyConstructed<ContactBookRepository>().getAllPromptOptions() } returns Pair(toneOptions, formatOptions)
+        coEvery {
+            anyConstructed<ContactBookRepository>().getAllPromptOptions()
+        } returns Pair(toneOptions, formatOptions)
 
         viewModel = AddGroupViewModel(application)
         advanceUntilIdle()

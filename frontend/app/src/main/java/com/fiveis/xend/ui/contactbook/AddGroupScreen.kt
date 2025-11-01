@@ -61,6 +61,7 @@ import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.Purple60
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -300,7 +301,7 @@ private fun MemberRow(member: Contact, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(randomStableColorFor(initial)),
+                    .background(StableColor.forId(member.id)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(initial, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -464,7 +465,7 @@ fun ContactSelectDialog(
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(contact.color),
+                                            .background(StableColor.forId(contact.id)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(

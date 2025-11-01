@@ -5,7 +5,6 @@ import com.fiveis.xend.data.repository.AuthRepository
 import com.fiveis.xend.data.repository.AuthResult
 import com.fiveis.xend.data.source.TokenManager
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

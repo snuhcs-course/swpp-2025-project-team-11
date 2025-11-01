@@ -1,6 +1,7 @@
 package com.fiveis.xend.ui.contactbook
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.theme.StableColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,20 +116,23 @@ fun GroupDetailScreen(
                 Divider()
                 Spacer(Modifier.height(8.dp))
                 Text("멤버 ${group.members.size}명", fontWeight = FontWeight.SemiBold)
+
+                // 멤버 목록
+                LazyColumn(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 1.dp,
+                        vertical = 8.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(group.members) { c ->
+                        MemberRow(c) { onMemberClick(c) }
+                    }
+                }
             }
         }
 
         PromptOptionsCard(options = group.options)
-
-        // 멤버 목록
-        LazyColumn(
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(group.members) { c ->
-                MemberRow(c) { onMemberClick(c) }
-            }
-        }
     }
 }
 
@@ -136,11 +141,10 @@ private fun MemberRow(member: Contact, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         tonalElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val initial = member.name.firstOrNull()?.toString() ?: "?"
@@ -148,7 +152,7 @@ private fun MemberRow(member: Contact, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF5A7DFF)),
+                    .background(StableColor.forId(member.id)),
                 contentAlignment = Alignment.Center
             ) { Text(initial, color = Color.White, fontWeight = FontWeight.Bold) }
 

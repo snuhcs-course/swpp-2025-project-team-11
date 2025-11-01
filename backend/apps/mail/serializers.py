@@ -11,6 +11,7 @@ class EmailListSerializer(serializers.Serializer):
     snippet = serializers.CharField()
     date = serializers.DateTimeField(allow_null=True)
     date_raw = serializers.CharField()
+    body = serializers.CharField()
     is_unread = serializers.BooleanField()
     label_ids = serializers.ListField(child=serializers.CharField())
 
@@ -94,6 +95,10 @@ class EmailListQuerySerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         help_text='Comma-separated labels (e.g., "INBOX,UNREAD"). Default: "INBOX"',
+    )
+    since_date = serializers.DateTimeField(
+        required=False,
+        help_text=("ISO8601 timestamp of the newest email the client already has, " "e.g. 2025-10-31T19:14:08+09:00. "),
     )
 
 
