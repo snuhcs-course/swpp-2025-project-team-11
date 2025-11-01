@@ -1,6 +1,7 @@
 .idea
 backend/.env
 backend/config/__pycache__
+backend/.coverage
 frontend/.gradle
 frontend/app/build
 

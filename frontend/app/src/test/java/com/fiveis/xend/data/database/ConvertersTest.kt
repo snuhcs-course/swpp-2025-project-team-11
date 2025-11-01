@@ -1,0 +1,98 @@
+package com.fiveis.xend.data.database
+
+import com.google.gson.JsonSyntaxException
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class ConvertersTest {
+
+    private lateinit var converters: Converters
+
+    @Before
+    fun setup() {
+        converters = Converters()
+    }
+
+    @Test
+    fun from_string_list_with_empty_list_returns_empty_json_array() {
+        val list = emptyList<String>()
+        val result = converters.fromStringList(list)
+        assertEquals("[]", result)
+    }
+
+    @Test
+    fun from_string_list_with_single_item_returns_json_array_with_one_element() {
+        val list = listOf("item1")
+        val result = converters.fromStringList(list)
+        val expectedJson = """["item1"]"""
+        assertEquals(expectedJson, result)
+    }
+
+    @Test
+    fun from_string_list_with_multiple_items_returns_correct_json_array() {
+        val list = listOf("item1", "item2", "item3")
+        val result = converters.fromStringList(list)
+        val expectedJson = """["item1","item2","item3"]"""
+        assertEquals(expectedJson, result)
+    }
+
+    @Test
+    fun from_string_list_with_special_characters_is_handled_correctly() {
+        val list = listOf("item with \"quotes\"", "item with, comma")
+        val result = converters.fromStringList(list)
+        val expectedJson = """["item with \"quotes\"","item with, comma"]"""
+        assertEquals(expectedJson, result)
+    }
+
+    @Test
+    fun to_string_list_with_empty_json_array_returns_empty_list() {
+        val json = "[]"
+        val result = converters.toStringList(json)
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun to_string_list_with_valid_json_array_returns_correct_list() {
+        val json = """["item1","item2","item3"]"""
+        val result = converters.toStringList(json)
+        assertEquals(listOf("item1", "item2", "item3"), result)
+    }
+
+    @Test
+    fun to_string_list_with_single_item_json_array_returns_list_with_one_element() {
+        val json = """["item1"]"""
+        val result = converters.toStringList(json)
+        assertEquals(listOf("item1"), result)
+    }
+
+    @Test
+    fun to_string_list_with_json_containing_special_characters_is_handled_correctly() {
+        val json = """["item with \"quotes\"","item with, comma"]"""
+        val result = converters.toStringList(json)
+        assertEquals(listOf("item with \"quotes\"", "item with, comma"), result)
+    }
+
+    @Test(expected = JsonSyntaxException::class)
+    fun to_string_list_with_malformed_json_throws_json_syntax_exception() {
+        val json = "[item1, item2"
+        converters.toStringList(json)
+    }
+
+    @Test
+    fun from_string_list_and_to_string_list_roundtrip() {
+        val originalList = listOf("a", "b", "c")
+        val json = converters.fromStringList(originalList)
+        val finalList = converters.toStringList(json)
+        assertEquals(originalList, finalList)
+    }
+
+    @Test
+    fun from_string_list_and_to_string_list_roundtrip_with_empty_list() {
+        val originalList = emptyList<String>()
+        val json = converters.fromStringList(originalList)
+        val finalList = converters.toStringList(json)
+        assertEquals(originalList, finalList)
+    }
+}

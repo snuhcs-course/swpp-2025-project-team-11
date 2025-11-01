@@ -2,6 +2,7 @@ package com.fiveis.xend.ui.contactbook
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -10,7 +11,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
@@ -67,12 +67,12 @@ class ContactBookActivity : ComponentActivity() {
 
                 ContactBookScreen(
                     uiState = uiState,
+                    onRefresh = { viewModel.refreshAll() },
                     onTabSelected = viewModel::onTabSelected,
                     onGroupClick = { group ->
                         startActivity(
                             Intent(this, GroupDetailActivity::class.java)
                                 .putExtra(GroupDetailActivity.EXTRA_GROUP_ID, group.id)
-                                .putExtra(GroupDetailActivity.EXTRA_GROUP_COLOR, group.color.toArgb())
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
@@ -80,7 +80,6 @@ class ContactBookActivity : ComponentActivity() {
                         startActivity(
                             Intent(this, ContactDetailActivity::class.java)
                                 .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
-                                .putExtra(ContactDetailActivity.EXTRA_CONTACT_COLOR, contact.color.toArgb())
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
@@ -105,6 +104,12 @@ class ContactBookActivity : ComponentActivity() {
                         viewModel.onContactDelete(it.id)
                     }
                 )
+
+                LaunchedEffect(uiState.error) {
+                    uiState.error?.let {
+                        Toast.makeText(this@ContactBookActivity, it, Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
     }

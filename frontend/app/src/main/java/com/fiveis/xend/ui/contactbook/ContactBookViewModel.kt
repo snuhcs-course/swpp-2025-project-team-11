@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,11 +32,44 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
     val uiState: StateFlow<ContactBookUiState> = _uiState.asStateFlow()
 
     init {
-        loadContactInfo(ContactBookTab.Groups)
+        viewModelScope.launch {
+            repository.observeGroups().collectLatest { groups ->
+                if (_uiState.value.selectedTab == ContactBookTab.Groups) {
+                    _uiState.update { it.copy(groups = groups) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.observeContacts().collectLatest { contacts ->
+                if (_uiState.value.selectedTab == ContactBookTab.Contacts) {
+                    _uiState.update { it.copy(contacts = contacts) }
+                }
+            }
+        }
+        // 초기 동기화(네트워크 → DB)
+        refreshAll()
     }
 
     fun onTabSelected(tab: ContactBookTab) {
-        loadContactInfo(tab)
+        _uiState.update { it.copy(selectedTab = tab) }
+        refreshAll()
+    }
+
+    fun refreshAll() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+//                when (_uiState.value.selectedTab) {
+//                    ContactBookTab.Groups -> repository.refreshGroups()
+//                    ContactBookTab.Contacts -> repository.refreshContacts()
+//                }
+                repository.refreshGroups()
+                repository.refreshContacts()
+                _uiState.update { it.copy(isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "동기화 실패") }
+            }
+        }
     }
 
     private fun loadContactInfo(tab: ContactBookTab) {
@@ -64,33 +98,28 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // 그룹/연락처 클릭 처리
-    fun onGroupClick(group: Group) {
-        // TODO: 그룹 상세 화면으로 이동
-    }
-
-    fun onContactClick(contact: Contact) {
-        // TODO: 연락처 상세 화면으로 이동
-    }
-
     fun onContactDelete(contactId: Long) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 repository.deleteContact(contactId)
-                loadContactInfo(ContactBookTab.Contacts)
+//                loadContactInfo(ContactBookTab.Contacts)
+                _uiState.update { it.copy(isLoading = false, error = null) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "연락처 삭제 실패") }
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "연락처 삭제 실패") }
             }
         }
     }
 
     fun onGroupDelete(groupId: Long) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 repository.deleteGroup(groupId)
-                loadContactInfo(ContactBookTab.Groups)
+//                loadContactInfo(ContactBookTab.Groups)
+                _uiState.update { it.copy(isLoading = false, error = null) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "그룹 삭제 실패") }
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "그룹 삭제 실패") }
             }
         }
     }

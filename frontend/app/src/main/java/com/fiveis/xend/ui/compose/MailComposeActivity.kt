@@ -114,9 +114,11 @@ import com.fiveis.xend.ui.theme.BannerBackground
 import com.fiveis.xend.ui.theme.BannerBorder
 import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
+import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.SuccessSurface
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
@@ -140,6 +142,7 @@ fun EmailComposeScreen(
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
     onNewContactChange: (TextFieldValue) -> Unit,
+    knownContactsByEmail: Map<String, Contact> = emptyMap(),
     isStreaming: Boolean,
     error: String?,
     onBack: () -> Unit = {},
@@ -206,7 +209,8 @@ fun EmailComposeScreen(
                 contacts = contacts,
                 onContactsChange = onContactsChange,
                 newContact = newContact,
-                onNewContactChange = onNewContactChange
+                onNewContactChange = onNewContactChange,
+                knownContactsByEmail = knownContactsByEmail
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -536,21 +540,30 @@ private fun RecipientSection(
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
-    onNewContactChange: (TextFieldValue) -> Unit
+    onNewContactChange: (TextFieldValue) -> Unit,
+    knownContactsByEmail: Map<String, Contact>
 ) {
-    val addContact = {
-        val trimmed = newContact.text.trim()
-        if (trimmed.isNotEmpty()) {
-            onContactsChange(
-                contacts + Contact(
-                    id = 0,
-                    name = trimmed,
-                    email = trimmed,
-                    group = null
-                )
-            )
+    fun normalizeEmail(s: String) = s.trim().lowercase()
+
+    val addContact: () -> Unit = fun() {
+        val raw = newContact.text.trim()
+        if (raw.isEmpty()) return
+
+        val email = Regex("<([^>]+)>").find(raw)?.groupValues?.getOrNull(1)?.trim() ?: raw
+
+        // 이메일 중복 방지
+        if (contacts.any { normalizeEmail(it.email) == normalizeEmail(email) }) {
             onNewContactChange(TextFieldValue(""))
+            return
         }
+
+        // DB 매칭
+        val saved = knownContactsByEmail[normalizeEmail(email)]
+
+        val contactToAdd = saved ?: Contact(id = -1L, name = email, email = email, group = null)
+
+        onContactsChange(contacts + contactToAdd)
+        onNewContactChange(TextFieldValue(""))
     }
 
     val scrollState = rememberScrollState()
@@ -917,11 +930,15 @@ private fun ErrorMessage(message: String) {
 
 @Composable
 fun ContactChip(contact: Contact, onRemove: () -> Unit) {
+    val isKnown = contact.id >= 0L
+    val borderColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
+    val dotColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
+
     Surface(
         modifier = Modifier.height(24.dp),
         shape = RoundedCornerShape(12.dp),
         color = AddButtonBackground,
-        border = BorderStroke(1.dp, Color(0xFF6366F1))
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier
@@ -933,11 +950,11 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
                 modifier = Modifier
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(contact.color),
+                    .background(dotColor),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = contact.name.firstOrNull()?.uppercase() ?: "?",
+                    text = if (contact.id < 0L) "?" else (contact.name.firstOrNull() ?: '?').uppercaseChar().toString(),
                     color = Color.White,
                     style = MaterialTheme.typography.labelSmall
                 )
@@ -945,7 +962,12 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "${contact.name} (${contact.email})",
-                style = MaterialTheme.typography.labelSmall.copy(color = AddButtonText),
+                style =
+                if (contact.id < 0L) {
+                    MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                } else {
+                    MaterialTheme.typography.labelSmall.copy(color = Blue80)
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1001,6 +1023,17 @@ class MailComposeActivity : ComponentActivity() {
                     key = "sendVm",
                     factory = SendMailViewModel.Factory(application)
                 )
+
+                // 3) Contact Lookup VM
+                val lookupVm: ContactLookupViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ContactLookupViewModel(application) as T
+                        }
+                    }
+                )
+                val knownByEmail by lookupVm.byEmail.collectAsState() // Map<String, Contact
 
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
@@ -1065,6 +1098,7 @@ class MailComposeActivity : ComponentActivity() {
                             onContactsChange = { contacts = it },
                             newContact = newContact,
                             onNewContactChange = { newContact = it },
+                            knownContactsByEmail = knownByEmail,
                             isStreaming = composeUi.isStreaming,
                             error = composeUi.error,
                             sendUiState = sendUi,
