@@ -181,7 +181,7 @@ class ReplyComposeViewModel(
             if (modelClass.isAssignableFrom(ReplyComposeViewModel::class.java)) {
                 val api = MailReplySseClient(
                     context = application,
-                    endpointUrl = com.fiveis.xend.BuildConfig.BASE_URL + "api/ai/mail/reply/stream/"
+                    endpointUrl = com.fiveis.xend.BuildConfig.BASE_URL + "/api/ai/mail/reply/stream/"
                 )
                 return ReplyComposeViewModel(api) as T
             }

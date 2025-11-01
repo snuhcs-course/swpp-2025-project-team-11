@@ -35,7 +35,8 @@ class InboxViewModel(
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
         loadCachedEmails()
-        refreshEmails()
+        // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
+        silentRefreshEmails()
     }
 
     private fun loadCachedEmails() {
@@ -48,20 +49,37 @@ class InboxViewModel(
         }
     }
 
+    /**
+     * 사용자가 Pull-to-Refresh할 때 호출 (UI 로딩 표시 있음)
+     */
     fun refreshEmails() {
-        Log.d("InboxViewModel", "refreshEmails called")
+        Log.d("InboxViewModel", "refreshEmails called (with UI loading)")
         _uiState.update { it.copy(isRefreshing = true) }
+        performRefresh(showLoading = true)
+    }
+
+    /**
+     * 백그라운드 사일런트 동기화 (UI 로딩 표시 없음)
+     */
+    private fun silentRefreshEmails() {
+        Log.d("InboxViewModel", "silentRefreshEmails called (background sync)")
+        performRefresh(showLoading = false)
+    }
+
+    private fun performRefresh(showLoading: Boolean) {
         viewModelScope.launch {
             try {
                 val result = repository.refreshEmails()
                 if (result.isFailure) {
                     val errorMessage = result.exceptionOrNull()?.message ?: "Unknown error"
                     Log.e("InboxViewModel", "refreshEmails failed: $errorMessage")
-                    _uiState.update {
-                        it.copy(
-                            error = errorMessage,
-                            isRefreshing = false
-                        )
+                    if (showLoading) {
+                        _uiState.update {
+                            it.copy(
+                                error = errorMessage,
+                                isRefreshing = false
+                            )
+                        }
                     }
                 } else {
                     val nextToken = result.getOrNull()
@@ -91,11 +109,13 @@ class InboxViewModel(
                 }
             } catch (e: Exception) {
                 Log.e("InboxViewModel", "Exception during refreshEmails", e)
-                _uiState.update {
-                    it.copy(
-                        error = e.message,
-                        isRefreshing = false
-                    )
+                if (showLoading) {
+                    _uiState.update {
+                        it.copy(
+                            error = e.message,
+                            isRefreshing = false
+                        )
+                    }
                 }
             }
         }
