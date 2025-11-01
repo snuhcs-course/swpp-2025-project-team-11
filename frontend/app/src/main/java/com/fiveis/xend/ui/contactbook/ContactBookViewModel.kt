@@ -98,15 +98,6 @@ class ContactBookViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // 그룹/연락처 클릭 처리
-    fun onGroupClick(group: Group) {
-        // TODO: 그룹 상세 화면으로 이동
-    }
-
-    fun onContactClick(contact: Contact) {
-        // TODO: 연락처 상세 화면으로 이동
-    }
-
     fun onContactDelete(contactId: Long) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }

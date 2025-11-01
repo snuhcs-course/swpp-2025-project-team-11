@@ -74,13 +74,38 @@ import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 
+enum class RoleInputMode { PRESET, MANUAL }
+
+val senderRoleOptionExamples = listOf(
+    "학생",
+    "조교",
+    "교수",
+    "직장 부하 직원",
+    "직장 동료",
+    "직장 상사",
+    "친한 친구",
+    "새로운 친구"
+)
+
+val recipientRoleOptionExamples = listOf(
+    "학생",
+    "조교",
+    "교수",
+    "직장 부하 직원",
+    "직장 동료",
+    "직장 상사",
+    "친한 친구",
+    "새로운 친구"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddContactScreen(
     groups: List<Group> = emptyList(),
     onNameChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
-    onRelationshipRoleChange: (String?) -> Unit,
+    onSenderRoleChange: (String?) -> Unit,
+    onRecipientRoleChange: (String?) -> Unit,
     onPersonalPromptChange: (String?) -> Unit,
     onBack: () -> Unit,
     onAdd: () -> Unit,
@@ -88,12 +113,27 @@ fun AddContactScreen(
     onBottomNavChange: (String) -> Unit = {},
     onGroupChange: (Group?) -> Unit = {}
 ) {
+    val directInputLabel = "직접 입력"
+
     var isManualOpen by rememberSaveable { mutableStateOf(true) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
-    val recipientRoleOptions = listOf("업무 동료", "개인 관계", "학술 관계")
-    var isRecipientRoleExpanded by remember { mutableStateOf(false) }
+
+    val senderRoleOptions = senderRoleOptionExamples + directInputLabel
+    val recipientRoleOptions = recipientRoleOptionExamples + directInputLabel
+
+    var senderRole by rememberSaveable { mutableStateOf<String?>(null) }
+    var senderMode by rememberSaveable { mutableStateOf(RoleInputMode.PRESET) }
+    var senderPreset by rememberSaveable { mutableStateOf<String?>(null) }
+    var senderManual by rememberSaveable { mutableStateOf("") }
+    var isSenderExpanded by remember { mutableStateOf(false) }
+
     var recipientRole by rememberSaveable { mutableStateOf<String?>(null) }
+    var recipientMode by rememberSaveable { mutableStateOf(RoleInputMode.PRESET) }
+    var recipientPreset by rememberSaveable { mutableStateOf<String?>(null) }
+    var recipientManual by rememberSaveable { mutableStateOf("") }
+    var isRecipientExpanded by remember { mutableStateOf(false) }
+
     var personalPrompt by rememberSaveable { mutableStateOf("") }
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
@@ -252,52 +292,201 @@ fun AddContactScreen(
                 }
 
                 FormBlock(label = "관계") {
-                    ExposedDropdownMenuBox(
-                        expanded = isRecipientRoleExpanded,
-                        onExpandedChange = { isRecipientRoleExpanded = !isRecipientRoleExpanded }
+                    // 드롭다운 2개(좌: sender / 우: recipient)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = recipientRole ?: "관계 선택",
-                            onValueChange = {},
-                            readOnly = true,
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Group,
-                                    contentDescription = null,
-                                    tint = ToolbarIconTint
-                                )
-                            },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientRoleExpanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                                .height(48.dp),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = BackgroundLight,
-                                unfocusedBorderColor = Gray200,
-                                focusedBorderColor = Purple60,
-                                focusedTextColor = Slate900,
-                                unfocusedTextColor = Gray600,
-                                cursorColor = Purple60
-                            )
-                        )
-                        ExposedDropdownMenu(
-                            expanded = isRecipientRoleExpanded,
-                            onDismissRequest = { isRecipientRoleExpanded = false }
+                        // ─── Sender Role ───
+                        ExposedDropdownMenuBox(
+                            expanded = isSenderExpanded,
+                            onExpandedChange = { isSenderExpanded = !isSenderExpanded },
+                            modifier = Modifier.weight(1f)
                         ) {
-                            recipientRoleOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = {
-                                        recipientRole = option
-                                        isRecipientRoleExpanded = false
-                                        onRelationshipRoleChange(option)
-                                    }
+                            OutlinedTextField(
+                                value = when (senderMode) {
+                                    RoleInputMode.PRESET -> senderPreset ?: "나"
+                                    RoleInputMode.MANUAL -> directInputLabel
+                                },
+                                onValueChange = {},
+                                readOnly = true,
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Group,
+                                        contentDescription = null,
+                                        tint = ToolbarIconTint
+                                    )
+                                },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(isSenderExpanded) },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .height(48.dp),
+                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = BackgroundLight,
+                                    unfocusedBorderColor = Gray200,
+                                    focusedBorderColor = Purple60,
+                                    focusedTextColor = Slate900,
+                                    unfocusedTextColor = Gray600,
+                                    cursorColor = Purple60
                                 )
+                            )
+                            ExposedDropdownMenu(
+                                expanded = isSenderExpanded,
+                                onDismissRequest = { isSenderExpanded = false }
+                            ) {
+                                senderRoleOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            isSenderExpanded = false
+                                            if (option == directInputLabel) {
+                                                senderMode = RoleInputMode.MANUAL
+                                                // 아직 입력 전이므로 콜백엔 null 혹은 현재 manual값 전달
+                                                onSenderRoleChange(
+                                                    senderManual.ifBlank { null }
+                                                )
+                                            } else {
+                                                senderMode = RoleInputMode.PRESET
+                                                senderPreset = option
+                                                senderManual = ""
+                                                onSenderRoleChange(option)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.width(12.dp))
+
+                        // Recipient Role
+                        ExposedDropdownMenuBox(
+                            expanded = isRecipientExpanded,
+                            onExpandedChange = { isRecipientExpanded = !isRecipientExpanded },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            OutlinedTextField(
+                                value = when (recipientMode) {
+                                    RoleInputMode.PRESET -> recipientPreset ?: "상대방"
+                                    RoleInputMode.MANUAL -> directInputLabel
+                                },
+                                onValueChange = {},
+                                readOnly = true,
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Group,
+                                        contentDescription = null,
+                                        tint = ToolbarIconTint
+                                    )
+                                },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(isRecipientExpanded) },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .height(48.dp),
+                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = BackgroundLight,
+                                    unfocusedBorderColor = Gray200,
+                                    focusedBorderColor = Purple60,
+                                    focusedTextColor = Slate900,
+                                    unfocusedTextColor = Gray600,
+                                    cursorColor = Purple60
+                                )
+                            )
+                            ExposedDropdownMenu(
+                                expanded = isRecipientExpanded,
+                                onDismissRequest = { isRecipientExpanded = false }
+                            ) {
+                                recipientRoleOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            isRecipientExpanded = false
+                                            if (option == directInputLabel) {
+                                                recipientMode = RoleInputMode.MANUAL
+                                                onRecipientRoleChange(
+                                                    recipientManual.ifBlank { null }
+                                                )
+                                            } else {
+                                                recipientMode = RoleInputMode.PRESET
+                                                recipientPreset = option
+                                                recipientManual = ""
+                                                onRecipientRoleChange(option)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 아래 한 줄: "직접 입력" 선택된 쪽만 텍스트 입력칸 노출
+                    if (senderMode == RoleInputMode.MANUAL || recipientMode == RoleInputMode.MANUAL) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth()) {
+                            if (senderMode == RoleInputMode.MANUAL) {
+                                OutlinedTextField(
+                                    value = senderManual,
+                                    onValueChange = {
+                                        senderManual = it
+                                        onSenderRoleChange(it.ifBlank { null })
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    placeholder = {
+                                        Text(
+                                            text = "나의 역할을 적어주세요",
+                                            style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                            color = Gray400
+                                        )
+                                    },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedBorderColor = BorderGray,
+                                        focusedBorderColor = Purple60
+                                    )
+                                )
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            if (recipientMode == RoleInputMode.MANUAL) {
+                                OutlinedTextField(
+                                    value = recipientManual,
+                                    onValueChange = {
+                                        recipientManual = it
+                                        onRecipientRoleChange(it.ifBlank { null })
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    placeholder = {
+                                        Text(
+                                            text = "상대방 역할을 적어주세요",
+                                            style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                            color = Gray400
+                                        )
+                                    },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedBorderColor = BorderGray,
+                                        focusedBorderColor = Purple60
+                                    )
+                                )
+                            } else {
+                                Spacer(Modifier.weight(1f))
                             }
                         }
                     }
@@ -315,7 +504,7 @@ fun AddContactScreen(
                             .height(110.dp),
                         placeholder = {
                             Text(
-                                text = "상대방과의 관계를 설명해주세요.",
+                                text = "상대방과의 관계를 설명해 주세요",
                                 style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                                 color = Gray400
                             )
@@ -331,7 +520,7 @@ fun AddContactScreen(
                     )
                 }
 
-                FormBlock(label = "그룹(선택사항)") {
+                FormBlock(label = "그룹") {
                     ExposedDropdownMenuBox(
                         expanded = isGroupExpanded,
                         onExpandedChange = { isGroupExpanded = !isGroupExpanded }
