@@ -267,8 +267,21 @@ private fun SubjectSection(subject: String) {
 private fun BodySection(body: String) {
     // 디버깅: 메일 본문 확인
     android.util.Log.d("MailDetailScreen", "=== BODY ===")
-    android.util.Log.d("MailDetailScreen", body)
+    android.util.Log.d("MailDetailScreen", "Body length: ${body.length}")
+    android.util.Log.d("MailDetailScreen", body.take(200)) // 처음 200자만
     android.util.Log.d("MailDetailScreen", "============")
+
+    // body가 비어있으면 안내 메시지 표시
+    if (body.isBlank()) {
+        Text(
+            text = "메일 본문이 없습니다.",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            color = TextSecondary
+        )
+        return
+    }
 
     // 원본 메시지 분리
     val markers = listOf(

@@ -44,12 +44,92 @@ abstract class AppDatabase : RoomDatabase() {
         /**
          * Migration from v1 to v2:
          * - Add body column to emails table
-         * - Contact/Group tables are created automatically by Room
+         * - Create Contact/Group related tables
          */
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 // Add body column to emails table
                 database.execSQL("ALTER TABLE emails ADD COLUMN body TEXT NOT NULL DEFAULT ''")
+
+                // Create groups table
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `groups` (
+                        `id` INTEGER NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `description` TEXT,
+                        `createdAt` TEXT,
+                        `updatedAt` TEXT,
+                        PRIMARY KEY(`id`)
+                    )"""
+                )
+
+                // Create contacts table
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `contacts` (
+                        `id` INTEGER NOT NULL,
+                        `groupId` INTEGER,
+                        `name` TEXT NOT NULL,
+                        `email` TEXT NOT NULL,
+                        `createdAt` TEXT,
+                        `updatedAt` TEXT,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`groupId`) REFERENCES `groups`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )"""
+                )
+
+                // Create index for contacts.groupId
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_contacts_groupId` ON `contacts` (`groupId`)"
+                )
+
+                // Create contact_contexts table
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `contact_contexts` (
+                        `contactId` INTEGER NOT NULL,
+                        `senderRole` TEXT,
+                        `recipientRole` TEXT,
+                        `relationshipDetails` TEXT,
+                        `personalPrompt` TEXT,
+                        `languagePreference` TEXT,
+                        `createdAt` TEXT,
+                        `updatedAt` TEXT,
+                        PRIMARY KEY(`contactId`)
+                    )"""
+                )
+
+                // Create prompt_options table
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `prompt_options` (
+                        `id` INTEGER NOT NULL,
+                        `key` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `prompt` TEXT NOT NULL,
+                        `createdAt` TEXT,
+                        `updatedAt` TEXT,
+                        PRIMARY KEY(`id`)
+                    )"""
+                )
+
+                // Create group_prompt_option_cross_ref table
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `group_prompt_option_cross_ref` (
+                        `groupId` INTEGER NOT NULL,
+                        `optionId` INTEGER NOT NULL,
+                        PRIMARY KEY(`groupId`, `optionId`),
+                        FOREIGN KEY(`groupId`) REFERENCES `groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`optionId`) REFERENCES `prompt_options`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )"""
+                )
+
+                // Create indices for group_prompt_option_cross_ref
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_group_prompt_option_cross_ref_groupId` " +
+                        "ON `group_prompt_option_cross_ref` (`groupId`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_group_prompt_option_cross_ref_optionId` " +
+                        "ON `group_prompt_option_cross_ref` (`optionId`)"
+                )
             }
         }
 
