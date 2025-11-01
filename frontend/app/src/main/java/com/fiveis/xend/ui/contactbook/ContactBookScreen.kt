@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -35,6 +38,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -60,13 +64,15 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookTab
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.Red60
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextSecondary
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ContactBookScreen(
     modifier: Modifier = Modifier,
     uiState: ContactBookUiState,
+    onRefresh: () -> Unit = {},
     onTabSelected: (ContactBookTab) -> Unit,
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
@@ -80,145 +86,161 @@ fun ContactBookScreen(
 ) {
     val selectedTab = uiState.selectedTab
 
-    if (selectedTab == ContactBookTab.Groups) {
-        Scaffold(
-            bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .background(BackgroundLight)
-            ) {
-                // 헤더
-                TopAppBar(
-                    title = { Text("연락처", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
-                    actions = {
-                        IconButton(onClick = { /* 연락처 검색 */ }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
-                        }
-                        IconButton(onClick = onAddContactClick) {
-                            Icon(Icons.Default.Add, contentDescription = "Add")
-                        }
-                    }
-                )
+    val refreshing = uiState.isLoading
+    val pullState = rememberPullRefreshState(
+        refreshing = refreshing,
+        onRefresh = onRefresh
+    )
 
-                // 탭
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
-                        if (selectedTab != ContactBookTab.Groups) {
-                            onTabSelected(ContactBookTab.Groups)
-                        }
-                    }
-                    TabChip("전체", selectedTab == ContactBookTab.Contacts) {
-                        if (selectedTab != ContactBookTab.Contacts) {
-                            onTabSelected(ContactBookTab.Contacts)
-                        }
-                    }
-                }
-
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(uiState.groups.size) { index ->
-                        GroupCard(
-                            group = uiState.groups[index],
-                            onClick = onGroupClick,
-                            onEdit = onEditGroupClick,
-                            onDelete = onDeleteGroupClick
-                        )
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        QuickActions(onAddGroupClick = onAddGroupClick)
-                    }
-                }
-            }
-        }
-    } else {
-        Scaffold(
-            bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .background(BackgroundLight)
-            ) {
-                // 헤더
-                TopAppBar(
-                    title = { Text("연락처", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
-                    actions = {
-                        IconButton(onClick = { /* 연락처 검색 */ }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
-                        }
-                        IconButton(onClick = onAddContactClick) {
-                            Icon(Icons.Default.Add, contentDescription = "Add")
-                        }
-                    }
-                )
-
-                // 탭
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
-                        if (selectedTab != ContactBookTab.Groups) {
-                            onTabSelected(ContactBookTab.Groups)
-                        }
-                    }
-                    TabChip("전체", selectedTab == ContactBookTab.Contacts) {
-                        if (selectedTab != ContactBookTab.Contacts) {
-                            onTabSelected(ContactBookTab.Contacts)
-                        }
-                    }
-                }
-
-                // 섹션 헤더 ("전체 연락처" / "N명")
-                Row(
+    Box(modifier.fillMaxSize()) {
+        if (selectedTab == ContactBookTab.Groups) {
+            Scaffold(
+                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
+            ) { padding ->
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(padding)
+                        .fillMaxSize()
+                        .background(BackgroundLight)
                 ) {
-                    Text("전체 연락처", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Spacer(Modifier.weight(1f))
-                    Text("${uiState.contacts.size}명", color = Color.Gray)
-                }
-                Divider()
+                    // 헤더
+                    TopAppBar(
+                        title = { Text("연락처", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                        actions = {
+                            IconButton(onClick = { /* 연락처 검색 */ }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
+                            IconButton(onClick = onAddContactClick) {
+                                Icon(Icons.Default.Add, contentDescription = "Add")
+                            }
+                        }
+                    )
 
-                // 연락처 리스트
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    items(uiState.contacts.size) { index ->
-                        ContactRow(
-                            contact = uiState.contacts[index],
-                            subtitle = uiState.contacts[index].email,
-                            color = uiState.contacts[index].color,
-                            onClick = onContactClick,
-                            onEdit = onEditContactClick,
-                            onDelete = onDeleteContactClick
-                        )
+                    // 탭
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
+                            if (selectedTab != ContactBookTab.Groups) {
+                                onTabSelected(ContactBookTab.Groups)
+                            }
+                        }
+                        TabChip("전체", selectedTab == ContactBookTab.Contacts) {
+                            if (selectedTab != ContactBookTab.Contacts) {
+                                onTabSelected(ContactBookTab.Contacts)
+                            }
+                        }
                     }
 
-                    item {
-                        Spacer(modifier = Modifier.height(12.dp))
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.groups.size) { index ->
+                            GroupCard(
+                                group = uiState.groups[index],
+                                onClick = onGroupClick,
+                                onEdit = onEditGroupClick,
+                                onDelete = onDeleteGroupClick
+                            )
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            QuickActions(onAddGroupClick = onAddGroupClick)
+                        }
+                    }
+                }
+            }
+        } else {
+            Scaffold(
+                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
+            ) { padding ->
+                Column(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .background(BackgroundLight)
+                ) {
+                    // 헤더
+                    TopAppBar(
+                        title = { Text("연락처", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                        actions = {
+                            IconButton(onClick = { /* 연락처 검색 */ }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
+                            IconButton(onClick = onAddContactClick) {
+                                Icon(Icons.Default.Add, contentDescription = "Add")
+                            }
+                        }
+                    )
+
+                    // 탭
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TabChip("그룹별", selectedTab == ContactBookTab.Groups) {
+                            if (selectedTab != ContactBookTab.Groups) {
+                                onTabSelected(ContactBookTab.Groups)
+                            }
+                        }
+                        TabChip("전체", selectedTab == ContactBookTab.Contacts) {
+                            if (selectedTab != ContactBookTab.Contacts) {
+                                onTabSelected(ContactBookTab.Contacts)
+                            }
+                        }
+                    }
+
+                    // 섹션 헤더 ("전체 연락처" / "N명")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("전체 연락처", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(Modifier.weight(1f))
+                        Text("${uiState.contacts.size}명", color = Color.Gray)
+                    }
+                    Divider()
+
+                    // 연락처 리스트
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        items(uiState.contacts.size) { index ->
+                            ContactRow(
+                                contact = uiState.contacts[index],
+                                subtitle = uiState.contacts[index].email,
+                                color = StableColor.forId(uiState.contacts[index].id),
+                                onClick = onContactClick,
+                                onEdit = onEditContactClick,
+                                onDelete = onDeleteContactClick
+                            )
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
                     }
                 }
             }
         }
+
+        PullRefreshIndicator(
+            refreshing = refreshing,
+            state = pullState,
+            modifier = Modifier
+                .align(Alignment.TopCenter),
+            contentColor = colorScheme.primary
+        )
     }
 }
 
@@ -243,9 +265,11 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
+    val groupColor = StableColor.forId(group.id)
+
     Surface(
-        color = group.color.copy(alpha = 0.1f),
-        border = BorderStroke(2.dp, group.color),
+        color = groupColor.copy(alpha = 0.1f),
+        border = BorderStroke(2.dp, groupColor),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -257,11 +281,11 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(group.color)
+                        .background(groupColor)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(group.name, fontWeight = FontWeight.Bold, color = group.color, fontSize = 18.sp)
+                    Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
                     Text(
                         group.description ?: "",
                         color = Color.Gray,
@@ -271,7 +295,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                Text("${group.members.size}명", color = group.color, fontWeight = FontWeight.Bold)
+                Text("${group.members.size}명", color = groupColor, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(12.dp))
             }
 
@@ -283,7 +307,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     group.members.take(3).forEach {
-                        MemberCircle(it.name.first().toString(), group.color)
+                        MemberCircle(it.name.first().toString(), groupColor)
                     }
                     if (group.members.size > 3) {
                         MemberCircle("+${group.members.size - 3}", Color.LightGray)
@@ -595,8 +619,7 @@ fun ContactScreenPreview() {
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
             null,
-            null,
-            Color(0xFFFF5C5C)
+            null
         ),
         Group(
             2,
@@ -608,8 +631,7 @@ fun ContactScreenPreview() {
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
             null,
-            null,
-            Color(0xFFFFA500)
+            null
         )
     )
     ContactBookScreen(

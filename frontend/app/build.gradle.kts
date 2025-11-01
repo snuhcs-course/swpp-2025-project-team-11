@@ -8,6 +8,8 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
+
+    alias(libs.plugins.androidx.room)
 }
 
 // Read local.properties
@@ -78,6 +80,10 @@ android {
         compose = true
         buildConfig = true // Ensure BuildConfig is generated
     }
+
+    // 마이그레이션 테스트 대비
+    sourceSets.getByName("androidTest").assets.srcDirs(files("$projectDir/schemas"))
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -182,4 +188,8 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     testImplementation(kotlin("test"))
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
 }
