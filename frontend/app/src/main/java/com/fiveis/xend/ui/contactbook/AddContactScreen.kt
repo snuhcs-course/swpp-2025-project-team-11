@@ -500,7 +500,7 @@ fun AddContactScreen(
                             .height(110.dp),
                         placeholder = {
                             Text(
-                                text = "상대방과의 관계를 설명해주세요.",
+                                text = "상대방과의 관계를 설명해 주세요",
                                 style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
                                 color = Gray400
                             )
