@@ -341,19 +341,19 @@ class PromptOptionViewTest(BaseContactViewTest):
         # PromptOption 모델 실제 필드: key, name, prompt, created_by
         # 시스템 프롬프트: created_by=None
         self.sys_opt = PromptOption.objects.create(
-            key="sys_polite",
+            key=PromptOption.Key.TONE,
             name="System Default Polite",
             prompt="Please respond politely.",
             created_by=None,
         )
         self.u1_opt = PromptOption.objects.create(
-            key="u1_casual",
+            key=PromptOption.Key.OTHER,
             name="Casual tone",
             prompt="Keep it friendly, short.",
             created_by=self.user1,
         )
         self.u2_opt = PromptOption.objects.create(
-            key="u2_formal",
+            key=PromptOption.Key.OTHER,
             name="Serious tone",
             prompt="Keep it formal and structured.",
             created_by=self.user2,
