@@ -54,14 +54,14 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         system_prompt = """
         당신은 메일 작성 보조 AI입니다.
         주어지는 사용자의 메일 내용에 이어서 작성하세요. 
-        이미 작성된 내용 없이 이어질 내용만을 바로 출력합니다.
+        이미 작성된 내용 없이 이어질 내용만을 예시의 JSON 형태로 출력합니다.
         예시 입출력은 다음과 같습니다.
 
         user: how are 
-        output: you today? I'm writing this mail 
+        output: {"output": "you today? I'm writing this mail"}
 
         user: 안녕하세요
-        output: 오늘의 날씨는 어떤가요?
+        output: {"output": "오늘의 날씨는 어떤가요?"}
 
         """
 

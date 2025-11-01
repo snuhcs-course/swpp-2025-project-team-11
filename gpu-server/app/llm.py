@@ -1,8 +1,8 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import redis.asyncio as aioredis
 import json
 import asyncio
-import redis.asyncio as aioredis
 
 MODEL_NAME = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
 
@@ -16,31 +16,32 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map=None
 ).to(device)
 
-
 async def stream_generate_reply(system_prompt: str, user_input: str, max_tokens: int = 10):
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_input},
-    ]
-    input_ids = tokenizer.apply_chat_template(
-        messages,
-        tokenize=True,
-        add_generation_prompt=True,
-        return_tensors="pt"
-    ).to(device)
-    
-    input_length = input_ids.shape[1]
-
     try:
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
+        ]
+        input_ids = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_tensors="pt"
+        ).to(device)
+
+        input_length = input_ids.shape[1]
+        
         output = model.generate(
             input_ids,
             eos_token_id=tokenizer.eos_token_id,
             max_new_tokens=max_tokens,
-            do_sample=True,
+            do_sample=False,
         )
 
         generated_ids = output[0][input_length:]
         generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+        print(f"[DEBUG] Generated: {generated_text}")
 
         for token in generated_text.split():  # 공백 단위 스트리밍
             yield token
@@ -52,7 +53,7 @@ async def stream_generate_reply(system_prompt: str, user_input: str, max_tokens:
 
 
 async def generate_and_publish(user_id: int, system_prompt: str, user_input: str, max_tokens: int = 10):
-    redis = await aioredis.from_url("redis://redis:6379")
+    redis = await aioredis.from_url("redis://xend-fiveis-dev.duckdns.org:6379")
     channel = f"user_{user_id}_mail"
 
     async for token in stream_generate_reply(system_prompt, user_input, max_tokens):
