@@ -35,15 +35,23 @@ async def stream_generate_reply(system_prompt: str, user_input: str, max_tokens:
             input_ids,
             eos_token_id=tokenizer.eos_token_id,
             max_new_tokens=max_tokens,
-            do_sample=False,
+            do_sample=True,
         )
 
         generated_ids = output[0][input_length:]
         generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
 
+        try:
+            clean_text = generated_text.strip("`json\n")
+            data = json.loads(clean_text)
+            print(data)
+            output_text = data.get("output", "")
+        except json.JSONDecodeError:
+            output_text = generated_text
         print(f"[DEBUG] Generated: {generated_text}")
+        print(f"[DEBUG] Parsed: {output_text}")
 
-        for token in generated_text.split():  # 공백 단위 스트리밍
+        for token in output_text.split():  # 공백 단위 스트리밍
             yield token
             await asyncio.sleep(0.01)
     except torch.cuda.OutOfMemoryError:

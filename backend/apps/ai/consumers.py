@@ -52,17 +52,16 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)  # to_emails 포함
 
         system_prompt = """
-        당신은 메일 작성 보조 AI입니다.
-        주어지는 사용자의 메일 내용에 이어서 작성하세요. 
-        이미 작성된 내용 없이 이어질 내용만을 예시의 JSON 형태로 출력합니다.
-        예시 입출력은 다음과 같습니다.
+        당신은 사용자가 작성 중인 메일을 이어서 완성하는 역할을 수행합니다.
+        사용자가 작성한 내용에 자연스럽게 이어서 6단어 정도만 작성하세요.
+        사용자가 이미 작성한 내용을 중복하여 출력하지 않습니다.
+        출력은 반드시 JSON 형태로 아래와 같이 작성합니다.
 
-        user: how are 
-        output: {"output": "you today? I'm writing this mail"}
+        user: 안녕하세요 오늘 회의 진행을 맡은 홍길동 대리입니다.
+        output: {"output": "오늘 회의 자료를 준비하면서"}
 
-        user: 안녕하세요
-        output: {"output": "오늘의 날씨는 어떤가요?"}
-
+        user: 저는 내일 미팅을 준비하고 있고, 
+        output: {"output": "미팅 준비를 위해 필요한 자료와"}
         """
 
         try:
@@ -74,7 +73,7 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
                     "user_id": self.user.id,
                     "system_prompt": system_prompt,
                     "user_input": data.get("text"),
-                    "max_tokens": 10,  # fixed value
+                    "max_tokens": 30,  # fixed value
                 },
                 timeout=5,  # GPU 서버 응답 지연 시 타임아웃 방지
             )
