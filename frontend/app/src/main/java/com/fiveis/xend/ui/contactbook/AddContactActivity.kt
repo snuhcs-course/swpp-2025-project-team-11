@@ -63,7 +63,8 @@ class AddContactActivity : ComponentActivity() {
                     groups = bookUiState.groups,
                     onNameChange = { name = it },
                     onEmailChange = { email = it },
-                    onRelationshipRoleChange = { recipientRole = it },
+                    onSenderRoleChange = { senderRole = it },
+                    onRecipientRoleChange = { recipientRole = it },
                     onPersonalPromptChange = { personalPrompt = it },
                     onGroupChange = { selectedGroup = it },
                     onBack = {
