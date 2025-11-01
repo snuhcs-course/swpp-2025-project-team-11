@@ -80,10 +80,12 @@ android {
         compose = true
         buildConfig = true // Ensure BuildConfig is generated
     }
-
-    // 마이그레이션 테스트 대비
-    sourceSets.getByName("androidTest").assets.srcDirs(files("$projectDir/schemas"))
-
+    packaging {
+        resources {
+            excludes += "/META-INF/LICENSE.md"
+            excludes += "/META-INF/LICENSE-notice.md"
+        }
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
