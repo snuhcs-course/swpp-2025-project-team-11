@@ -94,7 +94,10 @@ class MailComposeViewModel(
                             val data = json.optJSONObject("data")
                             val rawText = data?.optString("text") ?: ""
 
-                            // Append raw text first
+                            // GPU sends word by word, append with space
+                            if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
+                                suggestionBuffer.append(" ")
+                            }
                             suggestionBuffer.append(rawText)
 
                             // Parse the entire buffer

@@ -853,50 +853,18 @@ private fun RichTextEditorCard(
                     .defaultMinSize(minHeight = 240.dp)
                     .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
             ) {
-                Box {
-                    RichTextEditor(
-                        state = richTextState,
-                        enabled = !isStreaming,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                text = "내용을 입력하세요",
-                                style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                            )
-                        }
-                    )
-
-                    if (suggestionText.isNotEmpty()) {
-                        androidx.compose.material3.FloatingActionButton(
-                            onClick = onAcceptSuggestion,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(16.dp),
-                            containerColor = Blue60,
-                            contentColor = Color.White,
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "제안 수락",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "탭 완성",
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                )
-                            }
-                        }
+                RichTextEditor(
+                    state = richTextState,
+                    enabled = !isStreaming,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text = "내용을 입력하세요",
+                            style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
+                        )
                     }
-                }
+                )
 
                 if (suggestionText.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -914,6 +882,33 @@ private fun RichTextEditorCard(
                             ),
                             modifier = Modifier.padding(12.dp)
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.FloatingActionButton(
+                        onClick = onAcceptSuggestion,
+                        modifier = Modifier.align(Alignment.End),
+                        containerColor = Blue60,
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "제안 수락",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "탭 완성",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -1112,16 +1107,18 @@ class MailComposeActivity : ComponentActivity() {
                             onUndo = { /* TODO */ },
                             suggestionText = composeUi.suggestionText,
                             onAcceptSuggestion = {
-                                // 다음 단어 하나만 가져오기
-                                val nextWord = composeVm.acceptNextWord()
-                                if (nextWord != null) {
-                                    // RichTextState에 직접 텍스트 추가
+                                // 전체 추천 문장 적용
+                                val suggestion = composeUi.suggestionText
+                                if (suggestion.isNotEmpty()) {
                                     val currentText = richTextState.annotatedString.text
                                     val separator = if (currentText.endsWith(" ") || currentText.isEmpty()) "" else " "
 
-                                    // 기존 HTML + 새 단어를 조합
+                                    // 기존 HTML + 전체 추천 문장
                                     val currentHtml = richTextState.toHtml()
-                                    richTextState.setHtml(currentHtml + separator + nextWord)
+                                    richTextState.setHtml(currentHtml + separator + suggestion)
+
+                                    // 추천 완료 후 클리어
+                                    composeVm.acceptSuggestion()
                                 }
                             },
                             aiRealtime = aiRealtime,
