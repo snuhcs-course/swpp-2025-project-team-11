@@ -66,7 +66,7 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description='Comma-separated labels (e.g., "INBOX,UNREAD"). Default: "INBOX"',
+                description='Comma-separated labels (e.g., "INBOX,UNREAD,SENT"). Default: "INBOX"',
             ),
             OpenApiParameter(
                 name="since_date",
