@@ -23,10 +23,11 @@ data class ContactBookUiState(
     val error: String? = null
 )
 
-class ContactBookViewModel(application: Application) : AndroidViewModel(application) {
-    private var loadJob: Job? = null
-
+class ContactBookViewModel(
+    application: Application,
     private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
+) : AndroidViewModel(application) {
+    private var loadJob: Job? = null
 
     private val _uiState = MutableStateFlow(ContactBookUiState())
     val uiState: StateFlow<ContactBookUiState> = _uiState.asStateFlow()

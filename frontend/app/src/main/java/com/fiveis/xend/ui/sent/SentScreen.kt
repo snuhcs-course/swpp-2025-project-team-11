@@ -1,4 +1,4 @@
-package com.fiveis.xend.ui.inbox
+package com.fiveis.xend.ui.sent
 
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
@@ -71,8 +71,8 @@ import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 
 @Composable
-fun InboxScreen(
-    uiState: InboxUiState,
+fun SentScreen(
+    uiState: SentUiState,
     onEmailClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
@@ -141,7 +141,7 @@ fun InboxScreen(
                     )
                 )
             ) {
-                BottomNavBar(selected = "inbox", onSelect = onBottomNavChange)
+                BottomNavBar(selected = "sent", onSelect = onBottomNavChange)
             }
         },
         modifier = modifier.fillMaxSize(),
@@ -342,20 +342,20 @@ private fun EmailList(
                     // Trigger when last visible item is within 3 items from the end
                     val shouldLoad = lastVisibleItem.index >= totalItems - 4
                     if (shouldLoad) {
-                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
+                        Log.d("SentScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
                     }
                     shouldLoad
                 }
             }.collect { shouldLoadMore ->
                 Log.d(
-                    "InboxScreen",
+                    "SentScreen",
                     "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
                 )
                 if (shouldLoadMore && !isLoadingMore) {
-                    Log.d("InboxScreen", "Triggering loadMore")
+                    Log.d("SentScreen", "Triggering loadMore")
                     onLoadMore()
                 } else {
-                    Log.d("InboxScreen", "Not triggering loadMore - conditions not met")
+                    Log.d("SentScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }

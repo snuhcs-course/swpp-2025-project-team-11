@@ -1,4 +1,4 @@
-package com.fiveis.xend.ui.inbox
+package com.fiveis.xend.ui.sent
 
 import android.content.Context
 import android.content.Intent
@@ -12,20 +12,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.database.AppDatabase
-import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.data.repository.SentRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
+import com.fiveis.xend.ui.inbox.InboxActivity
 import com.fiveis.xend.ui.search.SearchActivity
-import com.fiveis.xend.ui.sent.SentActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.ui.view.MailDetailActivity
 
-class InboxActivity : ComponentActivity() {
-    private val viewModel: InboxViewModel by viewModels { InboxViewModelFactory(this.applicationContext) }
+class SentActivity : ComponentActivity() {
+    private val viewModel: SentViewModel by viewModels { SentViewModelFactory(this.applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +44,7 @@ class InboxActivity : ComponentActivity() {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
 
-                InboxScreen(
+                SentScreen(
                     uiState = uiState,
                     onEmailClick = {
                         val intent = Intent(this, MailDetailActivity::class.java)
@@ -56,15 +55,15 @@ class InboxActivity : ComponentActivity() {
                         startActivity(Intent(this, SearchActivity::class.java))
                     },
                     onFabClick = {
-                        startActivity(Intent(this@InboxActivity, MailComposeActivity::class.java))
+                        startActivity(Intent(this@SentActivity, MailComposeActivity::class.java))
                     },
                     onRefresh = viewModel::refreshEmails,
                     onLoadMore = viewModel::loadMoreEmails,
                     onBottomNavChange = {
                         when (it) {
-                            "sent" -> {
-                                startActivity(Intent(this, SentActivity::class.java))
-                                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                            "inbox" -> {
+                                startActivity(Intent(this, InboxActivity::class.java))
+                                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                             }
                             "contacts" -> {
                                 startActivity(Intent(this, ContactBookActivity::class.java))
@@ -78,14 +77,14 @@ class InboxActivity : ComponentActivity() {
     }
 }
 
-class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
+class SentViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(InboxViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(SentViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             val mailApiService = RetrofitClient.getMailApiService(context)
             val database = AppDatabase.getDatabase(context)
-            val repository = InboxRepository(mailApiService, database.emailDao())
-            return InboxViewModel(repository) as T
+            val repository = SentRepository(mailApiService, database.emailDao())
+            return SentViewModel(repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

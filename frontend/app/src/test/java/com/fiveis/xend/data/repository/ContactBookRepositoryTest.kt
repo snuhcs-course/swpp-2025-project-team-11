@@ -1,17 +1,23 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
+import com.fiveis.xend.data.database.AppDatabase // <-- Room DB 임포트
+import com.fiveis.xend.data.database.ContactDao // <-- DAO 임포트
+import com.fiveis.xend.data.database.GroupDao // <-- DAO 임포트
+import com.fiveis.xend.data.database.PromptOptionDao // <-- DAO 임포트
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.ContactResponseContext
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
+import androidx.room.withTransaction
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
+import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -26,17 +32,42 @@ class ContactBookRepositoryTest {
 
     private lateinit var context: Context
     private lateinit var contactApiService: ContactApiService
+
+    // 1. DB와 DAO 변수 선언
+    private lateinit var db: AppDatabase
+    private lateinit var contactDao: ContactDao
+    private lateinit var groupDao: GroupDao
+    private lateinit var optionDao: PromptOptionDao
+
     private lateinit var repository: ContactBookRepository
 
     @Before
     fun setup() {
+        // API 모킹
         context = mockk(relaxed = true)
         contactApiService = mockk()
-
         mockkObject(RetrofitClient)
         every { RetrofitClient.getContactApiService(context) } returns contactApiService
 
-        repository = ContactBookRepository(context)
+        // 2. DB와 DAO 모킹 (NPE 해결의 핵심)
+        db = mockk(relaxed = true)
+        contactDao = mockk(relaxed = true)
+        groupDao = mockk(relaxed = true)
+        optionDao = mockk(relaxed = true)
+
+        // 3. Mock DB가 Mock DAO를 반환하도록 연결
+        every { db.contactDao() } returns contactDao
+        every { db.groupDao() } returns groupDao
+        every { db.promptOptionDao() } returns optionDao
+
+        // 4. Mock withTransaction to execute the block immediately
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { db.withTransaction(any<suspend () -> Any>()) } coAnswers {
+            secondArg<suspend () -> Any>().invoke()
+        }
+
+        // 5. Repository 생성 시 Mock DB를 두 번째 파라미터로 주입
+        repository = ContactBookRepository(context, db)
     }
 
     @After
@@ -45,7 +76,7 @@ class ContactBookRepositoryTest {
     }
 
     @Test
-    fun get_contact_info_with_groups_tab_returns_group_data() = runTest {
+    fun refresh_groups_updates_local_database() = runTest {
         val mockGroups = listOf(
             GroupResponse(
                 id = 1L,
@@ -55,16 +86,18 @@ class ContactBookRepositoryTest {
         )
 
         coEvery { contactApiService.getAllGroups() } returns Response.success(mockGroups)
+        coEvery { groupDao.deleteAllGroups() } returns Unit
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.deleteAllCrossRefs() } returns Unit
 
-        val result = repository.getContactInfo(ContactBookTab.Groups)
+        repository.refreshGroups()
 
-        assertTrue(result is GroupData)
-        assertEquals(1, (result as GroupData).groups.size)
-        assertEquals("Test Group", result.groups[0].name)
+        coVerify { contactApiService.getAllGroups() }
+        coVerify { groupDao.deleteAllGroups() }
     }
 
     @Test
-    fun get_contact_info_with_contacts_tab_returns_contact_data() = runTest {
+    fun refresh_contacts_updates_local_database() = runTest {
         val mockContacts = listOf(
             ContactResponse(
                 id = 1L,
@@ -74,12 +107,14 @@ class ContactBookRepositoryTest {
         )
 
         coEvery { contactApiService.getAllContacts() } returns Response.success(mockContacts)
+        coEvery { contactDao.deleteAllContexts() } returns Unit
+        coEvery { contactDao.deleteAllContacts() } returns Unit
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
 
-        val result = repository.getContactInfo(ContactBookTab.Contacts)
+        repository.refreshContacts()
 
-        assertTrue(result is ContactData)
-        assertEquals(1, (result as ContactData).contacts.size)
-        assertEquals("Test Contact", result.contacts[0].name)
+        coVerify { contactApiService.getAllContacts() }
+        coVerify { contactDao.deleteAllContacts() }
     }
 
     @Test
@@ -100,6 +135,7 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.addContact(any())
         } returns Response.success(expectedResponse)
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
 
         val result = repository.addContact(
             name = name,
@@ -140,6 +176,7 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.addContact(any())
         } returns Response.success(expectedResponse)
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
 
         repository.addContact(
             name = name,
@@ -175,12 +212,12 @@ class ContactBookRepositoryTest {
                 personalPrompt = null
             )
             null
-        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {
             e
         }
 
         assertTrue(exception != null)
-        assertTrue(exception?.message?.contains("Success response but body is null") == true)
+        assertTrue(exception?.message?.contains("Success but body null") == true)
     }
 
     @Test
@@ -210,48 +247,41 @@ class ContactBookRepositoryTest {
     @Test
     fun get_contact_returns_contact_with_all_fields() = runTest {
         val contactId = 1L
-        val mockResponse = ContactResponse(
+        val mockContactEntity = com.fiveis.xend.data.database.entity.ContactEntity(
             id = contactId,
+            groupId = null,
             name = "Test Contact",
-            email = "test@example.com",
-            group = GroupResponse(
-                id = 1L,
-                name = "Test Group",
-                description = "Description"
-            ),
-            context = ContactResponseContext(
-                id = 1L,
-                senderRole = "Manager",
-                recipientRole = "Employee"
-            ),
-            createdAt = "2025-01-01T00:00:00Z",
-            updatedAt = "2025-01-02T00:00:00Z"
+            email = "test@example.com"
+        )
+        val mockContext = com.fiveis.xend.data.database.ContactWithContext(
+            contact = mockContactEntity,
+            context = null
         )
 
-        coEvery {
-            contactApiService.getContact(contactId)
-        } returns Response.success(mockResponse)
+        coEvery { contactDao.getContactWithContext(contactId) } returns mockContext
 
         val result = repository.getContact(contactId)
 
         assertEquals(contactId, result.id)
         assertEquals("Test Contact", result.name)
         assertEquals("test@example.com", result.email)
-        assertEquals("Test Group", result.group?.name)
     }
 
     @Test
     fun get_contact_returns_contact_successfully() = runTest {
         val contactId = 1L
-        val mockResponse = ContactResponse(
+        val mockContactEntity = com.fiveis.xend.data.database.entity.ContactEntity(
             id = contactId,
+            groupId = null,
             name = "Test",
             email = "test@example.com"
         )
+        val mockContext = com.fiveis.xend.data.database.ContactWithContext(
+            contact = mockContactEntity,
+            context = null
+        )
 
-        coEvery {
-            contactApiService.getContact(contactId)
-        } returns Response.success(mockResponse)
+        coEvery { contactDao.getContactWithContext(contactId) } returns mockContext
 
         val result = repository.getContact(contactId)
 
@@ -260,22 +290,22 @@ class ContactBookRepositoryTest {
 
     @Test
     fun get_all_contacts_returns_list_of_contacts() = runTest {
-        val mockContacts = listOf(
-            ContactResponse(
-                id = 1L,
-                name = "Contact 1",
-                email = "contact1@example.com"
-            ),
-            ContactResponse(
-                id = 2L,
-                name = "Contact 2",
-                email = "contact2@example.com"
-            )
+        val mockEntity1 = com.fiveis.xend.data.database.entity.ContactEntity(
+            id = 1L,
+            groupId = null,
+            name = "Contact 1",
+            email = "contact1@example.com"
         )
+        val mockEntity2 = com.fiveis.xend.data.database.entity.ContactEntity(
+            id = 2L,
+            groupId = null,
+            name = "Contact 2",
+            email = "contact2@example.com"
+        )
+        val mockContact1 = com.fiveis.xend.data.database.ContactWithContext(mockEntity1, null)
+        val mockContact2 = com.fiveis.xend.data.database.ContactWithContext(mockEntity2, null)
 
-        coEvery {
-            contactApiService.getAllContacts()
-        } returns Response.success(mockContacts)
+        coEvery { contactDao.getAllWithContext() } returns listOf(mockContact1, mockContact2)
 
         val result = repository.getAllContacts()
 
@@ -286,9 +316,7 @@ class ContactBookRepositoryTest {
 
     @Test
     fun get_all_contacts_returns_empty_list_when_body_is_null() = runTest {
-        coEvery {
-            contactApiService.getAllContacts()
-        } returns Response.success(null)
+        coEvery { contactDao.getAllWithContext() } returns emptyList()
 
         val result = repository.getAllContacts()
 
@@ -297,19 +325,17 @@ class ContactBookRepositoryTest {
 
     @Test
     fun get_all_contacts_throws_exception_on_error() = runTest {
-        coEvery {
-            contactApiService.getAllContacts()
-        } returns Response.error(500, "Server error".toResponseBody())
+        coEvery { contactDao.getAllWithContext() } throws Exception("Database error")
 
         val exception = try {
             repository.getAllContacts()
             null
-        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {
             e
         }
 
         assertTrue(exception != null)
-        assertTrue(exception?.message?.contains("Failed to get all contacts") == true)
+        assertTrue(exception?.message?.contains("Database error") == true)
     }
 
     @Test
@@ -319,12 +345,14 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.deleteContact(contactId)
         } returns Response.success(null)
+        coEvery { contactDao.deleteById(contactId) } returns Unit
 
         repository.deleteContact(contactId)
 
         coVerify {
             contactApiService.deleteContact(contactId)
         }
+        coVerify { contactDao.deleteById(contactId) }
     }
 
     @Test
@@ -369,6 +397,10 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.addGroup(any())
         } returns Response.success(expectedResponse)
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.upsertOptions(any()) } returns Unit
+        coEvery { optionDao.deleteCrossRefsByGroup(any()) } returns Unit
+        coEvery { optionDao.upsertCrossRefs(any()) } returns Unit
 
         val result = repository.addGroup(name, description, options)
 
@@ -393,36 +425,35 @@ class ContactBookRepositoryTest {
         val exception = try {
             repository.addGroup("Test", "Description", emptyList())
             null
-        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {
             e
         }
 
         assertTrue(exception != null)
-        assertTrue(exception?.message?.contains("Success response but body is null") == true)
+        assertTrue(exception?.message?.contains("Success but body null") == true)
     }
 
     @Test
     fun get_group_returns_group_with_all_fields() = runTest {
         val groupId = 1L
-        val mockResponse = GroupResponse(
+        val mockGroupEntity = com.fiveis.xend.data.database.entity.GroupEntity(
             id = groupId,
             name = "Test Group",
-            description = "Test Description",
-            options = listOf(
-                PromptOption(
-                    id = 1L,
-                    key = "tone",
-                    name = "Formal",
-                    prompt = "Be formal"
-                )
-            ),
-            createdAt = "2025-01-01T00:00:00Z",
-            updatedAt = "2025-01-02T00:00:00Z"
+            description = "Test Description"
+        )
+        val mockOptionEntity = com.fiveis.xend.data.database.entity.PromptOptionEntity(
+            id = 1L,
+            key = "tone",
+            name = "Formal",
+            prompt = "Be formal"
+        )
+        val mockGroup = com.fiveis.xend.data.database.GroupWithMembersAndOptions(
+            group = mockGroupEntity,
+            members = emptyList(),
+            options = listOf(mockOptionEntity)
         )
 
-        coEvery {
-            contactApiService.getGroup(groupId)
-        } returns Response.success(mockResponse)
+        coEvery { groupDao.getGroupWithMembersAndOptions(groupId) } returns mockGroup
 
         val result = repository.getGroup(groupId)
 
@@ -434,22 +465,20 @@ class ContactBookRepositoryTest {
 
     @Test
     fun get_all_groups_returns_list_of_groups() = runTest {
-        val mockGroups = listOf(
-            GroupResponse(
-                id = 1L,
-                name = "Group 1",
-                description = "Description 1"
-            ),
-            GroupResponse(
-                id = 2L,
-                name = "Group 2",
-                description = "Description 2"
-            )
+        val mockEntity1 = com.fiveis.xend.data.database.entity.GroupEntity(
+            id = 1L,
+            name = "Group 1",
+            description = "Description 1"
         )
+        val mockEntity2 = com.fiveis.xend.data.database.entity.GroupEntity(
+            id = 2L,
+            name = "Group 2",
+            description = "Description 2"
+        )
+        val mockGroup1 = com.fiveis.xend.data.database.GroupWithMembersAndOptions(mockEntity1, emptyList(), emptyList())
+        val mockGroup2 = com.fiveis.xend.data.database.GroupWithMembersAndOptions(mockEntity2, emptyList(), emptyList())
 
-        coEvery {
-            contactApiService.getAllGroups()
-        } returns Response.success(mockGroups)
+        coEvery { groupDao.getGroupsWithMembersAndOptions() } returns listOf(mockGroup1, mockGroup2)
 
         val result = repository.getAllGroups()
 
@@ -460,19 +489,17 @@ class ContactBookRepositoryTest {
 
     @Test
     fun get_all_groups_throws_exception_on_error() = runTest {
-        coEvery {
-            contactApiService.getAllGroups()
-        } returns Response.error(500, "Server error".toResponseBody())
+        coEvery { groupDao.getGroupsWithMembersAndOptions() } throws Exception("Database error")
 
         val exception = try {
             repository.getAllGroups()
             null
-        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {
             e
         }
 
         assertTrue(exception != null)
-        assertTrue(exception?.message?.contains("Failed to get all groups") == true)
+        assertTrue(exception?.message?.contains("Database error") == true)
     }
 
     @Test
@@ -482,12 +509,14 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.deleteGroup(groupId)
         } returns Response.success(null)
+        coEvery { groupDao.deleteById(groupId) } returns Unit
 
         repository.deleteGroup(groupId)
 
         coVerify {
             contactApiService.deleteGroup(groupId)
         }
+        coVerify { groupDao.deleteById(groupId) }
     }
 
     @Test
@@ -525,6 +554,7 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.addPromptOption(any())
         } returns Response.success(expectedResponse)
+        coEvery { optionDao.upsertOptions(any()) } returns Unit
 
         val result = repository.addPromptOption(key, name, prompt)
 
@@ -549,12 +579,12 @@ class ContactBookRepositoryTest {
         val exception = try {
             repository.addPromptOption("key", "name", "prompt")
             null
-        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {
             e
         }
 
         assertTrue(exception != null)
-        assertTrue(exception?.message?.contains("Success response but body is null") == true)
+        assertTrue(exception?.message?.contains("Success but body null") == true)
     }
 
     @Test
@@ -583,6 +613,7 @@ class ContactBookRepositoryTest {
         coEvery {
             contactApiService.getAllPromptOptions()
         } returns Response.success(mockOptions)
+        coEvery { optionDao.upsertOptions(any()) } returns Unit
 
         val result = repository.getAllPromptOptions()
 

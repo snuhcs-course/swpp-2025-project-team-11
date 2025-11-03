@@ -20,7 +20,6 @@ class GroupTest {
         assertTrue(group.members.isEmpty())
         assertNull(group.createdAt)
         assertNull(group.updatedAt)
-        assertEquals(Color(0xFF000000), group.color)
     }
 
     @Test
@@ -45,8 +44,7 @@ class GroupTest {
             options = listOf(option),
             members = listOf(contact),
             createdAt = "2024-10-30T10:00:00Z",
-            updatedAt = "2024-10-30T12:00:00Z",
-            color = Color.Green
+            updatedAt = "2024-10-30T12:00:00Z"
         )
 
         assertEquals(1L, group.id)
@@ -58,7 +56,6 @@ class GroupTest {
         assertEquals(contact, group.members[0])
         assertEquals("2024-10-30T10:00:00Z", group.createdAt)
         assertEquals("2024-10-30T12:00:00Z", group.updatedAt)
-        assertEquals(Color.Green, group.color)
     }
 
     @Test
