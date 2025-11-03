@@ -92,9 +92,17 @@ class MailComposeViewModel(
                     when (type) {
                         "gpu.message" -> {
                             val data = json.optJSONObject("data")
-                            val text = data?.optString("text") ?: ""
-                            suggestionBuffer.append(text)
-                            _ui.update { it.copy(suggestionText = suggestionBuffer.toString()) }
+                            val rawText = data?.optString("text") ?: ""
+
+                            // GPU sends word by word, append with space
+                            if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
+                                suggestionBuffer.append(" ")
+                            }
+                            suggestionBuffer.append(rawText)
+
+                            // Parse the entire buffer
+                            val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
+                            _ui.update { it.copy(suggestionText = parsed) }
                         }
                     }
                 } catch (e: Exception) {
@@ -159,6 +167,24 @@ class MailComposeViewModel(
         if (suggestion.isNotEmpty()) {
             suggestionBuffer.clear()
             _ui.update { it.copy(suggestionText = "") }
+        }
+    }
+
+    private fun parseOutputFromMarkdown(rawText: String): String {
+        // Remove markdown code block markers: ```json ... ```
+        var text = rawText.trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+
+        // Try to parse JSON and extract "output" field
+        return try {
+            val json = JSONObject(text)
+            json.optString("output", text)
+        } catch (e: Exception) {
+            // If parsing fails, return original text
+            text
         }
     }
 
