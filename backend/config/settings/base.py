@@ -51,23 +51,19 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    "channels",
+    "django_celery_beat",
+    "django_celery_results",
 ]
 
-INSTALLED_APPS = (
-    DJANGO_APPS
-    + PROJECT_APPS
-    + THIRD_PARTY_APPS
-    + [
-        "channels",
-    ]
-)
+INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
 ASGI_APPLICATION = "config.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": ["redis://redis:6379"],
+            "hosts": [env("CHANNEL_URL")],
         },
     },
 }
@@ -143,6 +139,30 @@ DATABASES = {
         "PORT": env("DATABASE_PORT"),
     }
 }
+
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": env("CACHE_URL"),
+#         "OPTIONS": {
+#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+#         },
+#     }
+# }
+
+# CELERY
+CELERY_ALWAYS_EAGER = False
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_TIMEZONE = "Asia/Seoul"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+# CELERY_BEAT_SCHEDULE = {
+#     "shedulename": {
+#         "task": "apps.ai.tasks.base.taskname",
+#         "schedule": crontab(hour="1", minute="30"),
+#     },
+# }
 
 
 # Password validation

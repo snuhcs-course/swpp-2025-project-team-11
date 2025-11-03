@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   server:
-    build:
+    build: &server-build
       context: .
       target: dev
     container_name: xend-server
@@ -26,6 +26,35 @@ services:
     ports:
       - "6379:6379"
     command: redis-server --loglevel debug
+
+  celery_worker:
+    build: *server-build
+    command: >
+      bash -c "poetry run celery -A config.celery worker --loglevel=info --concurrency=4"
+    volumes:
+      - ./:/app
+    depends_on:
+      - server
+    shm_size: "2gb"
+    privileged: true
+
+  celery_beat:
+    build: *server-build
+    command: >
+      bash -c "poetry run celery -A config.celery beat --loglevel=info"
+    depends_on:
+      - server
+
+  celery_flower:
+    build: *server-build
+    command: >
+      bash -c "poetry run celery -A config.celery flower --port=5555 --basic-auth=fiveis:fiveis"
+    ports:
+      - "5555:5555"
+    depends_on:
+      - server
+      - redis
+      - celery_worker
  
   nginx:
     image: nginx:1.27-alpine
