@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from apps.user.models import GoogleAccount, User
 from apps.user.services import google_refresh
 
+from ..ai.tasks import analyze_speech
 from ..contact.models import Contact
 from ..core.mixins import AuthRequiredMixin
 from ..core.utils.docs import extend_schema_with_common_errors
@@ -292,6 +293,12 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
                     ]
                     with transaction.atomic():
                         SentMail.objects.bulk_create(rows, batch_size=1000)
+        except Exception:
+            pass
+
+        try:
+            # 알맞은 parameter와 함께 celery work 호출
+            analyze_speech.delay()
         except Exception:
             pass
 

@@ -290,3 +290,9 @@ def stream_reply_options_llm(
 
     mapping.clear()
     yield sse_event("done", {"reason": "all_options_finished"}, eid=str(next_eid))
+
+
+def analyze_speech_llm():
+    analysis_result = None
+
+    return analysis_result
