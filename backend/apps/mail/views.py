@@ -298,7 +298,7 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
 
         try:
             # 알맞은 parameter와 함께 celery work 호출
-            analyze_speech.delay()
+            analyze_speech.delay(user, subject, body, to_emails)
         except Exception:
             pass
 

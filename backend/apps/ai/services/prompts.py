@@ -200,3 +200,33 @@ You are {{ sender_role }} writing to {{ recipient_role }}.
 Write a polished reply body in {{ language }} that strictly follows the locked type and title.
 Avoid unrelated topics.
 """.strip()
+
+ANALYSIS_SYSTEM_J2 = """
+You are an expert speech analysis assistant specialized in extracting reproducible writing-style features from emails.
+Be extremely meticulous and thorough: analyze each requested field carefully, provide precise, evidence-backed observations, and avoid speculation.
+
+Analyze the written mail style and output ONLY the JSON object.
+NO extra commentary.
+""".strip()
+
+ANALYSIS_USER_J2 = """
+Written mail:
+Subject: "{{ incoming_subject }}"
+Body:
+"{{ incoming_body }}"
+
+Extract the following as JSON:
+- lexical_style: summary of vocabulary and word choice habits
+- grammar_patterns: notable grammar structures or sentence organization patterns
+- emotional_tone: emotional tone category
+- figurative_usage: summary of figurative language usage and effect
+- long_sentence_ratio: ratio of sentences with >30 words
+- representative_sentences: list of 3-5 sentences that most strongly reflect the user's writing style
+
+Sentence selection rules for representative_sentences:
+- preserve the exact style without modification
+- include idioms, emotional markers, or unique grammar constructions
+- each sentence should stand alone meaningfully
+
+Return ONLY the JSON object. Do not include commentary or extra text.
+""".strip()

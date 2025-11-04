@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 
 from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
 from apps.ai.services.prompts import (
+    ANALYSIS_SYSTEM_J2,
+    ANALYSIS_USER_J2,
     BODY_SYSTEM_J2,
     BODY_USER_J2,
     PLAN_SYSTEM_J2,
@@ -161,6 +163,28 @@ _reply_body_model = ChatOpenAI(
 reply_body_chain = _reply_body_prompt | _reply_body_model | StrOutputParser()
 
 
+class SpeechAnalysis(BaseModel):
+    lexical_style: str
+    grammar_patterns: str
+    emotional_tone: str
+    figurative_usage: str
+    long_sentence_ratio: str
+    representative_sentences: list[str] = Field(default_factory=list)
+
+
+_analysis_prompt = ChatPromptTemplate.from_messages(
+    [("system", ANALYSIS_SYSTEM_J2), ("user", ANALYSIS_USER_J2)],
+    template_format="jinja2",
+)
+
+_analysis_model = ChatOpenAI(
+    model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+    temperature=float(os.getenv("AI_TEMPERATURE", "0.4")),
+)
+
+analysis_chain = _analysis_prompt | _analysis_model.with_structured_output(SpeechAnalysis)
+
+
 def stream_reply_options_llm(
     *,
     user,
@@ -292,7 +316,16 @@ def stream_reply_options_llm(
     yield sse_event("done", {"reason": "all_options_finished"}, eid=str(next_eid))
 
 
-def analyze_speech_llm():
-    analysis_result = None
+def analyze_speech_llm(
+    user,
+    subject: str | None,
+    body: str | None,
+    to_emails: list[str],
+):
+    analysis_input = {
+        "incoming_subject": subject,
+        "incoming_body": body,
+    }
 
+    analysis_result = analysis_chain.invoke(analysis_input)
     return analysis_result
