@@ -19,7 +19,8 @@ interface MailApiService {
     suspend fun getEmails(
         @Query("labels") labels: String? = "INBOX",
         @Query("max_results") maxResults: Int? = 20,
-        @Query("page_token") pageToken: String? = null
+        @Query("page_token") pageToken: String? = null,
+        @Query("since_date") sinceDate: String? = null
     ): Response<MailListResponse>
 
     @GET("api/mail/emails/{message_id}/")

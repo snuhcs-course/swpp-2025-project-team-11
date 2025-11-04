@@ -21,8 +21,10 @@ class TokenRefreshAuthenticator(private val context: Context, private val tokenM
             if (tokenResponse.isSuccessful && tokenResponse.body() != null) {
                 val newTokens = tokenResponse.body()!!
                 tokenManager.saveTokens(newTokens.accessToken, newTokens.refreshToken, tokenManager.getUserEmail()!!)
+                val fullToken = "Bearer ${newTokens.accessToken}"
+                android.util.Log.d("TokenAuthenticator", "Refreshed token added to header: $fullToken")
                 response.request.newBuilder()
-                    .header("Authorization", "Bearer ${newTokens.accessToken}")
+                    .header("Authorization", fullToken)
                     .build()
             } else {
                 tokenManager.clearTokens()

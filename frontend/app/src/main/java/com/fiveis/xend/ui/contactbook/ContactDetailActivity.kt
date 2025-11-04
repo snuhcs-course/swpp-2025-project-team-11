@@ -13,15 +13,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.ui.theme.StableColor
 
 class ContactDetailActivity : ComponentActivity() {
     companion object {
         const val EXTRA_CONTACT_ID = "extra_contact_id"
-        const val EXTRA_CONTACT_COLOR = "extra_contact_color"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,9 +33,6 @@ class ContactDetailActivity : ComponentActivity() {
             return
         }
 
-        val contactColorInt = intent.getIntExtra(EXTRA_CONTACT_COLOR, Color.Black.toArgb())
-        val contactColor = Color(contactColorInt)
-
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
@@ -50,6 +45,8 @@ class ContactDetailActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
+                val contactColor = StableColor.forId(contactId)
+
                 val vm: ContactDetailViewModel = viewModel()
                 LaunchedEffect(contactId) { vm.load(contactId) }
                 val state by vm.uiState.collectAsState()

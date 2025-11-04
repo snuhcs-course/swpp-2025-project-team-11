@@ -47,35 +47,30 @@ import androidx.compose.ui.unit.dp
 import com.fiveis.xend.data.model.PromptOption
 import kotlinx.coroutines.launch
 
-//  private val toneOptions = listOf(
-//    PromptOption(0, "tone", "회사 동료", "회사 동료"),
-//    PromptOption(0, "tone", "업무 관련", "업무 관련"),
-//    PromptOption(0, "tone", "효율성 중시", "효율성 중시"),
-//    PromptOption(0, "tone", "전문적", "전문적"),
-//    PromptOption(0, "tone", "팀워크", "팀워크"),
-//    PromptOption(0, "tone", "긴급성", "긴급성")
-//  )
-//
-//  private val styleOptions = listOf(
-//    PromptOption("tone", "존댓말", "존댓말"),
-//    PromptOption("tone", "직설적", "직설적"),
-//    PromptOption("tone", "간결함", "간결함"),
-//    PromptOption("tone", "두괄식", "두괄식"),
-//    PromptOption("tone", "격식적", "격식적"),
-//    PromptOption("tone", "친근함", "친근함"),
-//    PromptOption("tone", "신중함", "신중함")
-//  )
-//
-//  private val formatOptions = listOf(
-//    PromptOption(0, "format", "3-5문장", "3-5문장"),
-//    PromptOption(0, "format", "핵심 키워드", "핵심 키워드"),
-//    PromptOption(0, "format", "구체적 일정", "구체적 일정"),
-//    PromptOption(0, "format", "액션 아이템", "액션 아이템"),
-//    PromptOption(0, "format", "불릿포인트", "불릿포인트"),
-//    PromptOption(0, "format", "번호 매김", "번호 매김"),
-//    PromptOption(0, "format", "템플릿 형식", "템플릿 형식"),
-//    PromptOption(0, "format", "인삿말 최소", "인삿말 최소")
-//  )
+/**
+ * 하드코딩된 예시 프롬프트 (클릭 시 백엔드에 추가됨)
+ */
+data class PromptExample(
+    val key: String,
+    val name: String,
+    val prompt: String
+)
+
+private val TONE_EXAMPLES = listOf(
+    PromptExample("tone", "존댓말", "존댓말을 사용하여 정중하게 작성하세요"),
+    PromptExample("tone", "직설적", "직설적이고 간결하게 요점만 전달하세요"),
+    PromptExample("tone", "결론우선", "결론을 먼저 제시하고 세부사항은 나중에 설명하세요"),
+    PromptExample("tone", "격식적", "격식을 갖춘 공식적인 표현을 사용하세요"),
+    PromptExample("tone", "친근함", "친근하고 부드러운 어조로 작성하세요"),
+    PromptExample("tone", "신중함", "신중하고 조심스러운 표현을 사용하세요")
+)
+
+private val FORMAT_EXAMPLES = listOf(
+    PromptExample("format", "3~5문장", "3~5문장 이내로 간결하게 작성하세요"),
+    PromptExample("format", "핵심키워드", "핵심 키워드를 강조하여 작성하세요"),
+    PromptExample("format", "구체적일정", "구체적인 날짜와 시간을 포함하여 작성하세요"),
+    PromptExample("format", "인사말최소", "인사말을 최소화하고 본론 중심으로 작성하세요")
+)
 
 data class PromptingUiState(
     val selectedTone: Set<PromptOption> = emptySet(),
@@ -183,7 +178,8 @@ fun AiPromptingCard(
             onSelectionChange = { newState ->
                 uiState = newState
                 onValueChange(newState)
-            }
+            },
+            onAddPromptOption = onAddPromptOption
         )
     }
 
@@ -295,7 +291,8 @@ fun PromptingBottomSheet(
     onSave: (PromptingUiState) -> Unit,
     onDismiss: () -> Unit,
     onRequestAddNew: (key: String) -> Unit,
-    onSelectionChange: (PromptingUiState) -> Unit
+    onSelectionChange: (PromptingUiState) -> Unit,
+    onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> }
 ) {
     val scope = rememberCoroutineScope()
 
@@ -339,7 +336,8 @@ fun PromptingBottomSheet(
                 onToggle = { id ->
                     selectedTone = selectedTone.toggle(id)
                 },
-                onAddNew = { onRequestAddNew("tone") }
+                onAddNew = { onRequestAddNew("tone") },
+                onAddPromptOption = onAddPromptOption
             )
 
             Spacer(Modifier.height(12.dp))
@@ -354,7 +352,8 @@ fun PromptingBottomSheet(
                 onToggle = { id ->
                     selectedFormat = selectedFormat.toggle(id)
                 },
-                onAddNew = { onRequestAddNew("format") }
+                onAddNew = { onRequestAddNew("format") },
+                onAddPromptOption = onAddPromptOption
             )
 
             Spacer(Modifier.height(20.dp))
@@ -393,17 +392,28 @@ private fun Section(
     options: List<PromptOption>,
     selected: Set<PromptOption>,
     onToggle: (PromptOption) -> Unit,
-    onAddNew: () -> Unit
+    onAddNew: () -> Unit,
+    onAddPromptOption: AddPromptOptionHandler
 ) {
     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(6.dp))
     Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(12.dp))
 
+    // 예시 리스트 결정
+    val examples = if (title.contains("문체")) TONE_EXAMPLES else FORMAT_EXAMPLES
+    // DB에 없는 예시만 필터링
+    val availableExamples = examples.filter { example ->
+        !options.any { it.name == example.name }
+    }
+
+    var addingExample by remember { mutableStateOf<String?>(null) }
+
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // 이미 DB에 있는 옵션들
         options.forEach { opt ->
             val isSelected = selected.contains(opt)
             FilterChip(
@@ -420,6 +430,49 @@ private fun Section(
             )
         }
 
+        // 하드코딩된 예시들 (아직 DB에 없는 것)
+        availableExamples.forEach { example ->
+            val isAdding = addingExample == example.name
+            FilterChip(
+                selected = false,
+                enabled = !isAdding,
+                onClick = {
+                    addingExample = example.name
+                    onAddPromptOption(
+                        example.key,
+                        example.name,
+                        example.prompt,
+                        { created ->
+                            // 성공 시 자동으로 선택
+                            onToggle(created)
+                            addingExample = null
+                        },
+                        { _ ->
+                            addingExample = null
+                        }
+                    )
+                },
+                label = {
+                    if (isAdding) {
+                        Text("추가 중...")
+                    } else {
+                        Text(example.name)
+                    }
+                },
+                leadingIcon = {
+                    if (isAdding) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(4.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    }
+                }
+            )
+        }
+
+        // 새 프롬프트 추가 버튼
         FilterChip(
             selected = false,
             onClick = onAddNew,

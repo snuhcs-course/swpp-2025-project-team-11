@@ -40,11 +40,15 @@ class AddContactActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                val addViewModel: AddContactViewModel = viewModel()
+                val addViewModel: AddContactViewModel = viewModel(
+                    factory = AddContactViewModel.Factory(application)
+                )
                 val addUiState by addViewModel.uiState.collectAsState()
 
                 // 그룹 목록이 필요하면 ContactBookViewModel 활용
-                val bookViewModel: ContactBookViewModel = viewModel()
+                val bookViewModel: ContactBookViewModel = viewModel(
+                    factory = ContactBookViewModel.Factory(application)
+                )
                 val bookUiState by bookViewModel.uiState.collectAsState()
 
                 // AddContactScreen 입력값들 보관
@@ -59,7 +63,8 @@ class AddContactActivity : ComponentActivity() {
                     groups = bookUiState.groups,
                     onNameChange = { name = it },
                     onEmailChange = { email = it },
-                    onRelationshipRoleChange = { recipientRole = it },
+                    onSenderRoleChange = { senderRole = it },
+                    onRecipientRoleChange = { recipientRole = it },
                     onPersonalPromptChange = { personalPrompt = it },
                     onGroupChange = { selectedGroup = it },
                     onBack = {

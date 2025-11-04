@@ -1,5 +1,6 @@
 package com.fiveis.xend.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
@@ -36,6 +37,10 @@ data class EmailItem(
 
     @SerializedName("label_ids")
     val labelIds: List<String>,
+
+    @ColumnInfo(defaultValue = "")
+    @SerializedName("body")
+    val body: String = "",
 
     val cachedAt: Long = System.currentTimeMillis()
 )

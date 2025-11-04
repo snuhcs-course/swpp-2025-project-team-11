@@ -33,6 +33,17 @@ interface EmailDao {
     @Query("SELECT COUNT(*) FROM emails")
     suspend fun getEmailCount(): Int
 
+    /**
+     * Get the latest email's dateRaw for incremental sync.
+     *
+     * NOTE: Using cachedAt for sorting because dateRaw format is inconsistent
+     * (ISO 8601 vs RFC 2822). This should be fixed by:
+     * 1. Backend sending consistent ISO 8601 format, or
+     * 2. Adding a separate timestamp field for sorting
+     */
+    @Query("SELECT dateRaw FROM emails ORDER BY cachedAt DESC LIMIT 1")
+    suspend fun getLatestEmailDate(): String?
+
     @Query(
         """
         SELECT * FROM emails

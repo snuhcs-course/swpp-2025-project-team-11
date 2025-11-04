@@ -1,5 +1,8 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import redis.asyncio as aioredis
+import json
+import asyncio
 
 MODEL_NAME = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
 
@@ -13,7 +16,7 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map=None
 ).to(device)
 
-def generate_reply(system_prompt: str, user_input: str, max_tokens: int = 10):
+async def stream_generate_reply(system_prompt: str, user_input: str, max_tokens: int = 10):
     try:
         messages = [
             {"role": "system", "content": system_prompt},
@@ -36,9 +39,34 @@ def generate_reply(system_prompt: str, user_input: str, max_tokens: int = 10):
         )
 
         generated_ids = output[0][input_length:]
-        
-        return tokenizer.decode(generated_ids, skip_special_tokens=True)
+        generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+        try:
+            clean_text = generated_text.strip("`json\n")
+            data = json.loads(clean_text)
+            print(data)
+            output_text = data.get("output", "")
+        except json.JSONDecodeError:
+            output_text = generated_text
+        print(f"[DEBUG] Generated: {generated_text}")
+        print(f"[DEBUG] Parsed: {output_text}")
+
+        for token in output_text.split():  # 공백 단위 스트리밍
+            yield token
+            await asyncio.sleep(0.01)
     except torch.cuda.OutOfMemoryError:
         raise RuntimeError("GPU 메모리 부족")
     except Exception as e:
         raise RuntimeError(f"모델 생성 중 오류 발생: {str(e)}")
+
+
+async def generate_and_publish(user_id: int, system_prompt: str, user_input: str, max_tokens: int = 10):
+    redis = await aioredis.from_url("redis://xend-fiveis-dev.duckdns.org:6379")
+    channel = f"user_{user_id}_mail"
+
+    async for token in stream_generate_reply(system_prompt, user_input, max_tokens):
+        message = json.dumps({"type": "gpu.message", "data": {"text": token}})
+        await redis.publish(channel, message)
+
+    await redis.publish(channel, json.dumps({"type": "gpu.done"}))
+    await redis.close()

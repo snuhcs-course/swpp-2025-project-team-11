@@ -8,13 +8,15 @@ import com.fiveis.xend.data.repository.ContactBookRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AddGroupUiState(
     val tonePromptOptions: List<PromptOption> = emptyList(),
     val formatPromptOptions: List<PromptOption> = emptyList(),
-    val isLoading: Boolean = false,
+    val isFetchingOptions: Boolean = false,
+    val isSubmitting: Boolean = false,
     val lastSuccessMsg: String? = null,
     val error: String? = null
 )
@@ -26,31 +28,65 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<AddGroupUiState> = _uiState.asStateFlow()
 
     init {
-        getAllPromptOptions()
+        viewModelScope.launch {
+            repository.observePromptOptions().collectLatest { all ->
+                _uiState.update {
+                    it.copy(
+                        tonePromptOptions = all.filter { o -> o.key == "tone" },
+                        formatPromptOptions = all.filter { o -> o.key == "format" }
+                    )
+                }
+            }
+        }
+        // 서버 → DB 동기화
+        viewModelScope.launch {
+            runCatching { repository.refreshPromptOptions() }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
     }
 
-    fun addGroup(name: String, description: String, options: List<PromptOption>) {
+    fun addGroup(
+        name: String,
+        description: String,
+        options: List<PromptOption>,
+        members: List<com.fiveis.xend.data.model.Contact> = emptyList()
+    ) {
         if (name.isBlank()) {
-            _uiState.update { it.copy(isLoading = false, error = "그룹 이름을 입력해 주세요.") }
+            _uiState.update { it.copy(error = "그룹 이름을 입력해 주세요.") }
             return
         }
 
-        _uiState.update { it.copy(isLoading = true, error = null, lastSuccessMsg = null) }
+        _uiState.update { it.copy(isSubmitting = true, error = null, lastSuccessMsg = null) }
 
         viewModelScope.launch {
             try {
+                // 1. 그룹 생성
+                android.util.Log.d("AddGroupViewModel", "Creating group: $name")
                 val res = repository.addGroup(name, description, options)
+                android.util.Log.d("AddGroupViewModel", "Group created with ID: ${res.id}")
+
+                // 2. 멤버들의 group_id 업데이트
+                if (members.isNotEmpty()) {
+                    android.util.Log.d("AddGroupViewModel", "Updating ${members.size} members")
+                    members.forEach { contact ->
+                        android.util.Log.d("AddGroupViewModel", "Updating contact ${contact.id} to group ${res.id}")
+                        repository.updateContactGroup(contact.id, res.id)
+                    }
+                    android.util.Log.d("AddGroupViewModel", "All members updated")
+                }
+
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        lastSuccessMsg = "추가 성공(그룹 ID: ${res.id})",
+                        isSubmitting = false,
+                        lastSuccessMsg = "추가 성공(그룹 ID: ${res.id}, 멤버 ${members.size}명)",
                         error = null
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("AddGroupViewModel", "Error adding group", e)
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
+                        isSubmitting = false,
                         error = e.message ?: "알 수 없는 오류"
                     )
                 }
@@ -86,25 +122,35 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
 
     fun getAllPromptOptions() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isFetchingOptions = true, error = null) }
             try {
                 val (tone, format) = repository.getAllPromptOptions()
                 _uiState.update {
                     it.copy(
                         tonePromptOptions = tone,
                         formatPromptOptions = format,
-                        isLoading = false,
+                        isFetchingOptions = false,
                         error = null
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
+                        isFetchingOptions = false,
                         error = e.message ?: "알 수 없는 오류"
                     )
                 }
             }
+        }
+    }
+
+    class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(AddGroupViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return AddGroupViewModel(application) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
 }

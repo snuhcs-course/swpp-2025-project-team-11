@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FormatBold
@@ -106,15 +107,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.network.MailComposeSseClient
+import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.AddButtonText
 import com.fiveis.xend.ui.theme.BannerBackground
 import com.fiveis.xend.ui.theme.BannerBorder
 import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
+import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
+import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.SuccessSurface
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
@@ -138,6 +142,7 @@ fun EmailComposeScreen(
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
     onNewContactChange: (TextFieldValue) -> Unit,
+    knownContactsByEmail: Map<String, Contact> = emptyMap(),
     isStreaming: Boolean,
     error: String?,
     onBack: () -> Unit = {},
@@ -147,12 +152,15 @@ fun EmailComposeScreen(
     onStopStreaming: () -> Unit = {},
     modifier: Modifier = Modifier,
     sendUiState: SendUiState,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    suggestionText: String = "",
+    onAcceptSuggestion: () -> Unit = {},
+    aiRealtime: Boolean = true,
+    onAiRealtimeToggle: (Boolean) -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val scrollState = rememberScrollState()
     var showBanner by rememberSaveable { mutableStateOf(true) }
-    var aiRealtime by rememberSaveable { mutableStateOf(true) }
 
     Scaffold(
         modifier = modifier
@@ -201,7 +209,8 @@ fun EmailComposeScreen(
                 contacts = contacts,
                 onContactsChange = onContactsChange,
                 newContact = newContact,
-                onNewContactChange = onNewContactChange
+                onNewContactChange = onNewContactChange,
+                knownContactsByEmail = knownContactsByEmail
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -217,12 +226,14 @@ fun EmailComposeScreen(
 
             BodyHeader(
                 isRealtimeOn = aiRealtime,
-                onToggle = { aiRealtime = it }
+                onToggle = onAiRealtimeToggle
             )
             RichTextEditorCard(
                 richTextState = richTextState,
                 isStreaming = isStreaming,
-                onTapComplete = onAiComplete
+                onTapComplete = onAiComplete,
+                suggestionText = suggestionText,
+                onAcceptSuggestion = onAcceptSuggestion
             )
 
             error?.let { ErrorMessage(it) }
@@ -529,21 +540,30 @@ private fun RecipientSection(
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
-    onNewContactChange: (TextFieldValue) -> Unit
+    onNewContactChange: (TextFieldValue) -> Unit,
+    knownContactsByEmail: Map<String, Contact>
 ) {
-    val addContact = {
-        val trimmed = newContact.text.trim()
-        if (trimmed.isNotEmpty()) {
-            onContactsChange(
-                contacts + Contact(
-                    id = 0,
-                    name = trimmed,
-                    email = trimmed,
-                    group = null
-                )
-            )
+    fun normalizeEmail(s: String) = s.trim().lowercase()
+
+    val addContact: () -> Unit = fun() {
+        val raw = newContact.text.trim()
+        if (raw.isEmpty()) return
+
+        val email = Regex("<([^>]+)>").find(raw)?.groupValues?.getOrNull(1)?.trim() ?: raw
+
+        // 이메일 중복 방지
+        if (contacts.any { normalizeEmail(it.email) == normalizeEmail(email) }) {
             onNewContactChange(TextFieldValue(""))
+            return
         }
+
+        // DB 매칭
+        val saved = knownContactsByEmail[normalizeEmail(email)]
+
+        val contactToAdd = saved ?: Contact(id = -1L, name = email, email = email, group = null)
+
+        onContactsChange(contacts + contactToAdd)
+        onNewContactChange(TextFieldValue(""))
     }
 
     val scrollState = rememberScrollState()
@@ -813,7 +833,9 @@ private fun RichTextEditorControls(
 private fun RichTextEditorCard(
     richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
     isStreaming: Boolean,
-    onTapComplete: () -> Unit
+    onTapComplete: () -> Unit,
+    suggestionText: String = "",
+    onAcceptSuggestion: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -825,21 +847,71 @@ private fun RichTextEditorCard(
     ) {
         Column {
             RichTextEditorControls(state = richTextState)
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                placeholder = {
-                    Text(
-                        text = "내용을 입력하세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                    )
+                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
+            ) {
+                RichTextEditor(
+                    state = richTextState,
+                    enabled = !isStreaming,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text = "내용을 입력하세요",
+                            style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
+                        )
+                    }
+                )
+
+                if (suggestionText.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = TextSecondary.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.2f))
+                    ) {
+                        Text(
+                            text = suggestionText,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = TextSecondary.copy(alpha = 0.7f),
+                                fontStyle = FontStyle.Italic
+                            ),
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.FloatingActionButton(
+                        onClick = onAcceptSuggestion,
+                        modifier = Modifier.align(Alignment.End),
+                        containerColor = Blue60,
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "제안 수락",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "탭 완성",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
                 }
-            )
+            }
         }
     }
 }
@@ -858,11 +930,15 @@ private fun ErrorMessage(message: String) {
 
 @Composable
 fun ContactChip(contact: Contact, onRemove: () -> Unit) {
+    val isKnown = contact.id >= 0L
+    val borderColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
+    val dotColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
+
     Surface(
         modifier = Modifier.height(24.dp),
         shape = RoundedCornerShape(12.dp),
         color = AddButtonBackground,
-        border = BorderStroke(1.dp, Color(0xFF6366F1))
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier
@@ -874,11 +950,11 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
                 modifier = Modifier
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(contact.color),
+                    .background(dotColor),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = contact.name.firstOrNull()?.uppercase() ?: "?",
+                    text = if (contact.id < 0L) "?" else (contact.name.firstOrNull() ?: '?').uppercaseChar().toString(),
                     color = Color.White,
                     style = MaterialTheme.typography.labelSmall
                 )
@@ -886,7 +962,12 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "${contact.name} (${contact.email})",
-                style = MaterialTheme.typography.labelSmall.copy(color = AddButtonText),
+                style =
+                if (contact.id < 0L) {
+                    MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                } else {
+                    MaterialTheme.typography.labelSmall.copy(color = Blue80)
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -903,10 +984,13 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
     }
 }
 
-class ComposeVmFactory(private val client: MailComposeSseClient) : ViewModelProvider.Factory {
+class ComposeVmFactory(
+    private val sseClient: MailComposeSseClient,
+    private val wsClient: MailComposeWebSocketClient
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MailComposeViewModel(client) as T
+        return MailComposeViewModel(sseClient, wsClient) as T
     }
 }
 
@@ -923,9 +1007,13 @@ class MailComposeActivity : ComponentActivity() {
                 // 1) AI Compose VM
                 val composeVm: MailComposeViewModel = viewModel(
                     factory = ComposeVmFactory(
-                        MailComposeSseClient(
+                        sseClient = MailComposeSseClient(
                             application.applicationContext,
-                            endpointUrl = BuildConfig.BASE_URL + "api/ai/mail/generate/stream/"
+                            endpointUrl = BuildConfig.BASE_URL + "/api/ai/mail/generate/stream/"
+                        ),
+                        wsClient = MailComposeWebSocketClient(
+                            context = application.applicationContext,
+                            wsUrl = BuildConfig.WS_URL
                         )
                     )
                 )
@@ -936,6 +1024,17 @@ class MailComposeActivity : ComponentActivity() {
                     factory = SendMailViewModel.Factory(application)
                 )
 
+                // 3) Contact Lookup VM
+                val lookupVm: ContactLookupViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ContactLookupViewModel(application) as T
+                        }
+                    }
+                )
+                val knownByEmail by lookupVm.byEmail.collectAsState() // Map<String, Contact
+
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
                 val richTextState = rememberRichTextState()
@@ -943,23 +1042,29 @@ class MailComposeActivity : ComponentActivity() {
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
                 var showTemplateScreen by remember { mutableStateOf(false) }
-
-                // Set initial content for the editor
-                LaunchedEffect(Unit) {
-                    richTextState.setHtml(
-                        "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 <b>우수한 성과</b>라고 판단됩니다."
-                    )
-                }
+                var aiRealtime by rememberSaveable { mutableStateOf(true) }
 
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
+
+                // Enable/disable realtime mode when toggle changes
+                LaunchedEffect(aiRealtime) {
+                    composeVm.enableRealtimeMode(aiRealtime)
+                }
 
                 // Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
                         richTextState.setHtml(composeUi.bodyRendered)
+                    }
+                }
+
+                // Monitor text changes for realtime suggestions
+                LaunchedEffect(richTextState.annotatedString.text) {
+                    if (aiRealtime) {
+                        composeVm.onTextChanged(richTextState.toHtml())
                     }
                 }
 
@@ -993,11 +1098,31 @@ class MailComposeActivity : ComponentActivity() {
                             onContactsChange = { contacts = it },
                             newContact = newContact,
                             onNewContactChange = { newContact = it },
+                            knownContactsByEmail = knownByEmail,
                             isStreaming = composeUi.isStreaming,
                             error = composeUi.error,
                             sendUiState = sendUi,
                             onBack = { finish() },
+                            onTemplateClick = { showTemplateScreen = true },
                             onUndo = { /* TODO */ },
+                            suggestionText = composeUi.suggestionText,
+                            onAcceptSuggestion = {
+                                // 전체 추천 문장 적용
+                                val suggestion = composeUi.suggestionText
+                                if (suggestion.isNotEmpty()) {
+                                    val currentText = richTextState.annotatedString.text
+                                    val separator = if (currentText.endsWith(" ") || currentText.isEmpty()) "" else " "
+
+                                    // 기존 HTML + 전체 추천 문장
+                                    val currentHtml = richTextState.toHtml()
+                                    richTextState.setHtml(currentHtml + separator + suggestion)
+
+                                    // 추천 완료 후 클리어
+                                    composeVm.acceptSuggestion()
+                                }
+                            },
+                            aiRealtime = aiRealtime,
+                            onAiRealtimeToggle = { aiRealtime = it },
                             onAiComplete = {
                                 val payload = JSONObject().apply {
                                     put("subject", subject.ifBlank { "제목 생성" })
@@ -1055,7 +1180,11 @@ private fun EmailComposePreview() {
             error = null,
             sendUiState = SendUiState(),
             onTemplateClick = {},
-            onSend = {}
+            onSend = {},
+            suggestionText = "",
+            onAcceptSuggestion = {},
+            aiRealtime = true,
+            onAiRealtimeToggle = {}
         )
     }
 }

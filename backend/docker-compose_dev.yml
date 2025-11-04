@@ -2,11 +2,13 @@ version: "3.9"
 
 services:
   server:
-    build:
+    build: &server-build
       context: .
       target: dev
     container_name: xend-server
     working_dir: /app
+    depends_on:
+       - redis
     ports:
        - "8008:8000"
     volumes:
@@ -17,7 +19,42 @@ services:
       poetry run python manage.py migrate &&
       poetry run uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --reload-include '*.html'"
 
+  redis:
+    image: redis:7
+    container_name: xend-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --loglevel debug
 
+  celery_worker:
+    build: *server-build
+    command: >
+      bash -c "poetry run celery -A config.celery worker --loglevel=info --concurrency=2"
+    volumes:
+      - ./:/app
+    depends_on:
+      - server
+    shm_size: "256m"
+
+  celery_beat:
+    build: *server-build
+    command: >
+      bash -c "poetry run celery -A config.celery beat --loglevel=info"
+    depends_on:
+      - server
+
+  celery_flower:
+    build: *server-build
+    command: >
+      bash -c "poetry run celery -A config.celery flower --port=5555 --basic-auth=fiveis:fiveis"
+    ports:
+      - "5555:5555"
+    depends_on:
+      - server
+      - redis
+      - celery_worker
+ 
   nginx:
     image: nginx:1.27-alpine
     container_name: xend-nginx

@@ -18,7 +18,7 @@ data class InboxUiState(
     val emails: List<EmailItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val nextPageToken: String? = null,
+    val loadMoreNextPageToken: String? = null,
     val isRefreshing: Boolean = false
 )
 
@@ -35,7 +35,8 @@ class InboxViewModel(
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
         loadCachedEmails()
-        refreshEmails()
+        // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
+        silentRefreshEmails()
     }
 
     private fun loadCachedEmails() {
@@ -48,39 +49,73 @@ class InboxViewModel(
         }
     }
 
+    /**
+     * 사용자가 Pull-to-Refresh할 때 호출 (UI 로딩 표시 있음)
+     */
     fun refreshEmails() {
-        Log.d("InboxViewModel", "refreshEmails called")
+        Log.d("InboxViewModel", "refreshEmails called (with UI loading)")
         _uiState.update { it.copy(isRefreshing = true) }
+        performRefresh(showLoading = true)
+    }
+
+    /**
+     * 백그라운드 사일런트 동기화 (UI 로딩 표시 없음)
+     */
+    private fun silentRefreshEmails() {
+        Log.d("InboxViewModel", "silentRefreshEmails called (background sync)")
+        performRefresh(showLoading = false)
+    }
+
+    private fun performRefresh(showLoading: Boolean) {
         viewModelScope.launch {
             try {
                 val result = repository.refreshEmails()
                 if (result.isFailure) {
                     val errorMessage = result.exceptionOrNull()?.message ?: "Unknown error"
                     Log.e("InboxViewModel", "refreshEmails failed: $errorMessage")
-                    _uiState.update {
-                        it.copy(
-                            error = errorMessage,
-                            isRefreshing = false
-                        )
+                    if (showLoading) {
+                        _uiState.update {
+                            it.copy(
+                                error = errorMessage,
+                                isRefreshing = false
+                            )
+                        }
                     }
                 } else {
                     val nextToken = result.getOrNull()
                     Log.d("InboxViewModel", "refreshEmails succeeded, nextPageToken: $nextToken")
-                    _uiState.update {
-                        it.copy(
+
+                    _uiState.update { currentState ->
+                        // DB가 비어있을 때만 loadMoreNextPageToken 설정
+                        // (DB에 메일이 있으면 refresh 토큰은 이미 저장된 메일을 가리키므로 버림)
+                        val newLoadMoreToken = if (currentState.emails.isEmpty()) {
+                            Log.d("InboxViewModel", "DB empty - setting loadMoreNextPageToken: $nextToken")
+                            nextToken
+                        } else {
+                            Log.d(
+                                "InboxViewModel",
+                                "DB has ${currentState.emails.size} emails - keeping existing loadMoreNextPageToken: " +
+                                    "${currentState.loadMoreNextPageToken}"
+                            )
+                            currentState.loadMoreNextPageToken
+                        }
+
+                        currentState.copy(
                             isRefreshing = false,
                             error = null,
-                            nextPageToken = nextToken
+                            loadMoreNextPageToken = newLoadMoreToken
                         )
                     }
                 }
             } catch (e: Exception) {
                 Log.e("InboxViewModel", "Exception during refreshEmails", e)
-                _uiState.update {
-                    it.copy(
-                        error = e.message,
-                        isRefreshing = false
-                    )
+                if (showLoading) {
+                    _uiState.update {
+                        it.copy(
+                            error = e.message,
+                            isRefreshing = false
+                        )
+                    }
                 }
             }
         }
@@ -88,18 +123,24 @@ class InboxViewModel(
 
     fun loadMoreEmails() {
         val currentState = _uiState.value
-        if (currentState.isLoading || currentState.isRefreshing) {
-            Log.d("InboxViewModel", "loadMoreEmails skipped: already loading or refreshing")
+        Log.d(
+            "InboxViewModel",
+            "loadMoreEmails called - isLoading=${currentState.isLoading}, isRefreshing=${currentState.isRefreshing}, " +
+                "loadMoreNextPageToken=${currentState.loadMoreNextPageToken}"
+        )
+
+        if (currentState.isLoading) {
+            Log.d("InboxViewModel", "loadMoreEmails skipped: already loading")
             return
         }
 
-        val token = currentState.nextPageToken
+        val token = currentState.loadMoreNextPageToken
         if (token == null) {
             Log.d("InboxViewModel", "loadMoreEmails skipped: no next page token")
             return
         }
 
-        Log.d("InboxViewModel", "loadMoreEmails called with token: $token")
+        Log.d("InboxViewModel", "loadMoreEmails proceeding with token: $token")
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
@@ -107,13 +148,26 @@ class InboxViewModel(
                 if (response.isSuccessful) {
                     val newEmails = response.body()?.messages ?: emptyList()
                     Log.d("InboxViewModel", "Received ${newEmails.size} more emails")
+
+                    // Check for duplicates
+                    val existingIds = currentState.emails.map { it.id }.toSet()
+                    val actuallyNewEmails = newEmails.filter { it.id !in existingIds }
+                    Log.d(
+                        "InboxViewModel",
+                        "Actually new emails: ${actuallyNewEmails.size} (duplicates: " +
+                            "${newEmails.size - actuallyNewEmails.size})"
+                    )
+
                     if (newEmails.isNotEmpty()) {
                         repository.saveEmailsToCache(newEmails)
                         Log.d("InboxViewModel", "Saved ${newEmails.size} emails to cache")
                     }
+
+                    val newLoadMoreToken = response.body()?.nextPageToken
+                    Log.d("InboxViewModel", "Updated loadMoreNextPageToken: $newLoadMoreToken")
                     _uiState.update {
                         it.copy(
-                            nextPageToken = response.body()?.nextPageToken,
+                            loadMoreNextPageToken = newLoadMoreToken,
                             isLoading = false,
                             error = null
                         )
