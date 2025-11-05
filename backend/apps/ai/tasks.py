@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Count
 
@@ -6,13 +7,20 @@ from ..contact.models import Contact
 from .models import ContactAnalysisResult, GroupAnalysisResult, MailAnalysisResult
 from .services.langchain import analyze_speech_llm, integrate_analysis
 
+User = get_user_model()
+
 
 @shared_task(bind=True, max_retries=3)
-def analyze_speech(self, user, subject, body, to_emails):
+def analyze_speech(self, user_id, subject, body, to_emails):
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return None
+
     # langchain 이용하여 주어진 메일로 사용자의 말투를 분석한다.
     try:
-        analysis_result = analyze_speech_llm(user, subject, body, to_emails).model_dump()
-        contacts = Contact.objects.filter(email__in=to_emails, user_id=user.id)
+        analysis_result = analyze_speech_llm(subject, body).model_dump()
+        contacts = Contact.objects.filter(email__in=to_emails, user_id=user_id)
 
         with transaction.atomic():
             for contact in contacts:
@@ -42,7 +50,7 @@ def analyze_speech(self, user, subject, body, to_emails):
                     )
 
                 # 해당 (user, contact.group)에 해당하는 GroupAnalysisResult이 없다면 방금 분석된 결과를 필드에 그대로 넣어줌
-                if not GroupAnalysisResult.objects.filter(user=user, group=contact.group).exits():
+                if not GroupAnalysisResult.objects.filter(user=user, group=contact.group).exists():
                     GroupAnalysisResult.objects.create(
                         user=user,
                         group=contact.group,
