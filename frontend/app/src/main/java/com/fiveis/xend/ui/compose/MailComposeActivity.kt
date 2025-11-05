@@ -685,7 +685,7 @@ private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) 
         Row(
             modifier = Modifier
                 .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -851,12 +851,10 @@ private fun RichTextEditorCard(
                 }
             )
 
-            if (suggestionText.isNotEmpty()) {
-                SuggestionPreviewPanel(
-                    suggestionText = suggestionText,
-                    onAcceptSuggestion = onAcceptSuggestion
-                )
-            }
+            SuggestionPreviewPanel(
+                suggestionText = suggestionText,
+                onAcceptSuggestion = onAcceptSuggestion
+            )
 
             ComposeTapCompleteButton(onClick = onTapComplete)
         }
@@ -865,6 +863,8 @@ private fun RichTextEditorCard(
 
 @Composable
 private fun SuggestionPreviewPanel(suggestionText: String, onAcceptSuggestion: () -> Unit) {
+    if (suggestionText.isEmpty()) return
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -873,7 +873,7 @@ private fun SuggestionPreviewPanel(suggestionText: String, onAcceptSuggestion: (
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            color = Color(0xFFF8FAFC),
+            color = Color.White,
             border = BorderStroke(1.dp, Color(0xFFE2E8F0))
         ) {
             Text(
@@ -894,9 +894,9 @@ private fun SuggestionPreviewPanel(suggestionText: String, onAcceptSuggestion: (
         ) {
             OutlinedButton(
                 onClick = onAcceptSuggestion,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(1.dp, Color(0xFFCBD5F5)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = Color.White,
                     contentColor = Blue60
@@ -905,12 +905,16 @@ private fun SuggestionPreviewPanel(suggestionText: String, onAcceptSuggestion: (
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "제안 적용",
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "제안 적용",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Blue60
+                    )
                 )
             }
         }
@@ -928,11 +932,11 @@ private fun ComposeTapCompleteButton(onClick: () -> Unit) {
         OutlinedButton(
             onClick = onClick,
             modifier = Modifier
-                .widthIn(min = 72.dp)
-                .height(32.dp),
-            shape = RoundedCornerShape(10.dp),
+                .widthIn(min = 68.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, Color(0xFFC7D2FE)),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = Color.White,
                 contentColor = Blue60
@@ -940,19 +944,20 @@ private fun ComposeTapCompleteButton(onClick: () -> Unit) {
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.FlashOn,
                     contentDescription = "탭 완성",
                     tint = Blue60,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(14.dp)
                 )
                 Text(
                     text = "탭 완성",
-                    style = MaterialTheme.typography.labelLarge.copy(
+                    style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.SemiBold,
+                        color = Blue60
                     )
                 )
             }
