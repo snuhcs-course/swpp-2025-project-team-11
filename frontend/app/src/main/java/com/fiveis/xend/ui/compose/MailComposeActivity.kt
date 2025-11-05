@@ -127,6 +127,7 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.UndoBorder
+import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 import kotlinx.coroutines.delay
@@ -830,7 +831,7 @@ private fun RichTextEditorCard(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(28.dp),
         border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeBackground
+        color = Color.White
     ) {
         Column {
             RichTextEditorControls(state = richTextState)
@@ -843,6 +844,7 @@ private fun RichTextEditorCard(
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 240.dp)
                     .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
+
                 placeholder = {
                     Text(
                         text = "내용을 입력하세요",
@@ -1072,7 +1074,7 @@ class MailComposeActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            XendTheme {
                 // 1) AI Compose VM
                 val composeVm: MailComposeViewModel = viewModel(
                     factory = ComposeVmFactory(
