@@ -425,17 +425,17 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.clickable { onSelect("inbox") }
+                modifier = Modifier.clickable { onSelect("mail") }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Email,
-                    contentDescription = "받은메일함",
-                    tint = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    contentDescription = "메일함",
+                    tint = if (selected == "mail") Color(0xFF1A73E8) else Color(0xFF1E293B),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "받은메일",
-                    color = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    text = "메일함",
+                    color = if (selected == "mail") Color(0xFF1A73E8) else Color(0xFF1E293B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -444,7 +444,7 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.clickable { onSelect("contacts") }
+                modifier = Modifier.clickable { /* 이미 연락처에 있음 */ }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Person,

@@ -41,11 +41,11 @@ class InboxRepositoryTest {
             createMockEmailItem("1"),
             createMockEmailItem("2")
         )
-        every { emailDao.getAllEmails() } returns flowOf(mockEmails)
+        every { emailDao.getEmailsByLabel("INBOX") } returns flowOf(mockEmails)
 
         val result = repository.getCachedEmails()
 
-        coVerify { emailDao.getAllEmails() }
+        coVerify { emailDao.getEmailsByLabel("INBOX") }
     }
 
     @Test

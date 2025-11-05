@@ -14,8 +14,8 @@ class SentRepository(
     private val emailDao: EmailDao
 ) {
     fun getCachedEmails(): Flow<List<EmailItem>> {
-        return emailDao.getAllEmails().also {
-            Log.d("SentRepository", "getCachedEmails Flow created")
+        return emailDao.getEmailsByLabel("SENT").also {
+            Log.d("SentRepository", "getCachedEmails Flow created for SENT")
         }
     }
 

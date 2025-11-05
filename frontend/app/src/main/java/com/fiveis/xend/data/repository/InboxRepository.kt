@@ -14,8 +14,8 @@ class InboxRepository(
     private val emailDao: EmailDao
 ) {
     fun getCachedEmails(): Flow<List<EmailItem>> {
-        return emailDao.getAllEmails().also {
-            Log.d("InboxRepository", "getCachedEmails Flow created")
+        return emailDao.getEmailsByLabel("INBOX").also {
+            Log.d("InboxRepository", "getCachedEmails Flow created for INBOX")
         }
     }
 

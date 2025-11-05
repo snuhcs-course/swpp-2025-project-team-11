@@ -362,6 +362,50 @@ private fun EmailList(
     }
 }
 
+// Extracted EmailListContent for use in MailScreen
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EmailListContent(
+    emails: List<EmailItem>,
+    onEmailClick: (EmailItem) -> Unit,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean,
+    error: String?,
+    onScrollChange: (Int, Int) -> Unit = { _, _ -> }
+) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            onScrollChange(index, offset)
+        }
+    }
+
+    if (isRefreshing && emails.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else if (error != null && emails.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text = "Error: $error")
+        }
+    } else {
+        EmailList(
+            emails = emails,
+            onEmailClick = onEmailClick,
+            onRefresh = onRefresh,
+            onLoadMore = onLoadMore,
+            isRefreshing = isRefreshing,
+            isLoadingMore = isLoadingMore,
+            listState = listState
+        )
+    }
+}
+
 @Composable
 private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
     Box(

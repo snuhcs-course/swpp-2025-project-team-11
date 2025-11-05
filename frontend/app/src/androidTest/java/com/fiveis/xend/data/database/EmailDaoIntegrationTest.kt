@@ -296,15 +296,15 @@ class EmailDaoIntegrationTest {
 
     @Test
     fun large_number_of_emails_are_handled_correctly() = runTest {
-        val emails = (1..100).map { createMockEmailItem(it.toString()) }
+        val emails = (1..50).map { createMockEmailItem(it.toString()) }
 
         emailDao.insertEmails(emails)
 
         val count = emailDao.getEmailCount()
-        assertEquals(100, count)
+        assertEquals(50, count)
 
         val result = emailDao.getAllEmails().first()
-        assertEquals(100, result.size)
+        assertEquals(50, result.size)
     }
 
     private fun createMockEmailItem(

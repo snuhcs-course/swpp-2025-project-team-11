@@ -10,6 +10,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -23,14 +25,16 @@ class MailReplySseIntegrationTest {
     private lateinit var context: Context
     private lateinit var tokenManager: TokenManager
     private lateinit var sseClient: MailReplySseClient
+    private lateinit var mockWebServer: MockWebServer
 
     private val mockAccessToken = "mock_access_token_123456789"
-    private val mockEndpointUrl = "https://mock-server.com/api/ai/mail/reply/stream/"
 
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         tokenManager = mockk(relaxed = true)
+        mockWebServer = MockWebServer()
+        mockWebServer.start()
 
         every { tokenManager.getAccessToken() } returns mockAccessToken
     }
@@ -40,6 +44,7 @@ class MailReplySseIntegrationTest {
         if (::sseClient.isInitialized) {
             sseClient.stop()
         }
+        mockWebServer.shutdown()
     }
 
     @Test
@@ -47,22 +52,28 @@ class MailReplySseIntegrationTest {
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         assertTrue(::sseClient.isInitialized)
     }
 
-    @Test(timeout = 15000)
+    @Test(timeout = 10000)
     fun sse_start_with_valid_parameters_initializes_connection() {
         val callbackLatch = CountDownLatch(1)
         var callbackInvoked = false
-        var errorMessage = ""
+
+        // Mock SSE response that will trigger onError (connection failure is expected)
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(500)
+                .setBody("Server error")
+        )
 
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         sseClient.start(
@@ -81,26 +92,27 @@ class MailReplySseIntegrationTest {
                 callbackInvoked = true
                 callbackLatch.countDown()
             },
-            onError = { msg ->
+            onError = {
                 callbackInvoked = true
-                errorMessage = msg
                 callbackLatch.countDown()
             }
         )
 
-        // Connection will likely fail due to mock server, but any callback is acceptable
-        val callbackReceived = callbackLatch.await(12, TimeUnit.SECONDS)
-
-        // As long as we got some callback (error, ready, or done), the test passes
+        val callbackReceived = callbackLatch.await(8, TimeUnit.SECONDS)
         assertTrue("Expected some callback to be invoked", callbackInvoked || callbackReceived)
     }
 
     @Test
     fun sse_stop_cancels_ongoing_connection() {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(500)
+        )
+
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         val errorLatch = CountDownLatch(1)
@@ -129,12 +141,21 @@ class MailReplySseIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 15000)
     fun sse_multiple_starts_cancel_previous_connection() {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(500)
+        )
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(500)
+        )
+
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         val firstErrorLatch = CountDownLatch(1)
@@ -170,18 +191,23 @@ class MailReplySseIntegrationTest {
             onError = { secondErrorLatch.countDown() }
         )
 
-        assertTrue(secondErrorLatch.await(5, TimeUnit.SECONDS))
+        assertTrue(secondErrorLatch.await(10, TimeUnit.SECONDS))
     }
 
-    @Test
+    @Test(timeout = 15000)
     fun sse_handles_callback_invocations() {
         val callbacksInvoked = mutableListOf<String>()
         val latch = CountDownLatch(1)
 
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(500)
+        )
+
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         sseClient.start(
@@ -200,7 +226,7 @@ class MailReplySseIntegrationTest {
             }
         )
 
-        assertTrue(latch.await(5, TimeUnit.SECONDS))
+        assertTrue(latch.await(10, TimeUnit.SECONDS))
         assertTrue(callbacksInvoked.contains("error"))
     }
 
@@ -209,7 +235,7 @@ class MailReplySseIntegrationTest {
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         sseClient.stop()
@@ -221,7 +247,7 @@ class MailReplySseIntegrationTest {
 
     @Test
     fun sse_validates_endpoint_url() {
-        val validUrl = "https://api.example.com/stream"
+        val validUrl = mockWebServer.url("/stream").toString()
 
         sseClient = MailReplySseClient(
             context = context,
@@ -232,16 +258,21 @@ class MailReplySseIntegrationTest {
         assertTrue(::sseClient.isInitialized)
     }
 
-    @Test(timeout = 15000)
+    @Test(timeout = 10000)
     fun sse_handles_token_manager_integration() {
         val customTokenManager = TokenManager(context)
         val callbackLatch = CountDownLatch(1)
         var callbackInvoked = false
 
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+        )
+
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = customTokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         sseClient.start(
@@ -266,10 +297,7 @@ class MailReplySseIntegrationTest {
             }
         )
 
-        // Connection will likely fail due to mock server or missing token
-        val callbackReceived = callbackLatch.await(12, TimeUnit.SECONDS)
-
-        // As long as we got some callback, the test passes
+        val callbackReceived = callbackLatch.await(8, TimeUnit.SECONDS)
         assertTrue("Expected some callback to be invoked", callbackInvoked || callbackReceived)
     }
 
@@ -287,14 +315,19 @@ class MailReplySseIntegrationTest {
         assertEquals("Casual Reply", option2.title)
     }
 
-    @Test
+    @Test(timeout = 15000)
     fun sse_handles_empty_subject_and_body() {
         val errorLatch = CountDownLatch(1)
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(400)
+        )
 
         sseClient = MailReplySseClient(
             context = context,
             tokenManager = tokenManager,
-            endpointUrl = mockEndpointUrl
+            endpointUrl = mockWebServer.url("/stream").toString()
         )
 
         sseClient.start(
@@ -310,6 +343,6 @@ class MailReplySseIntegrationTest {
             onError = { errorLatch.countDown() }
         )
 
-        assertTrue(errorLatch.await(5, TimeUnit.SECONDS))
+        assertTrue(errorLatch.await(10, TimeUnit.SECONDS))
     }
 }

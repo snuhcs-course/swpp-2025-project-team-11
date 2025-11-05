@@ -48,14 +48,14 @@ class SentRepositoryTest {
             )
         )
 
-        every { emailDao.getAllEmails() } returns flowOf(mockEmails)
+        every { emailDao.getEmailsByLabel("SENT") } returns flowOf(mockEmails)
 
         val flow = repository.getCachedEmails()
         var result: List<EmailItem>? = null
         flow.collect { result = it }
 
         assertEquals(mockEmails, result)
-        verify { emailDao.getAllEmails() }
+        verify { emailDao.getEmailsByLabel("SENT") }
     }
 
     @Test
