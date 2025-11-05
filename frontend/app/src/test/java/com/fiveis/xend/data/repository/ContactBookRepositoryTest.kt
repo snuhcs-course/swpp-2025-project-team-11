@@ -1,24 +1,27 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
-import com.fiveis.xend.data.database.AppDatabase // <-- Room DB 임포트
-import com.fiveis.xend.data.database.ContactDao // <-- DAO 임포트
-import com.fiveis.xend.data.database.GroupDao // <-- DAO 임포트
-import com.fiveis.xend.data.database.PromptOptionDao // <-- DAO 임포트
+import androidx.room.withTransaction
+import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.database.ContactDao
+import com.fiveis.xend.data.database.GroupDao
+import com.fiveis.xend.data.database.PromptOptionDao
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.ContactResponseContext
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
-import androidx.room.withTransaction
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkAll
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
@@ -639,5 +642,246 @@ class ContactBookRepositoryTest {
 
         assertTrue(exception != null)
         assertTrue(exception?.message?.contains("Failed to get all prompt options") == true)
+    }
+
+    @Test
+    fun refresh_groups_with_options_upserts_options_and_crossrefs() = runTest {
+        val resp = listOf(
+            GroupResponse(
+                id = 10L, name = "G", description = "D",
+                options = listOf(
+                    PromptOption(101L, "tone", "Formal", "f"),
+                    PromptOption(102L, "format", "Short", "s")
+                )
+            )
+        )
+        coEvery { contactApiService.getAllGroups() } returns Response.success(resp)
+        coEvery { groupDao.deleteAllGroups() } returns Unit
+        coEvery { optionDao.deleteAllCrossRefs() } returns Unit
+
+        val groupsSlot = slot<List<com.fiveis.xend.data.database.entity.GroupEntity>>()
+        val optsSlot = slot<List<com.fiveis.xend.data.database.entity.PromptOptionEntity>>()
+        val refsSlot = slot<List<com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef>>()
+
+        coEvery { groupDao.upsertGroups(capture(groupsSlot)) } returns Unit
+        coEvery { optionDao.upsertOptions(capture(optsSlot)) } returns Unit
+        coEvery { optionDao.upsertCrossRefs(capture(refsSlot)) } returns Unit
+
+        repository.refreshGroups()
+
+        assertEquals(1, groupsSlot.captured.size)
+        assertEquals(setOf(101L, 102L), optsSlot.captured.map { it.id }.toSet())
+        assertEquals(setOf(101L, 102L), refsSlot.captured.map { it.optionId }.toSet())
+        assertTrue(refsSlot.captured.all { it.groupId == 10L })
+    }
+
+    @Test
+    fun refresh_groups_http_error_throws() = runTest {
+        coEvery { contactApiService.getAllGroups() } returns Response.error(500, "x".toResponseBody())
+        val e = runCatching { repository.refreshGroups() }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+    }
+
+    @Test
+    fun refresh_contacts_with_contexts_upserts_contexts() = runTest {
+        val resp = listOf(
+            ContactResponse(
+                id = 1L, name = "A", email = "a@x.com",
+                context = ContactResponseContext(id = 1L, senderRole = "S", recipientRole = "R")
+            )
+        )
+        coEvery { contactApiService.getAllContacts() } returns Response.success(resp)
+        coEvery { contactDao.deleteAllContexts() } returns Unit
+        coEvery { contactDao.deleteAllContacts() } returns Unit
+
+        val contactsSlot = slot<List<com.fiveis.xend.data.database.entity.ContactEntity>>()
+        val ctxSlot = slot<List<com.fiveis.xend.data.database.entity.ContactContextEntity>>()
+
+        coEvery { contactDao.upsertContacts(capture(contactsSlot)) } returns Unit
+        coEvery { contactDao.upsertContexts(capture(ctxSlot)) } returns Unit
+
+        repository.refreshContacts()
+
+        assertEquals(listOf(1L), contactsSlot.captured.map { it.id })
+        assertEquals(listOf(1L), ctxSlot.captured.map { it.contactId })
+        assertEquals("S", ctxSlot.captured.first().senderRole)
+    }
+
+    @Test
+    fun refresh_contacts_http_error_throws() = runTest {
+        coEvery { contactApiService.getAllContacts() } returns Response.error(400, "x".toResponseBody())
+        val e = runCatching { repository.refreshContacts() }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+    }
+
+    @Test
+    fun refresh_group_replaces_crossrefs_and_upserts_options() = runTest {
+        val resp = GroupResponse(
+            id = 3L, name = "G", description = null,
+            options = listOf(PromptOption(10L, "tone", "F", "f"))
+        )
+        coEvery { contactApiService.getGroup(3L) } returns Response.success(resp)
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.upsertOptions(any()) } returns Unit
+        coEvery { optionDao.deleteCrossRefsByGroup(3L) } returns Unit
+
+        val refsSlot = slot<List<com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef>>()
+        coEvery { optionDao.upsertCrossRefs(capture(refsSlot)) } returns Unit
+
+        repository.refreshGroup(3L)
+
+        coVerify { optionDao.deleteCrossRefsByGroup(3L) }
+        assertEquals(listOf(10L), refsSlot.captured.map { it.optionId })
+    }
+
+    @Test
+    fun refresh_group_with_no_options_clears_crossrefs_only() = runTest {
+        val resp = GroupResponse(id = 4L, name = "G4", description = null, options = emptyList())
+        coEvery { contactApiService.getGroup(4L) } returns Response.success(resp)
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.deleteCrossRefsByGroup(4L) } returns Unit
+
+        repository.refreshGroup(4L)
+
+        coVerify(exactly = 0) { optionDao.upsertCrossRefs(any()) }
+        coVerify(exactly = 0) { optionDao.upsertOptions(any()) }
+    }
+
+    @Test
+    fun refresh_group_http_error_throws() = runTest {
+        coEvery { contactApiService.getGroup(9L) } returns Response.error(404, "x".toResponseBody())
+        val e = runCatching { repository.refreshGroup(9L) }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+    }
+
+    @Test
+    fun refresh_group_and_members_calls_both_endpoints() = runTest {
+        coEvery { contactApiService.getGroup(1L) } returns Response.success(
+            GroupResponse(1L, "G", null, emptyList())
+        )
+        coEvery { contactApiService.getAllContacts() } returns Response.success(emptyList())
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.deleteCrossRefsByGroup(1L) } returns Unit
+        coEvery { contactDao.deleteAllContexts() } returns Unit
+        coEvery { contactDao.deleteAllContacts() } returns Unit
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
+
+        repository.refreshGroupAndMembers(1L)
+
+        coVerify { contactApiService.getGroup(1L) }
+        coVerify { contactApiService.getAllContacts() }
+    }
+
+    @Test
+    fun refresh_prompt_options_upserts_entities() = runTest {
+        val opts = listOf(PromptOption(1L, "tone", "F", "f"))
+        coEvery { contactApiService.getAllPromptOptions() } returns Response.success(opts)
+        coEvery { optionDao.upsertOptions(any()) } returns Unit
+
+        repository.refreshPromptOptions()
+
+        coVerify { optionDao.upsertOptions(match { it.size == 1 && it[0].id == 1L }) }
+    }
+
+    @Test
+    fun refresh_prompt_options_http_error_throws() = runTest {
+        coEvery { contactApiService.getAllPromptOptions() } returns Response.error(500, "err".toResponseBody())
+        val e = runCatching { repository.refreshPromptOptions() }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+    }
+
+    @Test
+    fun update_contact_group_success_updates_local() = runTest {
+        coEvery { contactApiService.updateContact(5L, any()) } returns Response.success(null)
+        coEvery { contactDao.updateGroupId(5L, 2L) } returns Unit
+
+        repository.updateContactGroup(5L, 2L)
+
+        coVerify { contactDao.updateGroupId(5L, 2L) }
+    }
+
+    @Test
+    fun update_contact_group_error_throws_and_does_not_update() = runTest {
+        coEvery { contactApiService.updateContact(5L, any()) } returns Response.error(400, "Bad".toResponseBody())
+
+        val e = runCatching { repository.updateContactGroup(5L, 2L) }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+        coVerify(exactly = 0) { contactDao.updateGroupId(any(), any()) }
+    }
+
+    @Test
+    fun add_contact_null_personal_prompt_becomes_blank_string() = runTest {
+        val reqSlot = slot<com.fiveis.xend.data.model.AddContactRequest>()
+        coEvery { contactApiService.addContact(capture(reqSlot)) } returns Response.success(
+            ContactResponse(id = 1L, name = "N", email = "e@x.com")
+        )
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
+
+        repository.addContact(
+            name = "N", email = "e@x.com",
+            groupId = null, senderRole = "Writer", recipientRole = "Emp", personalPrompt = null
+        )
+
+        assertEquals("", reqSlot.captured.context?.personalPrompt)
+    }
+
+    @Test
+    fun add_contact_with_context_persists_context_locally() = runTest {
+        val resp = ContactResponse(
+            id = 77L, name = "New", email = "n@x.com",
+            context = ContactResponseContext(id = 77L, senderRole = "Mgr", recipientRole = "Emp")
+        )
+        coEvery { contactApiService.addContact(any()) } returns Response.success(resp)
+
+        val ctxSlot = slot<List<com.fiveis.xend.data.database.entity.ContactContextEntity>>()
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
+        coEvery { contactDao.upsertContexts(capture(ctxSlot)) } returns Unit
+
+        repository.addContact("New", "n@x.com", null, "Mgr", "Emp", null)
+
+        assertEquals(listOf(77L), ctxSlot.captured.map { it.contactId })
+        assertEquals("Mgr", ctxSlot.captured.first().senderRole)
+    }
+
+    @Test
+    fun get_contact_throws_when_not_found_locally() = runTest {
+        coEvery { contactDao.getContactWithContext(123L) } returns null
+        val e = runCatching { repository.getContact(123L) }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+    }
+
+    @Test
+    fun get_group_throws_when_not_found_locally() = runTest {
+        coEvery { groupDao.getGroupWithMembersAndOptions(999L) } returns null
+        val e = runCatching { repository.getGroup(999L) }.exceptionOrNull()
+        assertTrue(e is IllegalStateException)
+    }
+
+    @Test
+    fun get_all_prompt_options_upserts_to_local() = runTest {
+        val all = listOf(
+            PromptOption(1L, "tone", "Formal", "f"),
+            PromptOption(2L, "format", "Short", "s")
+        )
+        coEvery { contactApiService.getAllPromptOptions() } returns Response.success(all)
+        coEvery { optionDao.upsertOptions(any()) } returns Unit
+
+        repository.getAllPromptOptions()
+
+        coVerify { optionDao.upsertOptions(match { it.map { e -> e.id }.toSet() == setOf(1L, 2L) }) }
+    }
+
+    @Test
+    fun observe_prompt_options_maps_entities_to_domain() = runTest {
+        val e1 = com.fiveis.xend.data.database.entity.PromptOptionEntity(
+            id = 1L, key = "tone", name = "Formal", prompt = "f"
+        )
+        every { optionDao.observeAllOptions() } returns flowOf(listOf(e1))
+
+        val first = repository.observePromptOptions().first()
+
+        assertEquals(1, first.size)
+        assertEquals("tone", first[0].key)
+        assertEquals("Formal", first[0].name)
     }
 }
