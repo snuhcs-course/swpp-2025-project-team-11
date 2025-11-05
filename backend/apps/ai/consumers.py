@@ -49,14 +49,14 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         프론트엔드에서 GPU 요청 전송 시 호출됨.
         Django는 이 요청을 GPU 서버에 중계함.
         """
-        data = json.loads(text_data)  # to_emails 포함
+        data = json.loads(text_data)
+        # json should include: to_emails, body
         user = self.user
 
         to_emails = data.to_emails  # 보내는 사람들 = list[str]
 
         ctx = collect_prompt_context(user, to_emails)
         raw_inputs = build_prompt_inputs(ctx)
-        raw_inputs["subject"] = data.subject or ""
         raw_inputs["body"] = data.body or ""
 
         system_prompt = """
