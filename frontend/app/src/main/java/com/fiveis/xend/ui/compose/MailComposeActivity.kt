@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -110,7 +109,6 @@ import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.AddButtonText
-import com.fiveis.xend.ui.theme.BannerBackground
 import com.fiveis.xend.ui.theme.BannerBorder
 import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
@@ -188,11 +186,13 @@ fun EmailComposeScreen(
                 .imePadding()
         ) {
             if (showBanner) {
-                ComposeInfoBanner(
+                Banner(
+                    message = "연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.",
+                    type = BannerType.INFO,
+                    onDismiss = { showBanner = false },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
-                        .align(Alignment.CenterHorizontally),
-                    onDismiss = { showBanner = false }
+                        .align(Alignment.CenterHorizontally)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -351,49 +351,6 @@ private fun ToolbarIconButton(
             )
         ) {
             content()
-        }
-    }
-}
-
-@Composable
-private fun ComposeInfoBanner(modifier: Modifier = Modifier, onDismiss: () -> Unit) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, BannerBorder),
-        color = BannerBackground
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = null,
-                tint = BannerText,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.",
-                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(28.dp),
-                colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = TextSecondary
-                )
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "닫기",
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
     }
 }

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,6 +67,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.compose.Banner
+import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 
@@ -79,6 +82,8 @@ fun InboxScreen(
     onRefresh: () -> Unit = {},
     onLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
+    onAddContactClick: (EmailItem) -> Unit = {},
+    onDismissSuccessBanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -149,6 +154,34 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
+
+                // Success Banner
+                AnimatedVisibility(
+                    visible = uiState.addContactSuccess,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "연락처가 추가되었습니다",
+                            type = BannerType.INFO,
+                            onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
                 if (uiState.isRefreshing && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -161,6 +194,7 @@ fun InboxScreen(
                     EmailList(
                         emails = uiState.emails,
                         onEmailClick = onEmailClick,
+                        onAddContactClick = onAddContactClick,
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
@@ -283,6 +317,7 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
 private fun EmailList(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
@@ -300,7 +335,11 @@ private fun EmailList(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             items(items = emails, key = { it.id }) { item ->
-                EmailRow(item = item, onClick = { onEmailClick(item) })
+                EmailRow(
+                    item = item,
+                    onClick = { onEmailClick(item) },
+                    onAddContactClick = { onAddContactClick(item) }
+                )
                 HorizontalDivider(
                     modifier = Modifier,
                     thickness = DividerDefaults.Thickness,
@@ -362,7 +401,7 @@ private fun EmailList(
 }
 
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
+private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -394,15 +433,34 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = extractSenderName(item.fromEmail),
-                        color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    Row(
                         modifier = Modifier.weight(1f, fill = false),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = extractSenderName(item.fromEmail),
+                            color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        // Add Contact Button
+                        IconButton(
+                            onClick = { onAddContactClick() },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PersonAdd,
+                                contentDescription = "연락처 추가",
+                                tint = Blue80,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
 
                     Spacer(Modifier.width(8.dp))
 // 날짜 포매팅 해야함
