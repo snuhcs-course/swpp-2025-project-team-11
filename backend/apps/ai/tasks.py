@@ -11,7 +11,7 @@ from .services.langchain import analyze_speech_llm, integrate_analysis
 def analyze_speech(self, user, subject, body, to_emails):
     # langchain 이용하여 주어진 메일로 사용자의 말투를 분석한다.
     try:
-        analysis_result = analyze_speech_llm(user, subject, body, to_emails)
+        analysis_result = analyze_speech_llm(user, subject, body, to_emails).model_dump()
         contacts = Contact.objects.filter(email__in=to_emails, user_id=user.id)
 
         with transaction.atomic():
