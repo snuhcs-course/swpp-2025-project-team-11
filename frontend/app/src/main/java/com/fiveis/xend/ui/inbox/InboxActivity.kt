@@ -102,7 +102,10 @@ class InboxActivity : ComponentActivity() {
     private fun extractSenderName(fromEmail: String): String {
         val nameRegex = "(.+?)\\s*<".toRegex()
         val matchResult = nameRegex.find(fromEmail)
-        return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+        val name = matchResult?.groupValues?.get(1)?.trim()
+            ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+        // Remove surrounding quotes if present
+        return name.trim('"', '\'')
     }
 
     private fun extractSenderEmail(fromEmail: String): String {

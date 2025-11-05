@@ -71,6 +71,12 @@ import com.fiveis.xend.ui.compose.Banner
 import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 @Composable
 fun InboxScreen(
@@ -199,7 +205,8 @@ fun InboxScreen(
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
-                        listState = listState
+                        listState = listState,
+                        contactEmails = uiState.contactEmails
                     )
                 }
             }
@@ -322,7 +329,8 @@ private fun EmailList(
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    contactEmails: Set<String>
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -338,7 +346,8 @@ private fun EmailList(
                 EmailRow(
                     item = item,
                     onClick = { onEmailClick(item) },
-                    onAddContactClick = { onAddContactClick(item) }
+                    onAddContactClick = { onAddContactClick(item) },
+                    contactEmails = contactEmails
                 )
                 HorizontalDivider(
                     modifier = Modifier,
@@ -401,7 +410,11 @@ private fun EmailList(
 }
 
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: () -> Unit) {
+private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: () -> Unit, contactEmails: Set<String>) {
+    // Extract email from "Name <email>" format
+    val senderEmail = extractSenderEmailFromRow(item.fromEmail)
+    val isContact = senderEmail.lowercase() in contactEmails
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -448,24 +461,26 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: ()
                             modifier = Modifier.weight(1f, fill = false)
                         )
 
-                        // Add Contact Button
-                        IconButton(
-                            onClick = { onAddContactClick() },
-                            modifier = Modifier.size(20.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.PersonAdd,
-                                contentDescription = "연락처 추가",
-                                tint = Blue80,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        // Add Contact Button - only show if not already a contact
+                        if (!isContact) {
+                            IconButton(
+                                onClick = { onAddContactClick() },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.PersonAdd,
+                                    contentDescription = "연락처 추가",
+                                    tint = Blue80,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
 
                     Spacer(Modifier.width(8.dp))
 // 날짜 포매팅 해야함
                     Text(
-                        text = item.date,
+                        text = formatDisplayDate(item.date),
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -557,9 +572,51 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
+private fun formatDisplayDate(isoDate: String): String {
+    return try {
+        // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
+        val parsedDateTime = java.time.OffsetDateTime.parse(isoDate)
+            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+
+        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        val emailDate = parsedDateTime.toLocalDate()
+
+        // 2. 조건에 따라 다른 형식으로 변환
+        when {
+            // 오늘 받은 메일이면 시간만 표시
+            emailDate.isEqual(today) -> {
+                java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+                    .format(parsedDateTime)
+            }
+            // 올해 받은 메일이면 월/일만 표시
+            emailDate.year == today.year -> {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("M월 d일", java.util.Locale.KOREAN)
+                formatter.format(parsedDateTime)
+            }
+            // 작년 또는 그 이전 메일이면 연/월/일 표시
+            else -> {
+                java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.SHORT)
+                    .format(parsedDateTime)
+            }
+        }
+    } catch (e: Exception) {
+        // 변환 실패 시 날짜 부분만 표시
+        isoDate.substringBefore("T")
+    }
+}
+
 // Helper function to extract sender name from "Name <email>" format
 private fun extractSenderName(fromEmail: String): String {
     val nameRegex = "(.+?)\\s*<".toRegex()
     val matchResult = nameRegex.find(fromEmail)
-    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+    val name = matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+    // Remove surrounding quotes if present
+    return name.trim('"', '\'')
+}
+
+// Helper function to extract email address from "Name <email>" format
+private fun extractSenderEmailFromRow(fromEmail: String): String {
+    val emailRegex = "<(.+?)>".toRegex()
+    val matchResult = emailRegex.find(fromEmail)
+    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
 }

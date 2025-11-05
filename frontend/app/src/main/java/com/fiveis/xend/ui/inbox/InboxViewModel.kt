@@ -26,7 +26,9 @@ data class InboxUiState(
     val selectedEmailForContact: EmailItem? = null,
     val groups: List<Group> = emptyList(),
     val addContactSuccess: Boolean = false,
-    val addContactError: String? = null
+    val addContactError: String? = null,
+    // 연락처에 있는 이메일 주소들
+    val contactEmails: Set<String> = emptySet()
 )
 
 /**
@@ -44,6 +46,7 @@ class InboxViewModel(
         Log.d("InboxViewModel", "Initializing InboxViewModel")
         loadCachedEmails()
         loadGroups()
+        observeContacts()
         // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
         silentRefreshEmails()
     }
@@ -52,6 +55,16 @@ class InboxViewModel(
         viewModelScope.launch {
             contactRepository.observeGroups().collect { groups ->
                 _uiState.update { it.copy(groups = groups) }
+            }
+        }
+    }
+
+    private fun observeContacts() {
+        viewModelScope.launch {
+            contactRepository.observeContacts().collect { contacts ->
+                val contactEmailsSet = contacts.map { it.email.lowercase() }.toSet()
+                Log.d("InboxViewModel", "Contact emails updated: ${contactEmailsSet.size} contacts")
+                _uiState.update { it.copy(contactEmails = contactEmailsSet) }
             }
         }
     }

@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.ui.theme.BannerBackground
 import com.fiveis.xend.ui.theme.BannerBorder
 import com.fiveis.xend.ui.theme.BannerText
-import com.fiveis.xend.ui.theme.SuccessSurface
 
 enum class BannerType {
     SUCCESS,
@@ -49,10 +48,11 @@ data class BannerConfig(
 fun getBannerConfig(type: BannerType): BannerConfig {
     return when (type) {
         BannerType.SUCCESS -> BannerConfig(
-            backgroundColor = SuccessSurface,
-            contentColor = Color(0xFF166534),
+            backgroundColor = BannerBackground,
+            contentColor = BannerText,
+            // 아이콘은 SUCCESS 의미를 살림
             icon = Icons.Filled.Check,
-            borderColor = SuccessSurface
+            borderColor = BannerBorder
         )
         BannerType.ERROR -> BannerConfig(
             backgroundColor = Color(0xFFFEE2E2),
