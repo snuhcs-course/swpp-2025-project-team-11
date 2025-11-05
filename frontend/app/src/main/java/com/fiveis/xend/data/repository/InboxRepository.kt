@@ -94,7 +94,14 @@ class InboxRepository(
                     emailDao.insertEmails(newEmails)
                 }
 
-                pageToken = mailListResponse.nextPageToken
+                val previousToken = pageToken
+                val nextToken = mailListResponse.nextPageToken?.takeIf { it.isNotBlank() }
+                if (nextToken != null && nextToken == previousToken) {
+                    Log.d("InboxRepository", "Received identical nextPageToken; stopping pagination to avoid loop")
+                    break
+                }
+
+                pageToken = nextToken
                 Log.d("InboxRepository", "nextPageToken: $pageToken")
             } while (pageToken != null)
 

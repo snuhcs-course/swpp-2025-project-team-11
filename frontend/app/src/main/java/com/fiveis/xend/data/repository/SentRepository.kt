@@ -94,7 +94,14 @@ class SentRepository(
                     emailDao.insertEmails(newEmails)
                 }
 
-                pageToken = mailListResponse.nextPageToken
+                val previousToken = pageToken
+                val nextToken = mailListResponse.nextPageToken?.takeIf { it.isNotBlank() }
+                if (nextToken != null && nextToken == previousToken) {
+                    Log.d("SentRepository", "Received identical nextPageToken; stopping pagination to avoid loop")
+                    break
+                }
+
+                pageToken = nextToken
                 Log.d("SentRepository", "nextPageToken: $pageToken")
             } while (pageToken != null)
 
