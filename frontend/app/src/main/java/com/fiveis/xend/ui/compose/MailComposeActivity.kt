@@ -1061,6 +1061,13 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
+                // Update recipient context for WebSocket
+                LaunchedEffect(contacts) {
+                    composeVm.setRecipientContext(
+                        emails = contacts.map { it.email }
+                    )
+                }
+
                 // Monitor text changes for realtime suggestions
                 LaunchedEffect(richTextState.annotatedString.text) {
                     if (aiRealtime) {
