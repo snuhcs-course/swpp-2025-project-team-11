@@ -19,8 +19,10 @@ data class ContactDetailUiState(
     val error: String? = null
 )
 
-class ContactDetailViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = ContactBookRepository(app.applicationContext)
+class ContactDetailViewModel(
+    app: Application,
+    private val repo: ContactBookRepository = ContactBookRepository(app.applicationContext)
+) : AndroidViewModel(app) {
 
     private val ui = MutableStateFlow(ContactDetailUiState())
     val uiState: StateFlow<ContactDetailUiState> = ui.asStateFlow()

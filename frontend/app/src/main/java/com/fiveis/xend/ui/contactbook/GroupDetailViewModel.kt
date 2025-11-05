@@ -19,8 +19,10 @@ data class GroupDetailUiState(
     val error: String? = null
 )
 
-class GroupDetailViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = ContactBookRepository(app.applicationContext)
+class GroupDetailViewModel(
+    app: Application,
+    private val repo: ContactBookRepository = ContactBookRepository(app.applicationContext)
+) : AndroidViewModel(app) {
 
     private val ui = MutableStateFlow(GroupDetailUiState())
     val uiState: StateFlow<GroupDetailUiState> = ui.asStateFlow()

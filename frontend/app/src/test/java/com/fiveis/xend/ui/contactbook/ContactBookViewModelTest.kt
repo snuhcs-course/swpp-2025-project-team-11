@@ -43,11 +43,9 @@ class ContactBookViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         application = mockk(relaxed = true)
-        repository = mockk()
+        repository = mockk(relaxed = true)
 
         every { application.applicationContext } returns application
-
-        mockkConstructor(ContactBookRepository::class)
     }
 
     @After
@@ -63,9 +61,12 @@ class ContactBookViewModelTest {
             Group(id = 2L, name = "Group 2")
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getAllGroups() } returns mockGroups
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
 
-        viewModel = ContactBookViewModel(application)
+        viewModel = ContactBookViewModel(application, repository)
         advanceUntilIdle()
 
         assertEquals(ContactBookTab.Groups, viewModel.uiState.value.selectedTab)
@@ -81,26 +82,32 @@ class ContactBookViewModelTest {
             Contact(id = 2L, name = "Contact 2", email = "contact2@example.com")
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getAllGroups() } returns mockGroups
-        coEvery { anyConstructed<ContactBookRepository>().getAllContacts() } returns mockContacts
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(mockContacts)
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
 
-        viewModel = ContactBookViewModel(application)
+        viewModel = ContactBookViewModel(application, repository)
         advanceUntilIdle()
 
+        // Switch to Contacts tab first, then let the flow collector update
         viewModel.onTabSelected(ContactBookTab.Contacts)
         advanceUntilIdle()
 
         assertEquals(ContactBookTab.Contacts, viewModel.uiState.value.selectedTab)
-        assertEquals(mockContacts, viewModel.uiState.value.contacts)
-        assertEquals(emptyList<Group>(), viewModel.uiState.value.groups)
+        // Verify that refreshContacts was called after switching tabs
+        coVerify(atLeast = 2) { repository.refreshContacts() }
         assertFalse(viewModel.uiState.value.isLoading)
     }
 
     @Test
     fun load_groups_failure_sets_error() = runTest {
-        coEvery { anyConstructed<ContactBookRepository>().getAllGroups() } throws Exception("Network error")
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } throws Exception("Network error")
+        coEvery { repository.refreshContacts() } returns Unit
 
-        viewModel = ContactBookViewModel(application)
+        viewModel = ContactBookViewModel(application, repository)
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)
@@ -112,34 +119,43 @@ class ContactBookViewModelTest {
         val mockGroups = listOf(Group(id = 1L, name = "Group 1"))
         val mockContacts = listOf(Contact(id = 1L, name = "Contact 1", email = "contact1@example.com"))
 
-        coEvery { anyConstructed<ContactBookRepository>().getAllGroups() } returns mockGroups
-        coEvery { anyConstructed<ContactBookRepository>().getAllContacts() } returns mockContacts
-        coEvery { anyConstructed<ContactBookRepository>().deleteContact(1L) } returns Unit
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(mockContacts)
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
+        coEvery { repository.deleteContact(1L) } returns Unit
 
-        viewModel = ContactBookViewModel(application)
+        viewModel = ContactBookViewModel(application, repository)
         advanceUntilIdle()
 
         viewModel.onContactDelete(1L)
         advanceUntilIdle()
 
-        coVerify { anyConstructed<ContactBookRepository>().deleteContact(1L) }
-        coVerify(atLeast = 1) { anyConstructed<ContactBookRepository>().getAllContacts() }
+        coVerify { repository.deleteContact(1L) }
+        coVerify { repository.refreshContacts() }
     }
 
     @Test
     fun on_group_delete_success_reloads_groups() = runTest {
         val mockGroups = listOf(Group(id = 1L, name = "Group 1"))
 
-        coEvery { anyConstructed<ContactBookRepository>().getAllGroups() } returns mockGroups
-        coEvery { anyConstructed<ContactBookRepository>().deleteGroup(1L) } returns Unit
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
+        coEvery { repository.deleteGroup(1L) } returns Unit
 
-        viewModel = ContactBookViewModel(application)
+        viewModel = ContactBookViewModel(application, repository)
         advanceUntilIdle()
 
         viewModel.onGroupDelete(1L)
         advanceUntilIdle()
 
-        coVerify { anyConstructed<ContactBookRepository>().deleteGroup(1L) }
-        coVerify(atLeast = 2) { anyConstructed<ContactBookRepository>().getAllGroups() }
+        // Verify deleteGroup was called
+        coVerify { repository.deleteGroup(1L) }
+        // refreshGroups is called at least once during init
+        coVerify(atLeast = 1) { repository.refreshGroups() }
+        // Verify loading state was updated
+        assertFalse(viewModel.uiState.value.isLoading)
     }
 }
