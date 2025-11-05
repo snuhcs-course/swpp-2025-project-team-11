@@ -113,7 +113,6 @@ import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.inbox.AddContactDialog
-import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.AddButtonText
 import com.fiveis.xend.ui.theme.BannerBorder
 import com.fiveis.xend.ui.theme.BannerText
@@ -550,7 +549,7 @@ private fun RecipientSection(
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, AddButtonText.copy(alpha = 0.15f)),
+        border = BorderStroke(1.dp, ComposeOutline),
         color = ComposeSurface
     ) {
         Row(
@@ -603,7 +602,7 @@ private fun RecipientInputField(value: TextFieldValue, onValueChange: (TextField
             .widthIn(min = 80.dp, max = 200.dp)
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color.White)
+            .background(ComposeSurface)
             .then(borderModifier),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -988,7 +987,7 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit, onAddToContacts: (() -> 
     Surface(
         modifier = Modifier.height(24.dp),
         shape = RoundedCornerShape(12.dp),
-        color = AddButtonBackground,
+        color = ComposeSurface,
         border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
@@ -1219,7 +1218,12 @@ class MailComposeActivity : ComponentActivity() {
                             sendUiState = sendUi,
                             onBack = { finish() },
                             onTemplateClick = { showTemplateScreen = true },
-                            onUndo = { /* TODO */ },
+                            onUndo = {
+                                composeVm.undo()?.let { snapshot ->
+                                    subject = snapshot.subject
+                                    richTextState.setHtml(snapshot.bodyHtml)
+                                }
+                            },
                             suggestionText = composeUi.suggestionText,
                             onAcceptSuggestion = {
                                 // 전체 추천 문장 적용
@@ -1239,6 +1243,12 @@ class MailComposeActivity : ComponentActivity() {
                             aiRealtime = aiRealtime,
                             onAiRealtimeToggle = { aiRealtime = it },
                             onAiComplete = {
+                                // Save current state before AI generation
+                                composeVm.saveUndoSnapshot(
+                                    subject = subject,
+                                    bodyHtml = richTextState.toHtml()
+                                )
+
                                 val payload = JSONObject().apply {
                                     put("subject", subject.ifBlank { "제목 생성" })
                                     // Use HTML content for AI prompt

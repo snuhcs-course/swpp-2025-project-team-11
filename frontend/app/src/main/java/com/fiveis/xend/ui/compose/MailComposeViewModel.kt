@@ -35,6 +35,24 @@ class MailComposeViewModel(
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
 
+    // Undo snapshot
+    private var undoSnapshot: UndoSnapshot? = null
+
+    data class UndoSnapshot(
+        val subject: String,
+        val bodyHtml: String
+    )
+
+    fun saveUndoSnapshot(subject: String, bodyHtml: String) {
+        undoSnapshot = UndoSnapshot(subject, bodyHtml)
+    }
+
+    fun undo(): UndoSnapshot? {
+        val snapshot = undoSnapshot
+        undoSnapshot = null
+        return snapshot
+    }
+
     fun startStreaming(payload: JSONObject) {
         bodyBuffer.clear()
         _ui.value = MailComposeUiState(isStreaming = true)
