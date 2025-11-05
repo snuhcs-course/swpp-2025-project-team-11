@@ -6,7 +6,7 @@ import requests
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 
-# from . import services
+from .services.utils import build_prompt_inputs, collect_prompt_context
 
 
 class MailGenerateConsumer(AsyncWebsocketConsumer):
@@ -50,18 +50,41 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         Django는 이 요청을 GPU 서버에 중계함.
         """
         data = json.loads(text_data)  # to_emails 포함
+        user = self.user
+
+        to_emails = data.to_emails  # 보내는 사람들 = list[str]
+
+        ctx = collect_prompt_context(user, to_emails)
+        raw_inputs = build_prompt_inputs(ctx)
+        raw_inputs["subject"] = data.subject or ""
+        raw_inputs["body"] = data.body or ""
 
         system_prompt = """
         당신은 사용자가 작성 중인 메일을 이어서 완성하는 역할을 수행합니다.
         사용자가 작성한 내용에 자연스럽게 이어서 6단어 정도만 작성하세요.
         사용자가 이미 작성한 내용을 중복하여 출력하지 않습니다.
         출력은 반드시 JSON 형태로 아래와 같이 작성합니다.
+        """
 
+        if raw_inputs["recipients"]:
+            recipients_str = ", ".join(raw_inputs["recipients"])
+            system_prompt += f"\n사용자는 다음의 수신자에게 메일을 작성하고 있습니다:\n{recipients_str}"
+
+        if raw_inputs["group_description"]:
+            system_prompt += f"\n수신자들에 대한 설명은 다음과 같습니다:\n{raw_inputs['group_description']}"
+
+        if raw_inputs["prompt_text"]:
+            system_prompt += f"\n문장을 작성할 때 다음과 같은 스타일의 문체를 사용합니다:\n{raw_inputs['prompt_text']}"
+
+        if raw_inputs["body"]:
+            system_prompt += f"\n사용자는 다음 내용의 메일에 답장하고 있습니다:\n{raw_inputs["body"]}"
+
+        system_prompt += """\n\n
         user: 안녕하세요 오늘 회의 진행을 맡은 홍길동 대리입니다.
-        output: {"output": "오늘 회의 자료를 준비하면서"}
+        output: {{"output": "오늘 회의 자료를 준비하면서"}}
 
         user: 저는 내일 미팅을 준비하고 있고, 
-        output: {"output": "미팅 준비를 위해 필요한 자료와"}
+        output: {{"output": "미팅 준비를 위해 필요한 자료와"}}
         """
 
         try:
