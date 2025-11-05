@@ -40,11 +40,13 @@ data class ContactData(val contacts: List<Contact>) : ContactBookData
 //     return Color.hsv(hue, saturation, value)
 // }
 
-class ContactBookRepository(context: Context) {
+class ContactBookRepository(
+    context: Context,
+    private val db: AppDatabase = AppDatabase.getDatabase(context)
+) {
     private val api: ContactApiService = RetrofitClient.getContactApiService(context)
 
     // Room 주입
-    private val db = AppDatabase.getDatabase(context)
     private val groupDao = db.groupDao()
     private val contactDao = db.contactDao()
     private val optionDao = db.promptOptionDao()

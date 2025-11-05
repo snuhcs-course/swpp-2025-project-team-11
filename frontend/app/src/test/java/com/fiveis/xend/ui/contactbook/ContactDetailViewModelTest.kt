@@ -42,11 +42,9 @@ class ContactDetailViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         application = mockk(relaxed = true)
-        repository = mockk()
+        repository = mockk(relaxed = true)
 
         every { application.applicationContext } returns application
-
-        mockkConstructor(ContactBookRepository::class)
     }
 
     @After
@@ -64,9 +62,10 @@ class ContactDetailViewModelTest {
             email = "john@example.com"
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getContact(contactId) } returns mockContact
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
 
-        viewModel = ContactDetailViewModel(application)
+        viewModel = ContactDetailViewModel(application, repository)
 
         viewModel.load(contactId)
         advanceUntilIdle()
@@ -80,9 +79,10 @@ class ContactDetailViewModelTest {
     fun load_contact_failure_sets_error() = runTest {
         val contactId = 1L
 
-        coEvery { anyConstructed<ContactBookRepository>().getContact(contactId) } throws Exception("Network error")
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(null)
+        coEvery { repository.refreshContact(contactId) } throws Exception("Network error")
 
-        viewModel = ContactDetailViewModel(application)
+        viewModel = ContactDetailViewModel(application, repository)
 
         viewModel.load(contactId)
         advanceUntilIdle()
@@ -100,9 +100,10 @@ class ContactDetailViewModelTest {
             email = "john@example.com"
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getContact(contactId) } returns mockContact
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
 
-        viewModel = ContactDetailViewModel(application)
+        viewModel = ContactDetailViewModel(application, repository)
 
         viewModel.load(contactId)
         advanceUntilIdle()
@@ -110,7 +111,7 @@ class ContactDetailViewModelTest {
         viewModel.load(contactId, force = false)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { anyConstructed<ContactBookRepository>().getContact(contactId) }
+        coVerify(exactly = 1) { repository.refreshContact(contactId) }
     }
 
     @Test
@@ -122,9 +123,10 @@ class ContactDetailViewModelTest {
             email = "john@example.com"
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getContact(contactId) } returns mockContact
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
 
-        viewModel = ContactDetailViewModel(application)
+        viewModel = ContactDetailViewModel(application, repository)
 
         viewModel.load(contactId)
         advanceUntilIdle()
@@ -132,6 +134,6 @@ class ContactDetailViewModelTest {
         viewModel.load(contactId, force = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 2) { anyConstructed<ContactBookRepository>().getContact(contactId) }
+        coVerify(exactly = 2) { repository.refreshContact(contactId) }
     }
 }

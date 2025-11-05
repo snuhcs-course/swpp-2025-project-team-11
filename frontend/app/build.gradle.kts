@@ -115,9 +115,9 @@ jacoco {
 }
 
 tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn("testDebugUnitTest")
+    dependsOn("testDebugUnitTest", "connectedDebugAndroidTest")
     group = "Reporting"
-    description = "Generate Jacoco coverage reports"
+    description = "Generate Jacoco coverage reports including unit and integration tests"
 
     reports {
         xml.required.set(true)
