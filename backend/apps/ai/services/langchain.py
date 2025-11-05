@@ -332,10 +332,8 @@ def stream_reply_options_llm(
 
 
 def analyze_speech_llm(
-    user,
     subject: str | None,
     body: str | None,
-    to_emails: list[str],
 ):
     analysis_input = {
         "incoming_subject": subject,
@@ -347,7 +345,7 @@ def analyze_speech_llm(
 
 
 def integrate_analysis(analysis_results: list[dict[str, Any]]):
-    integrated_result = integrate_chain.invoke(analysis_results)
+    integrated_result = integrate_chain.invoke({"analysis_results": analysis_results})
     # 하나의 통합된 AnalysisResult를 반환한다.
 
     return integrated_result

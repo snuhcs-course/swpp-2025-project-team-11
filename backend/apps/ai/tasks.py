@@ -106,7 +106,7 @@ def unified_analysis(self, n=10):
             ]
 
             # 통합 분석 수행
-            unified = integrate_analysis(data)
+            unified = integrate_analysis(data).model_dump()
 
             # ContactAnalysisResult 업데이트
             contact_result.lexical_style = unified["lexical_style"]
@@ -154,7 +154,7 @@ def unified_analysis(self, n=10):
                 for r in latest_n_results
             ]
             # 통합 분석 수행
-            unified = integrate_analysis(data)
+            unified = integrate_analysis(data).model_dump()
 
             # GroupAnalysisResult 업데이트
             group_result.lexical_style = unified["lexical_style"]
@@ -187,4 +187,4 @@ def delete_up_n(n=10):
 
     for entry in groups:
         extra_count = entry["count"] - n
-        MailAnalysisResult.objects.filter(group=entry["group"]).order_by("created_at")[:extra_count].delete()
+        MailAnalysisResult.objects.filter(contact__group=entry["group"]).order_by("created_at")[:extra_count].delete()
