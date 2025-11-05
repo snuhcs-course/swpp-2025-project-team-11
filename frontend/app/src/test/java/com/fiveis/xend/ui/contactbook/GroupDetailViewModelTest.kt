@@ -42,11 +42,9 @@ class GroupDetailViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         application = mockk(relaxed = true)
-        repository = mockk()
+        repository = mockk(relaxed = true)
 
         every { application.applicationContext } returns application
-
-        mockkConstructor(ContactBookRepository::class)
     }
 
     @After
@@ -64,9 +62,10 @@ class GroupDetailViewModelTest {
             description = "Important people"
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getGroup(groupId) } returns mockGroup
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
 
-        viewModel = GroupDetailViewModel(application)
+        viewModel = GroupDetailViewModel(application, repository)
 
         viewModel.load(groupId)
         advanceUntilIdle()
@@ -80,9 +79,10 @@ class GroupDetailViewModelTest {
     fun load_group_failure_sets_error() = runTest {
         val groupId = 1L
 
-        coEvery { anyConstructed<ContactBookRepository>().getGroup(groupId) } throws Exception("Network error")
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(null)
+        coEvery { repository.refreshGroupAndMembers(groupId) } throws Exception("Network error")
 
-        viewModel = GroupDetailViewModel(application)
+        viewModel = GroupDetailViewModel(application, repository)
 
         viewModel.load(groupId)
         advanceUntilIdle()
@@ -100,9 +100,10 @@ class GroupDetailViewModelTest {
             description = "Important people"
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getGroup(groupId) } returns mockGroup
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
 
-        viewModel = GroupDetailViewModel(application)
+        viewModel = GroupDetailViewModel(application, repository)
 
         viewModel.load(groupId)
         advanceUntilIdle()
@@ -110,7 +111,7 @@ class GroupDetailViewModelTest {
         viewModel.load(groupId, force = false)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { anyConstructed<ContactBookRepository>().getGroup(groupId) }
+        coVerify(exactly = 1) { repository.refreshGroupAndMembers(groupId) }
     }
 
     @Test
@@ -122,9 +123,10 @@ class GroupDetailViewModelTest {
             description = "Important people"
         )
 
-        coEvery { anyConstructed<ContactBookRepository>().getGroup(groupId) } returns mockGroup
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
 
-        viewModel = GroupDetailViewModel(application)
+        viewModel = GroupDetailViewModel(application, repository)
 
         viewModel.load(groupId)
         advanceUntilIdle()
@@ -132,6 +134,6 @@ class GroupDetailViewModelTest {
         viewModel.load(groupId, force = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 2) { anyConstructed<ContactBookRepository>().getGroup(groupId) }
+        coVerify(exactly = 2) { repository.refreshGroupAndMembers(groupId) }
     }
 }

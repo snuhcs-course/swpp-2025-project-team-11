@@ -1,8 +1,8 @@
 package com.fiveis.xend.ui.view
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import com.fiveis.xend.data.model.MailDetailResponse
-import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.model.EmailItem
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +12,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,7 +20,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MailDetailViewModelTest {
@@ -31,13 +29,13 @@ class MailDetailViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private lateinit var repository: InboxRepository
+    private lateinit var emailDao: EmailDao
     private lateinit var viewModel: MailDetailViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        repository = mockk()
+        emailDao = mockk()
     }
 
     @After
@@ -48,23 +46,22 @@ class MailDetailViewModelTest {
     @Test
     fun init_loads_mail_successfully() = runTest {
         val messageId = "12345"
-        val mockMail = MailDetailResponse(
+        val mockMail = EmailItem(
             id = messageId,
-            thread_id = "thread123",
+            threadId = "thread123",
             subject = "Test Subject",
-            from_email = "sender@example.com",
-            to = "receiver@example.com",
-            date = "2025-01-01T00:00:00Z",
-            date_raw = "Wed, 1 Jan 2025 00:00:00 +0000",
-            body = "Test body",
+            fromEmail = "sender@example.com",
             snippet = "Test snippet",
-            is_unread = true,
-            label_ids = listOf("INBOX")
+            date = "2025-01-01T00:00:00Z",
+            dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
+            isUnread = true,
+            labelIds = listOf("INBOX"),
+            body = "Test body"
         )
 
-        coEvery { repository.getMail(messageId) } returns Response.success(mockMail)
+        coEvery { emailDao.getEmailById(messageId) } returns mockMail
 
-        viewModel = MailDetailViewModel(repository, messageId)
+        viewModel = MailDetailViewModel(emailDao, messageId)
         advanceUntilIdle()
 
         assertEquals(mockMail, viewModel.uiState.value.mail)
@@ -73,19 +70,16 @@ class MailDetailViewModelTest {
     }
 
     @Test
-    fun init_handles_error_response() = runTest {
+    fun init_handles_not_found() = runTest {
         val messageId = "12345"
 
-        coEvery { repository.getMail(messageId) } returns Response.error(
-            404,
-            "Not found".toResponseBody()
-        )
+        coEvery { emailDao.getEmailById(messageId) } returns null
 
-        viewModel = MailDetailViewModel(repository, messageId)
+        viewModel = MailDetailViewModel(emailDao, messageId)
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)
-        assertTrue(viewModel.uiState.value.error?.contains("Failed to load mail") == true)
+        assertTrue(viewModel.uiState.value.error?.contains("not found") == true)
         assertFalse(viewModel.uiState.value.isLoading)
     }
 
@@ -93,13 +87,13 @@ class MailDetailViewModelTest {
     fun init_handles_exception() = runTest {
         val messageId = "12345"
 
-        coEvery { repository.getMail(messageId) } throws Exception("Network error")
+        coEvery { emailDao.getEmailById(messageId) } throws Exception("Database error")
 
-        viewModel = MailDetailViewModel(repository, messageId)
+        viewModel = MailDetailViewModel(emailDao, messageId)
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)
-        assertTrue(viewModel.uiState.value.error?.contains("Network error") == true)
+        assertTrue(viewModel.uiState.value.error?.contains("Database error") == true)
         assertFalse(viewModel.uiState.value.isLoading)
     }
 }

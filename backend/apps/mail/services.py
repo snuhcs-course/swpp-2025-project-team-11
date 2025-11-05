@@ -374,8 +374,10 @@ def list_newer_emails_logic(access_token, max_results, label_ids, since_date):
 
     page_token = None
     collected_ids: list[str] = []
+    all_full_msgs = []
 
     while True:
+        collected_ids = []
         try:
             resp = gmail_service.list_messages(
                 max_results=100,
@@ -396,14 +398,11 @@ def list_newer_emails_logic(access_token, max_results, label_ids, since_date):
             if mid:
                 collected_ids.append(mid)
 
+        all_full_msgs.extend(gmail_service.get_messages_batch(collected_ids))
+
         page_token = resp.get("nextPageToken")
         if not page_token:
             break
-
-    if collected_ids:
-        all_full_msgs = gmail_service.get_messages_batch(collected_ids)
-    else:
-        all_full_msgs = []
 
     newer_only = [m for m in all_full_msgs if m.get("date") and compare_iso_datetimes(m["date"], since_date) == 1]
 

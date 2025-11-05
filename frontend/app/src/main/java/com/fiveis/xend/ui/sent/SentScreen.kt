@@ -1,4 +1,4 @@
-package com.fiveis.xend.ui.inbox
+package com.fiveis.xend.ui.sent
 
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
@@ -68,20 +67,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
-import com.fiveis.xend.ui.compose.Banner
-import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
 
 @Composable
-fun InboxScreen(
-    uiState: InboxUiState,
+fun SentScreen(
+    uiState: SentUiState,
     onEmailClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
@@ -89,8 +80,6 @@ fun InboxScreen(
     onRefresh: () -> Unit = {},
     onLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
-    onAddContactClick: (EmailItem) -> Unit = {},
-    onDismissSuccessBanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -152,7 +141,7 @@ fun InboxScreen(
                     )
                 )
             ) {
-                BottomNavBar(selected = "inbox", onSelect = onBottomNavChange)
+                BottomNavBar(selected = "sent", onSelect = onBottomNavChange)
             }
         },
         modifier = modifier.fillMaxSize(),
@@ -161,34 +150,6 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
-
-                // Success Banner
-                AnimatedVisibility(
-                    visible = uiState.addContactSuccess,
-                    enter = slideInVertically(
-                        animationSpec = tween(durationMillis = 300),
-                        initialOffsetY = { -it }
-                    ) + fadeIn(animationSpec = tween(300)),
-                    exit = slideOutVertically(
-                        animationSpec = tween(durationMillis = 300),
-                        targetOffsetY = { -it }
-                    ) + fadeOut(animationSpec = tween(300))
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Banner(
-                            message = "연락처가 추가되었습니다",
-                            type = BannerType.INFO,
-                            onDismiss = onDismissSuccessBanner,
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .padding(top = 8.dp, bottom = 8.dp)
-                        )
-                    }
-                }
-
                 if (uiState.isRefreshing && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -201,13 +162,11 @@ fun InboxScreen(
                     EmailList(
                         emails = uiState.emails,
                         onEmailClick = onEmailClick,
-                        onAddContactClick = onAddContactClick,
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
-                        listState = listState,
-                        contactEmails = uiState.contactEmails
+                        listState = listState
                     )
                 }
             }
@@ -325,13 +284,11 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
 private fun EmailList(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
-    onAddContactClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-    contactEmails: Set<String>
+    listState: androidx.compose.foundation.lazy.LazyListState
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -344,12 +301,7 @@ private fun EmailList(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             items(items = emails, key = { it.id }) { item ->
-                EmailRow(
-                    item = item,
-                    onClick = { onEmailClick(item) },
-                    onAddContactClick = { onAddContactClick(item) },
-                    contactEmails = contactEmails
-                )
+                EmailRow(item = item, onClick = { onEmailClick(item) })
                 HorizontalDivider(
                     modifier = Modifier,
                     thickness = DividerDefaults.Thickness,
@@ -390,20 +342,20 @@ private fun EmailList(
                     // Trigger when last visible item is within 3 items from the end
                     val shouldLoad = lastVisibleItem.index >= totalItems - 4
                     if (shouldLoad) {
-                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
+                        Log.d("SentScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
                     }
                     shouldLoad
                 }
             }.collect { shouldLoadMore ->
                 Log.d(
-                    "InboxScreen",
+                    "SentScreen",
                     "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
                 )
                 if (shouldLoadMore && !isLoadingMore) {
-                    Log.d("InboxScreen", "Triggering loadMore")
+                    Log.d("SentScreen", "Triggering loadMore")
                     onLoadMore()
                 } else {
-                    Log.d("InboxScreen", "Not triggering loadMore - conditions not met")
+                    Log.d("SentScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }
@@ -455,11 +407,7 @@ fun EmailListContent(
 }
 
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: () -> Unit, contactEmails: Set<String>) {
-    // Extract email from "Name <email>" format
-    val senderEmail = extractSenderEmailFromRow(item.fromEmail)
-    val isContact = senderEmail.lowercase() in contactEmails
-
+private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -491,41 +439,20 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: ()
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Text(
+                        text = extractSenderName(item.fromEmail),
+                        color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f, fill = false),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = extractSenderName(item.fromEmail),
-                            color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-
-                        // Add Contact Button - only show if not already a contact
-                        if (!isContact) {
-                            IconButton(
-                                onClick = { onAddContactClick() },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.PersonAdd,
-                                    contentDescription = "연락처 추가",
-                                    tint = Blue80,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
                     Spacer(Modifier.width(8.dp))
 // 날짜 포매팅 해야함
                     Text(
-                        text = formatDisplayDate(item.date),
+                        text = item.date,
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -636,51 +563,9 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
-private fun formatDisplayDate(isoDate: String): String {
-    return try {
-        // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
-        val parsedDateTime = java.time.OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(java.time.ZoneId.systemDefault())
-
-        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
-        val emailDate = parsedDateTime.toLocalDate()
-
-        // 2. 조건에 따라 다른 형식으로 변환
-        when {
-            // 오늘 받은 메일이면 시간만 표시
-            emailDate.isEqual(today) -> {
-                java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-            // 올해 받은 메일이면 월/일만 표시
-            emailDate.year == today.year -> {
-                val formatter = java.time.format.DateTimeFormatter.ofPattern("M월 d일", java.util.Locale.KOREAN)
-                formatter.format(parsedDateTime)
-            }
-            // 작년 또는 그 이전 메일이면 연/월/일 표시
-            else -> {
-                java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-        }
-    } catch (e: Exception) {
-        // 변환 실패 시 날짜 부분만 표시
-        isoDate.substringBefore("T")
-    }
-}
-
 // Helper function to extract sender name from "Name <email>" format
 private fun extractSenderName(fromEmail: String): String {
     val nameRegex = "(.+?)\\s*<".toRegex()
     val matchResult = nameRegex.find(fromEmail)
-    val name = matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
-    // Remove surrounding quotes if present
-    return name.trim('"', '\'')
-}
-
-// Helper function to extract email address from "Name <email>" format
-private fun extractSenderEmailFromRow(fromEmail: String): String {
-    val emailRegex = "<(.+?)>".toRegex()
-    val matchResult = emailRegex.find(fromEmail)
-    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
+    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
 }

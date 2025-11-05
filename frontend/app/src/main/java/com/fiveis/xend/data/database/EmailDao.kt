@@ -12,6 +12,9 @@ interface EmailDao {
     @Query("SELECT * FROM emails ORDER BY cachedAt DESC")
     fun getAllEmails(): Flow<List<EmailItem>>
 
+    @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY date DESC")
+    fun getEmailsByLabel(label: String): Flow<List<EmailItem>>
+
     @Query("SELECT * FROM emails WHERE id = :emailId")
     suspend fun getEmailById(emailId: String): EmailItem?
 

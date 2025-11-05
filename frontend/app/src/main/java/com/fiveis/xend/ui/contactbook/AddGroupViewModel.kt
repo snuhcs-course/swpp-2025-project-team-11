@@ -21,8 +21,10 @@ data class AddGroupUiState(
     val error: String? = null
 )
 
-class AddGroupViewModel(application: Application) : AndroidViewModel(application) {
+class AddGroupViewModel(
+    application: Application,
     private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AddGroupUiState())
     val uiState: StateFlow<AddGroupUiState> = _uiState.asStateFlow()
@@ -144,10 +146,13 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
+    class Factory(
+        private val application: Application
+    ) : androidx.lifecycle.ViewModelProvider.Factory {
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(AddGroupViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
+                // Default parameter로 repository가 생성됨
                 return AddGroupViewModel(application) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")

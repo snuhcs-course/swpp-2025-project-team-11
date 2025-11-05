@@ -85,6 +85,11 @@ class InboxViewModelTest {
         viewModel = InboxViewModel(repository)
         advanceUntilIdle()
 
+        // Silent refresh in init doesn't set error (showLoading=false)
+        // So we need to explicitly call refreshEmails() to test error handling
+        viewModel.refreshEmails()
+        advanceUntilIdle()
+
         assertNotNull(viewModel.uiState.value.error)
         assertTrue(viewModel.uiState.value.error?.contains("Network error") == true)
         assertFalse(viewModel.uiState.value.isRefreshing)

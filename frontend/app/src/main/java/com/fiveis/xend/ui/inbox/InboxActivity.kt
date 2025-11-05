@@ -21,6 +21,7 @@ import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
 import com.fiveis.xend.ui.search.SearchActivity
+import com.fiveis.xend.ui.sent.SentActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.ui.view.MailDetailActivity
 
@@ -61,9 +62,15 @@ class InboxActivity : ComponentActivity() {
                     onRefresh = viewModel::refreshEmails,
                     onLoadMore = viewModel::loadMoreEmails,
                     onBottomNavChange = {
-                        if (it == "contacts") {
-                            startActivity(Intent(this, ContactBookActivity::class.java))
-                            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                        when (it) {
+                            "sent" -> {
+                                startActivity(Intent(this, SentActivity::class.java))
+                                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                            }
+                            "contacts" -> {
+                                startActivity(Intent(this, ContactBookActivity::class.java))
+                                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                            }
                         }
                     },
                     onAddContactClick = { email ->

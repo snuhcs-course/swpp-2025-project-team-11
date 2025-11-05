@@ -14,7 +14,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.source.TokenManager
-import com.fiveis.xend.ui.inbox.InboxActivity
+import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -73,9 +73,9 @@ class MainActivity : ComponentActivity() {
 
                 val uiState by viewModel.uiState.collectAsState()
 
-                // 이미 로그인되어 있으면 받은편지함으로
+                // 이미 로그인되어 있으면 메일함으로
                 if (uiState.isLoggedIn) {
-                    goToInbox()
+                    goToMail()
                     return@XendTheme
                 }
 
@@ -165,12 +165,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun goToInbox() {
+    private fun goToMail() {
         try {
-            startActivity(Intent(this, InboxActivity::class.java))
+            startActivity(Intent(this, MailActivity::class.java))
             finish()
         } catch (e: Exception) {
-            Log.e("Nav", "InboxActivity 이동 실패", e)
+            Log.e("Nav", "MailActivity 이동 실패", e)
             Toast.makeText(this, "화면 이동 실패: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
