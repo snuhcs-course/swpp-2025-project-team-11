@@ -4,6 +4,7 @@ import queue
 import threading
 import time
 from collections.abc import Generator
+from typing import Any
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -16,6 +17,8 @@ from apps.ai.services.prompts import (
     ANALYSIS_USER_J2,
     BODY_SYSTEM_J2,
     BODY_USER_J2,
+    INTEGRATE_SYSTEM_J2,
+    INTEGRATE_USER_J2,
     PLAN_SYSTEM_J2,
     PLAN_USER_J2,
     REPLY_SYSTEM_J2,
@@ -184,6 +187,18 @@ _analysis_model = ChatOpenAI(
 
 analysis_chain = _analysis_prompt | _analysis_model.with_structured_output(SpeechAnalysis)
 
+_integrate_prompt = ChatPromptTemplate.from_messages(
+    [("system", INTEGRATE_SYSTEM_J2), ("user", INTEGRATE_USER_J2)],
+    template_format="jinja2",
+)
+
+_integrate_model = ChatOpenAI(
+    model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+    temperature=float(os.getenv("AI_TEMPERATURE", "0.4")),
+)
+
+integrate_chain = _integrate_prompt | _integrate_model.with_structured_output(SpeechAnalysis)
+
 
 def stream_reply_options_llm(
     *,
@@ -329,3 +344,10 @@ def analyze_speech_llm(
 
     analysis_result = analysis_chain.invoke(analysis_input)
     return analysis_result
+
+
+def integrate_analysis(analysis_results: list[dict[str, Any]]):
+    integrated_result = integrate_chain.invoke(analysis_results)
+    # 하나의 통합된 AnalysisResult를 반환한다.
+
+    return integrated_result

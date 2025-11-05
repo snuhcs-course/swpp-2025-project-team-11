@@ -1,24 +1,77 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
-from apps.contact.models import Contact
+from apps.contact.models import Contact, Group
+from apps.core.models import TimeStampedModel
 from apps.user.models import User
 
 
-class AnalysisResult(models.Model):
+class MailAnalysisResult(TimeStampedModel):
+    # 메일마다 분석 결과를 저장하는 모델
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="anaylsis_result",
+        related_name="mail_anaylsis_result",
         db_index=True,
     )
     contact = models.ForeignKey(
         Contact,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="anaylsis_result",
+        on_delete=models.CASCADE,
+        related_name="mail_anaylsis_result",
         db_index=True,
     )
+
+    # 프롬프트에서 분석하는 항목에 따라 필드 수정 필요함
+    lexical_style = models.TextField()
+    grammar_patterns = models.TextField()
+    emotional_tone = models.TextField()
+    figurative_usage = models.TextField()
+    long_sentence_ratio = models.TextField()
+    representative_sentences = ArrayField(base_field=models.TextField(), default=list)
+
+
+class ContactAnalysisResult(TimeStampedModel):
+    # contact 단위로 통합된 분석 결과를 저장하는 모델
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="contact_anaylsis_result",
+        db_index=True,
+    )
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.CASCADE,
+        related_name="contact_anaylsis_result",
+        db_index=True,
+    )
+    last_analysis_id = models.IntegerField(null=True, blank=True)
+    # 마지막으로 통합에 사용된 MailAnalysisResult 모델의 id를 저장함
+
+    # 프롬프트에서 분석하는 항목에 따라 필드 수정 필요함
+    lexical_style = models.TextField()
+    grammar_patterns = models.TextField()
+    emotional_tone = models.TextField()
+    figurative_usage = models.TextField()
+    long_sentence_ratio = models.TextField()
+    representative_sentences = ArrayField(base_field=models.TextField(), default=list)
+
+
+class GroupAnalysisResult(TimeStampedModel):
+    # group 단위로 통합된 분석 결과를 저장하는 모델
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="group_anaylsis_result",
+        db_index=True,
+    )
+    group = models.ForeignKey(
+        Group,
+        on_delete=models.CASCADE,
+        related_name="group_analysis_result",
+        db_index=True,
+    )
+    last_analysis_id = models.IntegerField(null=True, blank=True)
+    # 마지막으로 통합에 사용된 MailAnalysisResult 모델의 id를 저장함
 
     # 프롬프트에서 분석하는 항목에 따라 필드 수정 필요함
     lexical_style = models.TextField()
