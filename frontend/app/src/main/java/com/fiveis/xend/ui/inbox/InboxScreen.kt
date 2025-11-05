@@ -347,7 +347,7 @@ private fun EmailList(
                 EmailRow(
                     item = item,
                     onClick = { onEmailClick(item) },
-                    onAddContactClick = { onAddContactClick(item) },
+                    onAddContactClick = onAddContactClick,
                     contactEmails = contactEmails
                 )
                 HorizontalDivider(
@@ -416,12 +416,14 @@ private fun EmailList(
 fun EmailListContent(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
     error: String?,
-    onScrollChange: (Int, Int) -> Unit = { _, _ -> }
+    onScrollChange: (Int, Int) -> Unit = { _, _ -> },
+    contactEmails: Set<String>
 ) {
     val listState = rememberLazyListState()
 
@@ -445,17 +447,24 @@ fun EmailListContent(
         EmailList(
             emails = emails,
             onEmailClick = onEmailClick,
+            onAddContactClick = onAddContactClick,
             onRefresh = onRefresh,
             onLoadMore = onLoadMore,
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
-            listState = listState
+            listState = listState,
+            contactEmails = contactEmails
         )
     }
 }
 
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: () -> Unit, contactEmails: Set<String>) {
+private fun EmailRow(
+    item: EmailItem,
+    onClick: () -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
+    contactEmails: Set<String>
+) {
     // Extract email from "Name <email>" format
     val senderEmail = extractSenderEmailFromRow(item.fromEmail)
     val isContact = senderEmail.lowercase() in contactEmails
@@ -509,7 +518,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit, onAddContactClick: ()
                         // Add Contact Button - only show if not already a contact
                         if (!isContact) {
                             IconButton(
-                                onClick = { onAddContactClick() },
+                                onClick = { onAddContactClick(item) },
                                 modifier = Modifier.size(20.dp)
                             ) {
                                 Icon(

@@ -14,11 +14,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.data.repository.SentRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
+import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.inbox.InboxViewModel
 import com.fiveis.xend.ui.search.SearchActivity
 import com.fiveis.xend.ui.sent.SentViewModel
@@ -61,6 +63,9 @@ class MailActivity : ComponentActivity() {
                         intent.putExtra("message_id", it.id)
                         startActivity(intent)
                     },
+                    onAddContactClick = { email ->
+                        inboxViewModel.showAddContactDialog(email)
+                    },
                     onOpenSearch = {
                         startActivity(Intent(this, SearchActivity::class.java))
                     },
@@ -80,6 +85,27 @@ class MailActivity : ComponentActivity() {
                         }
                     }
                 )
+
+                if (inboxUiState.showAddContactDialog) {
+                    inboxUiState.selectedEmailForContact?.let { email ->
+                        AddContactDialog(
+                            senderName = extractSenderName(email.fromEmail),
+                            senderEmail = extractSenderEmail(email.fromEmail),
+                            groups = inboxUiState.groups,
+                            onDismiss = { inboxViewModel.dismissAddContactDialog() },
+                            onConfirm = { name, emailAddr, senderRole, recipientRole, personalPrompt, groupId ->
+                                inboxViewModel.addContact(
+                                    name = name,
+                                    email = emailAddr,
+                                    senderRole = senderRole,
+                                    recipientRole = recipientRole,
+                                    personalPrompt = personalPrompt,
+                                    groupId = groupId
+                                )
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -92,10 +118,25 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
             val mailApiService = RetrofitClient.getMailApiService(context)
             val database = AppDatabase.getDatabase(context)
             val repository = InboxRepository(mailApiService, database.emailDao())
-            return InboxViewModel(repository) as T
+            val contactRepository = ContactBookRepository(context)
+            return InboxViewModel(repository, contactRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
+}
+
+private fun extractSenderName(fromEmail: String): String {
+    val nameRegex = "(.+?)\\s*<".toRegex()
+    val matchResult = nameRegex.find(fromEmail)
+    val name = matchResult?.groupValues?.get(1)?.trim()
+        ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+    return name.trim('"', '\'')
+}
+
+private fun extractSenderEmail(fromEmail: String): String {
+    val emailRegex = "<(.+?)>".toRegex()
+    val matchResult = emailRegex.find(fromEmail)
+    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
 }
 
 class SentViewModelFactory(private val context: Context) : ViewModelProvider.Factory {

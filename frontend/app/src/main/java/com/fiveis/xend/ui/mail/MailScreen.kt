@@ -69,6 +69,7 @@ fun MailScreen(
     inboxUiState: InboxUiState,
     sentUiState: SentUiState,
     onEmailClick: (EmailItem) -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onFabClick: () -> Unit = {},
@@ -116,6 +117,7 @@ fun MailScreen(
                     MailTab.INBOX -> com.fiveis.xend.ui.inbox.EmailListContent(
                         emails = inboxUiState.emails,
                         onEmailClick = onEmailClick,
+                        onAddContactClick = onAddContactClick,
                         onRefresh = onInboxRefresh,
                         onLoadMore = onInboxLoadMore,
                         isRefreshing = inboxUiState.isRefreshing,
@@ -134,7 +136,8 @@ fun MailScreen(
                             }
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
-                        }
+                        },
+                        contactEmails = inboxUiState.contactEmails
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
