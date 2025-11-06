@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EmailDao {
-    @Query("SELECT * FROM emails ORDER BY date DESC")
+    @Query("SELECT * FROM emails ORDER BY cachedAt DESC")
     fun getAllEmails(): Flow<List<EmailItem>>
 
     @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY date DESC")

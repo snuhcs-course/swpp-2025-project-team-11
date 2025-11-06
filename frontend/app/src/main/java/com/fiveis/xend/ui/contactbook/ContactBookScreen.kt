@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -95,7 +97,8 @@ fun ContactBookScreen(
     Box(modifier.fillMaxSize()) {
         if (selectedTab == ContactBookTab.Groups) {
             Scaffold(
-                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
+                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
+                contentWindowInsets = WindowInsets(0, 0, 0, 0)
             ) { padding ->
                 Column(
                     modifier = Modifier
@@ -157,7 +160,8 @@ fun ContactBookScreen(
             }
         } else {
             Scaffold(
-                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
+                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
+                contentWindowInsets = WindowInsets(0, 0, 0, 0)
             ) { padding ->
                 Column(
                     modifier = Modifier
@@ -405,8 +409,8 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(67.dp)
             .background(Color.White)
+            .navigationBarsPadding()
     ) {
         HorizontalDivider(
             modifier = Modifier,
@@ -417,7 +421,7 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(67.dp)
                 .padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
