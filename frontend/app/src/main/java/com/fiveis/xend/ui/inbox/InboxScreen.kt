@@ -207,7 +207,8 @@ fun InboxScreen(
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
                         listState = listState,
-                        contactEmails = uiState.contactEmails
+                        contactEmails = uiState.contactEmails,
+                        contactsByEmail = uiState.contactsByEmail
                     )
                 }
             }
@@ -331,7 +332,8 @@ private fun EmailList(
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
     listState: androidx.compose.foundation.lazy.LazyListState,
-    contactEmails: Set<String>
+    contactEmails: Set<String>,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -348,7 +350,8 @@ private fun EmailList(
                     item = item,
                     onClick = { onEmailClick(item) },
                     onAddContactClick = onAddContactClick,
-                    contactEmails = contactEmails
+                    contactEmails = contactEmails,
+                    contactsByEmail = contactsByEmail
                 )
                 HorizontalDivider(
                     modifier = Modifier,
@@ -423,7 +426,8 @@ fun EmailListContent(
     isLoadingMore: Boolean,
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
-    contactEmails: Set<String>
+    contactEmails: Set<String>,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     val listState = rememberLazyListState()
 
@@ -453,7 +457,8 @@ fun EmailListContent(
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
             listState = listState,
-            contactEmails = contactEmails
+            contactEmails = contactEmails,
+            contactsByEmail = contactsByEmail
         )
     }
 }
@@ -463,11 +468,15 @@ private fun EmailRow(
     item: EmailItem,
     onClick: () -> Unit,
     onAddContactClick: (EmailItem) -> Unit,
-    contactEmails: Set<String>
+    contactEmails: Set<String>,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     // Extract email from "Name <email>" format
     val senderEmail = extractSenderEmailFromRow(item.fromEmail)
     val isContact = senderEmail.lowercase() in contactEmails
+
+    // Use contact name if available, otherwise use original sender name
+    val displayName = contactsByEmail[senderEmail.lowercase()] ?: extractSenderName(item.fromEmail)
 
     Box(
         modifier = Modifier
@@ -506,7 +515,7 @@ private fun EmailRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = extractSenderName(item.fromEmail),
+                            text = displayName,
                             color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,

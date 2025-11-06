@@ -28,7 +28,9 @@ data class InboxUiState(
     val addContactSuccess: Boolean = false,
     val addContactError: String? = null,
     // 연락처에 있는 이메일 주소들
-    val contactEmails: Set<String> = emptySet()
+    val contactEmails: Set<String> = emptySet(),
+    // 이메일 주소를 key로 하는 연락처 맵 (이름 표시용)
+    val contactsByEmail: Map<String, String> = emptyMap()
 )
 
 /**
@@ -63,8 +65,14 @@ class InboxViewModel(
         viewModelScope.launch {
             contactRepository.observeContacts().collect { contacts ->
                 val contactEmailsSet = contacts.map { it.email.lowercase() }.toSet()
+                val contactsByEmailMap = contacts.associate { it.email.lowercase() to it.name }
                 Log.d("InboxViewModel", "Contact emails updated: ${contactEmailsSet.size} contacts")
-                _uiState.update { it.copy(contactEmails = contactEmailsSet) }
+                _uiState.update {
+                    it.copy(
+                        contactEmails = contactEmailsSet,
+                        contactsByEmail = contactsByEmailMap
+                    )
+                }
             }
         }
     }

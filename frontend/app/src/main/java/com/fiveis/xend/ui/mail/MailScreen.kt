@@ -167,7 +167,8 @@ fun MailScreen(
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
                         },
-                        contactEmails = inboxUiState.contactEmails
+                        contactEmails = inboxUiState.contactEmails,
+                        contactsByEmail = inboxUiState.contactsByEmail
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
