@@ -53,11 +53,11 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         # json should include: to_emails, body
         user = self.user
 
-        to_emails = data.to_emails  # 보내는 사람들 = list[str]
+        to_emails = data.get("to_emails", [])  # 보내는 사람들 = list[str]
 
         ctx = collect_prompt_context(user, to_emails)
         raw_inputs = build_prompt_inputs(ctx)
-        raw_inputs["body"] = data.body or ""
+        raw_inputs["body"] = data.get("body", "")
 
         system_prompt = """
         당신은 사용자가 작성 중인 메일을 이어서 완성하는 역할을 수행합니다.
@@ -81,10 +81,10 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
 
         system_prompt += """\n\n
         user: 안녕하세요 오늘 회의 진행을 맡은 홍길동 대리입니다.
-        output: {{"output": "오늘 회의 자료를 준비하면서"}}
+        output: {"output": "오늘 회의 자료를 준비하면서"}
 
         user: 저는 내일 미팅을 준비하고 있고, 
-        output: {{"output": "미팅 준비를 위해 필요한 자료와"}}
+        output: {"output": "미팅 준비를 위해 필요한 자료와"}
         """
 
         try:
