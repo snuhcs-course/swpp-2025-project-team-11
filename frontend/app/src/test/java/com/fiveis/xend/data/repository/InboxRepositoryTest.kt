@@ -224,6 +224,34 @@ class InboxRepositoryTest {
         coVerify { emailDao.getEmailCount() }
     }
 
+    @Test
+    fun get_mail_calls_api_service_with_message_id() = runTest {
+        val messageId = "test_message_123"
+        val mockMailDetail = com.fiveis.xend.data.model.MailDetailResponse(
+            id = messageId,
+            thread_id = "thread_123",
+            subject = "Test Subject",
+            from_email = "sender@example.com",
+            to = "recipient@example.com",
+            body = "Test email body",
+            date = "2025-01-01T00:00:00Z",
+            date_raw = "Wed, 1 Jan 2025 00:00:00 +0000",
+            snippet = "Test snippet",
+            is_unread = true,
+            label_ids = listOf("INBOX")
+        )
+        val mockResponse = Response.success(mockMailDetail)
+
+        coEvery { mailApiService.getMail(messageId) } returns mockResponse
+
+        val result = repository.getMail(messageId)
+
+        assertEquals(mockResponse, result)
+        assertTrue(result.isSuccessful)
+        assertEquals(messageId, result.body()?.id)
+        coVerify { mailApiService.getMail(messageId) }
+    }
+
     private fun createMockEmailItem(id: String) = EmailItem(
         id = id,
         threadId = "thread_$id",
