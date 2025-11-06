@@ -85,6 +85,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.ui.compose.common.AIActionRow
+import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
+import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
@@ -225,11 +228,11 @@ fun ReplyDirectComposeScreen(
                 .imePadding()
         ) {
             // Action Row (실행취소 + AI 완성)
-            DirectComposeActionRow(
+            AIActionRow(
                 isStreaming = isStreaming,
-                onUndo = { /* TODO */ },
-                onAiComplete = { /* TODO */ },
-                onStopStreaming = { isStreaming = false }
+                onUndo = onUndo,
+                onAiComplete = onAiComplete,
+                onStopStreaming = onStopStreaming
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -275,16 +278,17 @@ fun ReplyDirectComposeScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // 본문 헤더 + 실시간 AI 토글
-            DirectComposeBodyHeader(
-                isRealtimeOn = isRealtimeAiOn,
-                onToggle = { isRealtimeAiOn = it }
+            BodyHeader(
+                isRealtimeOn = aiRealtime,
+                onToggle = onAiRealtimeToggle
             )
 
-            // Rich Text Editor
-            DirectComposeRichTextEditorCard(
+            // Rich Text Editor with AI
+            AIEnhancedRichTextEditor(
                 richTextState = richTextState,
                 isStreaming = isStreaming,
-                onTapComplete = { /* TODO */ }
+                suggestionText = suggestionText,
+                onAcceptSuggestion = onAcceptSuggestion
             )
         }
     }

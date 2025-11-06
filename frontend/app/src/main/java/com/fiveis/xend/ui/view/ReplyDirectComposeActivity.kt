@@ -22,6 +22,8 @@ import com.fiveis.xend.ui.compose.SendMailViewModel
 import com.fiveis.xend.ui.compose.TemplateSelectionScreen
 import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ReplyDirectComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,7 +31,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Intent에서 메일 정보 가져오기
-        val recipientEmail = intent.getStringExtra("recipient_email") ?: ""
+        val recipientEmailRaw = intent.getStringExtra("recipient_email") ?: ""
         val recipientName = intent.getStringExtra("recipient_name") ?: ""
         val initialSubject = intent.getStringExtra("subject") ?: ""
         val groups = intent.getStringArrayListExtra("groups") ?: emptyList()
@@ -37,6 +39,9 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         val date = intent.getStringExtra("date") ?: ""
         val originalBody = intent.getStringExtra("original_body") ?: ""
         val generatedBody = intent.getStringExtra("generated_body") ?: ""
+
+        // 이메일 주소 추출 ("이름 <email@example.com>" 형식에서 이메일만 추출)
+        val recipientEmail = extractEmailAddress(recipientEmailRaw)
 
         setContent {
             XendTheme {
@@ -143,10 +148,82 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         senderEmail = senderEmail,
                         date = date,
                         originalBody = originalBody,
-                        sendUiState = sendUiState
+                        sendUiState = sendUiState,
+                        // AI 관련 파라미터
+                        isStreaming = composeUi.isStreaming,
+                        suggestionText = composeUi.suggestionText,
+                        aiRealtime = aiRealtime,
+                        onUndo = {
+                            composeVm.undo()?.let { snapshot ->
+                                currentSubject = snapshot.subject
+                                richTextState.setHtml(snapshot.bodyHtml)
+                            }
+                        },
+                        onAiComplete = {
+                            // Save current state before AI generation
+                            composeVm.saveUndoSnapshot(
+                                subject = currentSubject,
+                                bodyHtml = richTextState.toHtml()
+                            )
+
+                            val payload = JSONObject().apply {
+                                put("subject", currentSubject.ifBlank { "제목 생성" })
+                                put("body", richTextState.toHtml().ifBlank { "간단한 답장 내용" })
+                                put("to_emails", JSONArray(listOf(recipientEmail)))
+                                // 답장이므로 원본 메일 정보 포함
+                                if (originalBody.isNotEmpty()) {
+                                    put("reply_body", originalBody)
+                                }
+                            }
+                            composeVm.startStreaming(payload)
+                        },
+                        onStopStreaming = { composeVm.stopStreaming() },
+                        onAcceptSuggestion = {
+                            // 전체 추천 문장 적용
+                            val suggestion = composeUi.suggestionText
+                            if (suggestion.isNotEmpty()) {
+                                val insertionIndex = with(richTextState.selection) {
+                                    if (reversed) start else end
+                                }
+                                val currentText = richTextState.annotatedString.text
+                                val previousChar = currentText.getOrNull(insertionIndex - 1)
+
+                                val normalizedSuggestion = suggestion.replace("\n", " ").trimEnd()
+                                val suggestionFirstChar = normalizedSuggestion.firstOrNull()
+
+                                val needsSpaceBefore =
+                                    previousChar != null &&
+                                        !previousChar.isWhitespace() &&
+                                        suggestionFirstChar != null &&
+                                        !suggestionFirstChar.isWhitespace()
+
+                                val textToInsert = buildString {
+                                    if (needsSpaceBefore) append(' ')
+                                    append(normalizedSuggestion)
+                                }
+
+                                if (textToInsert.isNotEmpty()) {
+                                    richTextState.addTextAfterSelection(textToInsert)
+                                }
+
+                                // 추천 완료 후 클리어
+                                composeVm.acceptSuggestion()
+                            }
+                        },
+                        onAiRealtimeToggle = { aiRealtime = it }
                     )
                 }
             }
         }
+    }
+
+    /**
+     * 이메일 주소 추출 헬퍼 함수
+     * "이름 <email@example.com>" 또는 "<email@example.com>" 형식에서 이메일만 추출
+     */
+    private fun extractEmailAddress(emailString: String): String {
+        val regex = "<([^>]+)>".toRegex()
+        val match = regex.find(emailString)
+        return match?.groupValues?.get(1)?.trim() ?: emailString.trim()
     }
 }
