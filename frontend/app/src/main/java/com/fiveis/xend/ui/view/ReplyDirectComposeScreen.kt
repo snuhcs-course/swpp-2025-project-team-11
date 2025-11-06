@@ -71,7 +71,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,10 +113,17 @@ fun ReplyDirectComposeScreen(
     senderEmail: String = "",
     date: String = "",
     originalBody: String = "",
-    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState()
+    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState(),
+    // AI 관련 파라미터
+    isStreaming: Boolean = false,
+    suggestionText: String = "",
+    aiRealtime: Boolean = true,
+    onUndo: () -> Unit = {},
+    onAiComplete: () -> Unit = {},
+    onStopStreaming: () -> Unit = {},
+    onAcceptSuggestion: () -> Unit = {},
+    onAiRealtimeToggle: (Boolean) -> Unit = {}
 ) {
-    var isRealtimeAiOn by rememberSaveable { mutableStateOf(true) }
-    var isStreaming by rememberSaveable { mutableStateOf(false) }
     var isMailContentExpanded by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
