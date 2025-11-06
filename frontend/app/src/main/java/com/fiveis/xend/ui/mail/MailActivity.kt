@@ -83,6 +83,9 @@ class MailActivity : ComponentActivity() {
                                 overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                             }
                         }
+                    },
+                    onDismissSuccessBanner = {
+                        inboxViewModel.dismissSuccessBanner()
                     }
                 )
 
