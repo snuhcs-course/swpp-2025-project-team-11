@@ -13,11 +13,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,11 +35,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatColorText
 import androidx.compose.material.icons.filled.FormatItalic
@@ -49,10 +45,7 @@ import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,7 +54,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -111,10 +103,11 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
+import com.fiveis.xend.ui.compose.common.AIActionRow
+import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
+import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.theme.AddButtonText
-import com.fiveis.xend.ui.theme.BannerBorder
-import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.ComposeBackground
@@ -124,11 +117,8 @@ import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
-import com.fiveis.xend.ui.theme.UndoBorder
 import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditorDefaults
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -214,7 +204,7 @@ fun EmailComposeScreen(
                 }
             }
 
-            ComposeActionRow(
+            AIActionRow(
                 isStreaming = isStreaming,
                 onUndo = onUndo,
                 onAiComplete = onAiComplete,
@@ -246,10 +236,9 @@ fun EmailComposeScreen(
                 isRealtimeOn = aiRealtime,
                 onToggle = onAiRealtimeToggle
             )
-            RichTextEditorCard(
+            AIEnhancedRichTextEditor(
                 richTextState = richTextState,
                 isStreaming = isStreaming,
-                onTapComplete = onAiComplete,
                 suggestionText = suggestionText,
                 onAcceptSuggestion = onAcceptSuggestion
             )
@@ -374,106 +363,6 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun ComposeActionRow(
-    isStreaming: Boolean,
-    onUndo: () -> Unit,
-    onAiComplete: () -> Unit,
-    onStopStreaming: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 15.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedButton(
-            onClick = onUndo,
-            modifier = Modifier.size(width = 94.dp, height = 35.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, UndoBorder),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = UndoBorder,
-                disabledContentColor = UndoBorder.copy(alpha = 0.2f)
-            )
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Undo,
-                    contentDescription = "실행취소",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "실행취소",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF64748B)
-                    )
-                )
-            }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedVisibility(visible = isStreaming) {
-                OutlinedButton(
-                    onClick = onStopStreaming,
-
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, BannerBorder),
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    modifier = Modifier.size(width = 104.dp, height = 35.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = BannerText,
-                        disabledContentColor = BannerText.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = "중지", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "중지",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-            }
-            OutlinedButton(
-                onClick = onAiComplete,
-                modifier = Modifier.size(width = 96.dp, height = 35.dp),
-                enabled = !isStreaming,
-                contentPadding = PaddingValues(horizontal = 15.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Blue60),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Blue60,
-                    disabledContentColor = Blue60.copy(alpha = 0.4f)
-                )
-            ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    "AI 완성",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SectionHeader(text: String) {
     Text(
         text = text,
@@ -485,30 +374,6 @@ private fun SectionHeader(text: String) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
     )
-}
-
-@Composable
-private fun BodyHeader(isRealtimeOn: Boolean, onToggle: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "본문",
-            style = MaterialTheme.typography.titleSmall.copy(
-                color = Color(0xFF64748B),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        )
-        RealtimeToggleChip(
-            isChecked = isRealtimeOn,
-            onToggle = onToggle
-        )
-    }
 }
 
 @Composable
@@ -811,127 +676,6 @@ private fun RichTextEditorControls(
                         Icon(Icons.Default.Circle, contentDescription = null, tint = color)
                     })
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RichTextEditorCard(
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
-    isStreaming: Boolean,
-    onTapComplete: () -> Unit,
-    suggestionText: String = "",
-    onAcceptSuggestion: () -> Unit = {}
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeSurface
-    ) {
-        Column {
-            RichTextEditorControls(state = richTextState)
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                colors = RichTextEditorDefaults.richTextEditorColors(
-                    containerColor = Color.White
-                ),
-                placeholder = {
-                    Text(
-                        text = "내용을 입력하세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                    )
-                }
-            )
-
-            SuggestionPreviewPanel(
-                suggestionText = suggestionText
-            )
-
-            // "탭 완성" button now accepts the suggestion, and only appears when there is one.
-            if (suggestionText.isNotEmpty()) {
-                ComposeTapCompleteButton(onClick = onAcceptSuggestion)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestionPreviewPanel(suggestionText: String) {
-    if (suggestionText.isEmpty()) return
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-        ) {
-            Text(
-                text = suggestionText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = TextSecondary.copy(alpha = 0.75f),
-                    fontStyle = FontStyle.Italic
-                ),
-                modifier = Modifier.padding(14.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ComposeTapCompleteButton(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp, top = 8.dp),
-        horizontalArrangement = Arrangement.End
-    ) {
-        OutlinedButton(
-            onClick = onClick,
-            modifier = Modifier
-                .widthIn(min = 68.dp)
-                .height(28.dp),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, Color(0xFFC7D2FE)),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.White,
-                contentColor = Blue60
-            )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FlashOn,
-                    contentDescription = "탭 완성",
-                    tint = Blue60,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "탭 완성",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Blue60
-                    )
-                )
             }
         }
     }
