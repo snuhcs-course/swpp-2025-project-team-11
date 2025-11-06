@@ -35,6 +35,9 @@ class MailComposeViewModel(
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
 
+    // WebSocket context for realtime suggestions
+    private var recipientEmails: List<String> = emptyList()
+    private var replyToBody: String? = null
     // Undo snapshot
     private var undoSnapshot: UndoSnapshot? = null
 
@@ -142,6 +145,11 @@ class MailComposeViewModel(
         _ui.update { it.copy(suggestionText = "") }
     }
 
+    fun setRecipientContext(emails: List<String>, replyBody: String? = null) {
+        recipientEmails = emails
+        replyToBody = replyBody
+    }
+
     fun onTextChanged(currentText: String) {
         if (!_ui.value.isRealtimeEnabled) return
 
@@ -150,9 +158,9 @@ class MailComposeViewModel(
             delay(500)
             suggestionBuffer.clear()
             wsClient?.sendMessage(
-                systemPrompt = "메일 초안 작성",
                 text = currentText,
-                maxTokens = 50
+                toEmails = recipientEmails,
+                body = replyToBody
             )
         }
     }
