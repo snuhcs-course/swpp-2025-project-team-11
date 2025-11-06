@@ -163,7 +163,7 @@ Output exactly 2–4 options.
 REPLY_SYSTEM_J2 = """
 You are an expert email reply assistant.
 Write only the reply body in {{ language }} (no subject line or commentary).
-Keep placeholders {{'{{PII:<...>}}'}} intact.
+Keep placeholders of the form {{'{{PII:<...>}}'}} exactly as they appear.
 Be faithful to the incoming email. Use appropriate greeting and sign-off.
 If essential details are missing, use placeholders like {{'{{DATE}}'}}, {{'{{CONTACT}}'}}.
 

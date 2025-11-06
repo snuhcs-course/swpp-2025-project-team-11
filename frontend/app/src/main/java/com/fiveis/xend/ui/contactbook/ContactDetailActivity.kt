@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -12,7 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.ui.theme.StableColor
@@ -47,7 +51,8 @@ class ContactDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val contactColor = StableColor.forId(contactId)
 
-                val vm: ContactDetailViewModel = viewModel()
+                val viewModelFactory = remember { ContactDetailViewModelFactory(application) }
+                val vm: ContactDetailViewModel = viewModel(factory = viewModelFactory)
                 LaunchedEffect(contactId) { vm.load(contactId) }
                 val state by vm.uiState.collectAsState()
 
@@ -76,5 +81,17 @@ class ContactDetailActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+private class ContactDetailViewModelFactory(
+    private val application: Application
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ContactDetailViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return ContactDetailViewModel(application) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

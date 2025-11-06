@@ -54,6 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.compose.Banner
+import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.inbox.InboxUiState
 import com.fiveis.xend.ui.sent.SentUiState
 import com.fiveis.xend.ui.theme.Blue60
@@ -69,6 +71,7 @@ fun MailScreen(
     inboxUiState: InboxUiState,
     sentUiState: SentUiState,
     onEmailClick: (EmailItem) -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onFabClick: () -> Unit = {},
@@ -77,6 +80,7 @@ fun MailScreen(
     onSentRefresh: () -> Unit = {},
     onSentLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
+    onDismissSuccessBanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(MailTab.INBOX) }
@@ -112,10 +116,38 @@ fun MailScreen(
                     onProfile = onOpenProfile
                 )
 
+                // Success Banner
+                AnimatedVisibility(
+                    visible = inboxUiState.addContactSuccess,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "연락처가 추가되었습니다",
+                            type = BannerType.INFO,
+                            onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
                 when (selectedTab) {
                     MailTab.INBOX -> com.fiveis.xend.ui.inbox.EmailListContent(
                         emails = inboxUiState.emails,
                         onEmailClick = onEmailClick,
+                        onAddContactClick = onAddContactClick,
                         onRefresh = onInboxRefresh,
                         onLoadMore = onInboxLoadMore,
                         isRefreshing = inboxUiState.isRefreshing,
@@ -134,7 +166,8 @@ fun MailScreen(
                             }
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
-                        }
+                        },
+                        contactEmails = inboxUiState.contactEmails
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
