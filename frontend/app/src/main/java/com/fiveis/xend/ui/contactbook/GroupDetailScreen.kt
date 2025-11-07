@@ -52,6 +52,7 @@ import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.StableColor
+import com.fiveis.xend.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -264,13 +265,13 @@ private fun PromptOptionsCard(options: List<PromptOption>) {
             Text("AI 프롬프트 설정", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
             if (tone.isNotEmpty()) {
-                Text("문체 스타일", color = Color.Gray, fontSize = 12.sp)
+                Text("문체 스타일", color = TextSecondary, fontSize = 13.sp)
                 ChipRow(tone)
             }
 
             if (format.isNotEmpty()) {
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                Text("형식 가이드", color = Color.Gray, fontSize = 12.sp)
+                Text("형식 가이드", color = TextSecondary, fontSize = 13.sp)
                 ChipRow(format)
             }
 
@@ -301,7 +302,7 @@ private fun TagChip(text: String) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.titleSmall
         )
     }
 }
@@ -379,6 +380,7 @@ private fun RenameGroupDialog(
     )
 }
 
+// 그룹 정보 수정 시 dialog 팝업에서 이용
 @Composable
 private fun FormBlock(label: String, content: @Composable ColumnScope.() -> Unit) {
     Column(

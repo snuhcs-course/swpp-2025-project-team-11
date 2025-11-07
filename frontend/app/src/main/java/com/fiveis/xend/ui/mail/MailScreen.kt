@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -104,6 +105,36 @@ fun MailScreen(
                 BottomNavBar(selected = "mail", onSelect = onBottomNavChange)
             }
         },
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    initialOffsetY = { it }
+                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
+                exit = slideOutVertically(
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    targetOffsetY = { it }
+                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
+            ) {
+                FloatingActionButton(
+                    onClick = onFabClick,
+                    modifier = Modifier
+                        .offset(y = 20.dp)
+                        .padding(bottom = 0.dp)
+                        .size(56.dp),
+                    containerColor = Blue80,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        Icons.Filled.Create,
+                        contentDescription = "새 메일 작성",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center,
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
@@ -192,37 +223,6 @@ fun MailScreen(
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
                         }
-                    )
-                }
-            }
-
-            val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-
-            AnimatedVisibility(
-                visible = showBottomBar,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(
-                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                    initialOffsetY = { it }
-                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
-                exit = slideOutVertically(
-                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                    targetOffsetY = { it }
-                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
-            ) {
-                FloatingActionButton(
-                    onClick = onFabClick,
-                    modifier = Modifier
-                        .offset(y = 28.dp)
-                        .padding(bottom = navBarPadding.calculateBottomPadding())
-                        .size(56.dp),
-                    containerColor = Blue80,
-                    contentColor = Color.White
-                ) {
-                    Icon(
-                        Icons.Filled.Create,
-                        contentDescription = "새 메일 작성",
-                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
