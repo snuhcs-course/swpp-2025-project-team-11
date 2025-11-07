@@ -115,7 +115,7 @@ fun AddGroupScreen(
                 }
             )
         },
-        bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
+//        bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAdd,
