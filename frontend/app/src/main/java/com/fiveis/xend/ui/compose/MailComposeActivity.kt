@@ -39,7 +39,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOn
@@ -129,6 +128,7 @@ import com.fiveis.xend.ui.theme.UndoBorder
 import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
+import com.mohamedrejeb.richeditor.ui.material3.RichTextEditorDefaults
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -816,6 +816,7 @@ private fun RichTextEditorControls(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RichTextEditorCard(
     richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
@@ -830,7 +831,7 @@ private fun RichTextEditorCard(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(28.dp),
         border = BorderStroke(1.dp, ComposeOutline),
-        color = Color.White
+        color = ComposeSurface
     ) {
         Column {
             RichTextEditorControls(state = richTextState)
@@ -839,11 +840,12 @@ private fun RichTextEditorCard(
                 enabled = !isStreaming,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
                 modifier = Modifier
-                    .background(Color.White)
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 240.dp)
                     .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-
+                colors = RichTextEditorDefaults.richTextEditorColors(
+                    containerColor = Color.White
+                ),
                 placeholder = {
                     Text(
                         text = "내용을 입력하세요",
@@ -853,17 +855,19 @@ private fun RichTextEditorCard(
             )
 
             SuggestionPreviewPanel(
-                suggestionText = suggestionText,
-                onAcceptSuggestion = onAcceptSuggestion
+                suggestionText = suggestionText
             )
 
-            ComposeTapCompleteButton(onClick = onTapComplete)
+            // "탭 완성" button now accepts the suggestion, and only appears when there is one.
+            if (suggestionText.isNotEmpty()) {
+                ComposeTapCompleteButton(onClick = onAcceptSuggestion)
+            }
         }
     }
 }
 
 @Composable
-private fun SuggestionPreviewPanel(suggestionText: String, onAcceptSuggestion: () -> Unit) {
+private fun SuggestionPreviewPanel(suggestionText: String) {
     if (suggestionText.isEmpty()) return
 
     Column(
@@ -886,39 +890,6 @@ private fun SuggestionPreviewPanel(suggestionText: String, onAcceptSuggestion: (
                 modifier = Modifier.padding(14.dp)
             )
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            OutlinedButton(
-                onClick = onAcceptSuggestion,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, Color(0xFFCBD5F5)),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
-                    contentColor = Blue60
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "제안 적용",
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "제안 적용",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Blue60
-                    )
-                )
-            }
-        }
     }
 }
 
@@ -927,7 +898,7 @@ private fun ComposeTapCompleteButton(onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp, top = 8.dp),
         horizontalArrangement = Arrangement.End
     ) {
         OutlinedButton(
@@ -1175,13 +1146,6 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
-                // Update recipient context for WebSocket
-                LaunchedEffect(contacts) {
-                    composeVm.setRecipientContext(
-                        emails = contacts.map { it.email }
-                    )
-                }
-
                 // Monitor text changes for realtime suggestions
                 LaunchedEffect(richTextState.annotatedString.text) {
                     if (aiRealtime) {
@@ -1236,12 +1200,29 @@ class MailComposeActivity : ComponentActivity() {
                                 // 전체 추천 문장 적용
                                 val suggestion = composeUi.suggestionText
                                 if (suggestion.isNotEmpty()) {
+                                    val insertionIndex = with(richTextState.selection) {
+                                        if (reversed) start else end
+                                    }
                                     val currentText = richTextState.annotatedString.text
-                                    val separator = if (currentText.endsWith(" ") || currentText.isEmpty()) "" else " "
+                                    val previousChar = currentText.getOrNull(insertionIndex - 1)
 
-                                    // 기존 HTML + 전체 추천 문장
-                                    val currentHtml = richTextState.toHtml()
-                                    richTextState.setHtml(currentHtml + separator + suggestion)
+                                    val normalizedSuggestion = suggestion.replace("\n", " ").trimEnd()
+                                    val suggestionFirstChar = normalizedSuggestion.firstOrNull()
+
+                                    val needsSpaceBefore =
+                                        previousChar != null &&
+                                            !previousChar.isWhitespace() &&
+                                            suggestionFirstChar != null &&
+                                            !suggestionFirstChar.isWhitespace()
+
+                                    val textToInsert = buildString {
+                                        if (needsSpaceBefore) append(' ')
+                                        append(normalizedSuggestion)
+                                    }
+
+                                    if (textToInsert.isNotEmpty()) {
+                                        richTextState.addTextAfterSelection(textToInsert)
+                                    }
 
                                     // 추천 완료 후 클리어
                                     composeVm.acceptSuggestion()
