@@ -75,20 +75,20 @@ class GroupDetailViewModel(
         }
     }
 
-    fun renameGroup(newName: String) {
+    fun renameGroup(newName: String, newDescription: String) {
         val id = observingId ?: return
-        val trimmed = newName.trim()
-        if (trimmed.isBlank()) {
+        val trimmedName = newName.trim()
+        if (trimmedName.isBlank()) {
             ui.update { it.copy(renameError = "그룹 이름을 입력해 주세요") }
             return
         }
         if (ui.value.isRenaming) return
 
-        val currentDescription = ui.value.group?.description ?: ""
+        val trimmedDescription = newDescription.trim()
         viewModelScope.launch {
             ui.update { it.copy(isRenaming = true, renameError = null) }
             try {
-                repo.updateGroup(id, trimmed, currentDescription)
+                repo.updateGroup(id, trimmedName, trimmedDescription)
                 ui.update { it.copy(isRenaming = false, renameError = null) }
             } catch (e: Exception) {
                 ui.update {

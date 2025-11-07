@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -48,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.StableColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,12 +61,13 @@ fun GroupDetailScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onMemberClick: (Contact) -> Unit,
-    onRenameGroup: (String) -> Unit,
+    onRenameGroup: (String, String) -> Unit,
     onClearRenameError: () -> Unit
 ) {
     val group = uiState.group
     var showRenameDialog by rememberSaveable { mutableStateOf(false) }
     var renameField by rememberSaveable { mutableStateOf("") }
+    var renameDescriptionField by rememberSaveable { mutableStateOf("") }
     var renameSubmitted by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isRenaming, uiState.renameError, showRenameDialog) {
@@ -134,6 +138,7 @@ fun GroupDetailScreen(
                             color = themeColor,
                             modifier = Modifier.clickable {
                                 renameField = group.name
+                                renameDescriptionField = group.description.orEmpty()
                                 renameSubmitted = false
                                 onClearRenameError()
                                 showRenameDialog = true
@@ -144,7 +149,14 @@ fun GroupDetailScreen(
                                 group.description,
                                 color = Color.Gray,
                                 maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.clickable {
+                                    renameField = group.name
+                                    renameDescriptionField = group.description.orEmpty()
+                                    renameSubmitted = false
+                                    onClearRenameError()
+                                    showRenameDialog = true
+                                }
                             )
                         }
                     }
@@ -173,26 +185,35 @@ fun GroupDetailScreen(
     }
 
     if (showRenameDialog) {
-        val trimmed = renameField.trim()
+        val trimmedName = renameField.trim()
+        val trimmedDescription = renameDescriptionField.trim()
+        val originalName = group?.name
+        val originalDescription = group?.description.orEmpty().trim()
+        val hasChanges = trimmedName != originalName || trimmedDescription != originalDescription
+
         RenameGroupDialog(
             value = renameField,
+            description = renameDescriptionField,
             errorMessage = uiState.renameError,
             isProcessing = uiState.isRenaming,
-            isConfirmEnabled = trimmed.isNotBlank() && trimmed != group?.name,
+            isConfirmEnabled = trimmedName.isNotBlank(),
             onValueChange = {
                 renameField = it
                 if (uiState.renameError != null) onClearRenameError()
             },
+            onDescriptionChange = { renameDescriptionField = it },
             onDismiss = {
                 showRenameDialog = false
                 renameSubmitted = false
+                renameDescriptionField = group?.description.orEmpty()
                 onClearRenameError()
             },
             onConfirm = {
                 val targetName = renameField.trim()
-                if (targetName.isBlank() || targetName == group?.name) return@RenameGroupDialog
+                val targetDescription = renameDescriptionField.trim()
+                if (targetName.isBlank()) return@RenameGroupDialog
                 renameSubmitted = true
-                onRenameGroup(targetName)
+                onRenameGroup(targetName, targetDescription)
             }
         )
     }
@@ -288,25 +309,52 @@ private fun TagChip(text: String) {
 @Composable
 private fun RenameGroupDialog(
     value: String,
+    description: String,
     errorMessage: String?,
     isProcessing: Boolean,
     isConfirmEnabled: Boolean,
     onValueChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
-        title = { Text("그룹 이름 수정", fontWeight = FontWeight.Bold) },
+        title = { Text("그룹 정보 수정", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    label = { Text("그룹 이름") },
-                    singleLine = true,
-                    enabled = !isProcessing
-                )
+                FormBlock(label = "그룹 이름") {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        placeholder = {
+                            Text(
+                                text = "이름을 입력하세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        singleLine = true,
+                        enabled = !isProcessing
+                    )
+                }
+
+                FormBlock(label = "그룹 설명") {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = onDescriptionChange,
+                        placeholder = {
+                            Text(
+                                text = "그룹을 소개해 주세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                color = Gray400
+                            )
+                        },
+                        enabled = !isProcessing,
+                        minLines = 4
+                    )
+                }
+
                 if (!errorMessage.isNullOrBlank()) {
                     Text(
                         errorMessage,
@@ -329,4 +377,20 @@ private fun RenameGroupDialog(
             ) { Text("취소") }
         }
     )
+}
+
+@Composable
+private fun FormBlock(label: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        content()
+    }
 }

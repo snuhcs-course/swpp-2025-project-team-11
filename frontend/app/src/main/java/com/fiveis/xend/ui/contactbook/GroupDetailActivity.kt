@@ -72,7 +72,7 @@ class GroupDetailActivity : ComponentActivity() {
                                 .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
                         )
                     },
-                    onRenameGroup = { vm.renameGroup(it) },
+                    onRenameGroup = { newName, newDesc -> vm.renameGroup(newName, newDesc) },
                     onClearRenameError = { vm.clearRenameError() }
                 )
 

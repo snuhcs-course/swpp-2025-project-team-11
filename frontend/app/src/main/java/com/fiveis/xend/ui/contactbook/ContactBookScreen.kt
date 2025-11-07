@@ -310,9 +310,10 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 그룹에 속한 연락처 목록
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     group.members.take(3).forEach {
-                        MemberCircle(it.name.first().toString(), groupColor)
+                        MemberCircle(it.name.first().toString(), StableColor.forId(it.id))
                     }
                     if (group.members.size > 3) {
                         MemberCircle("+${group.members.size - 3}", Color.LightGray)
