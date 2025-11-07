@@ -76,6 +76,7 @@ object RetrofitClient {
             .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
+
                 val accessToken = tokenManager.getAccessToken()
                 val request = if (accessToken != null) {
                     val fullToken = "Bearer $accessToken"

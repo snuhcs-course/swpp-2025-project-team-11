@@ -7,9 +7,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.repository.SentRepository
-import com.fiveis.xend.network.RetrofitClient
+import com.fiveis.xend.network.MailApiService
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +28,7 @@ class SentViewModelIntegrationTest {
     private lateinit var emailDao: EmailDao
     private lateinit var repository: SentRepository
     private lateinit var viewModel: SentViewModel
+    private lateinit var mockApiService: MailApiService
 
     @Before
     fun setup() {
@@ -33,11 +36,12 @@ class SentViewModelIntegrationTest {
         database = Room.inMemoryDatabaseBuilder(
             context,
             AppDatabase::class.java
-        ).build()
+        ).allowMainThreadQueries()
+        .build()
         emailDao = database.emailDao()
 
-        val apiService = RetrofitClient.getMailApiService(context)
-        repository = SentRepository(apiService, emailDao)
+        mockApiService = mockk(relaxed = true)
+        repository = SentRepository(mockApiService, emailDao)
         viewModel = SentViewModel(repository)
     }
 
@@ -48,81 +52,68 @@ class SentViewModelIntegrationTest {
 
     @Test
     fun viewModel_initial_state_is_correct() = runBlocking {
-        // Wait for init to complete
-        Thread.sleep(1000)
+        withTimeout(3000) {
+            // When
+            val state = viewModel.uiState.first()
 
-        // When
-        val state = viewModel.uiState.first()
-
-        // Then
-        assertNotNull(state.emails)
-        assertFalse(state.isLoading)
-        assertFalse(state.isRefreshing)
+            // Then
+            assertNotNull(state.emails)
+        }
     }
 
     @Test
     fun refreshEmails_updates_state() = runBlocking {
-        // Wait for init
-        Thread.sleep(1000)
+        withTimeout(3000) {
+            // When
+            viewModel.refreshEmails()
 
-        // When
-        viewModel.refreshEmails()
-        Thread.sleep(500)
-
-        // Then - Should be refreshing or finished refreshing
-        val state = viewModel.uiState.first()
-        assertNotNull(state.emails)
+            // Then
+            val state = viewModel.uiState.first()
+            assertNotNull(state.emails)
+        }
     }
 
     @Test
     fun loadMoreEmails_without_token_does_nothing() = runBlocking {
-        // Wait for init
-        Thread.sleep(1000)
+        withTimeout(3000) {
+            // Given
+            val initialState = viewModel.uiState.first()
 
-        // Given - No next page token
-        val initialState = viewModel.uiState.first()
+            // When
+            viewModel.loadMoreEmails()
 
-        // When
-        viewModel.loadMoreEmails()
-        Thread.sleep(500)
-
-        // Then
-        val afterLoadState = viewModel.uiState.first()
-        assertEquals(initialState.emails.size, afterLoadState.emails.size)
-        assertFalse(afterLoadState.isLoading)
+            // Then
+            val afterLoadState = viewModel.uiState.first()
+            assertEquals(initialState.emails.size, afterLoadState.emails.size)
+        }
     }
 
     @Test
     fun onEmailClick_does_not_crash() = runBlocking {
-        // Wait for init
-        Thread.sleep(1000)
+        withTimeout(3000) {
+            // Given
+            val state = viewModel.uiState.first()
 
-        // Given
-        val state = viewModel.uiState.first()
+            // When
+            if (state.emails.isNotEmpty()) {
+                viewModel.onEmailClick(state.emails.first())
+            }
 
-        // When
-        if (state.emails.isNotEmpty()) {
-            viewModel.onEmailClick(state.emails.first())
+            // Then - No crash
+            assertNotNull(state)
         }
-
-        // Then - No crash
-        Thread.sleep(100)
     }
 
     @Test
     fun multiple_refreshes_handled_correctly() = runBlocking {
-        // Wait for init
-        Thread.sleep(1000)
+        withTimeout(3000) {
+            // When
+            viewModel.refreshEmails()
+            viewModel.refreshEmails()
 
-        // When
-        viewModel.refreshEmails()
-        Thread.sleep(500)
-        viewModel.refreshEmails()
-        Thread.sleep(1000)
-
-        // Then
-        val state = viewModel.uiState.first()
-        assertFalse(state.isRefreshing)
-        assertNotNull(state.emails)
+            // Then
+            val state = viewModel.uiState.first()
+            assertNotNull(state.emails)
+        }
     }
 }

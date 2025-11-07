@@ -444,7 +444,7 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.clickable { /* 이미 연락처에 있음 */ }
+                modifier = Modifier.clickable { onSelect("contacts") }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Person,
