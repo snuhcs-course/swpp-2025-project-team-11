@@ -3,9 +3,9 @@ import json
 
 import redis.asyncio as aioredis
 import requests
+from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
-from asgiref.sync import sync_to_async
 
 from .services.utils import build_prompt_inputs, collect_prompt_context
 
@@ -56,7 +56,7 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
 
         to_emails = data.get("to_emails", [])  # 보내는 사람들 = list[str]
 
-        ctx = await sync_to_async(collect_prompt_context)(user, to_emails) 
+        ctx = await sync_to_async(collect_prompt_context)(user, to_emails)
         # async한 receive 함수 내부 / collect_prompt_context 함수 내부에서 ORM 호출(sync)이 존재함
         # Django ORM을 async context 내부에서 바로 호출 할 수 없음 -> sync_to_async로 변환하여 스레드에서 실행되게
         raw_inputs = build_prompt_inputs(ctx)
