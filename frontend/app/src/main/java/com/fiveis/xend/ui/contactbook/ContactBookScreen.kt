@@ -292,6 +292,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
                     Text(
                         group.description ?: "",
+                        modifier = Modifier.width(240.dp),
                         color = Color.Gray,
                         fontSize = 14.sp,
                         maxLines = 1,
