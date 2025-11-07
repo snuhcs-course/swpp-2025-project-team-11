@@ -16,7 +16,9 @@ import kotlinx.coroutines.launch
 data class GroupDetailUiState(
     val isLoading: Boolean = false,
     val group: Group? = null,
-    val error: String? = null
+    val error: String? = null,
+    val isRenaming: Boolean = false,
+    val renameError: String? = null
 )
 
 class GroupDetailViewModel(
@@ -71,6 +73,36 @@ class GroupDetailViewModel(
                 ui.update { it.copy(isLoading = false, error = e.message ?: "동기화 실패") }
             }
         }
+    }
+
+    fun renameGroup(newName: String) {
+        val id = observingId ?: return
+        val trimmed = newName.trim()
+        if (trimmed.isBlank()) {
+            ui.update { it.copy(renameError = "그룹 이름을 입력해 주세요") }
+            return
+        }
+        if (ui.value.isRenaming) return
+
+        val currentDescription = ui.value.group?.description ?: ""
+        viewModelScope.launch {
+            ui.update { it.copy(isRenaming = true, renameError = null) }
+            try {
+                repo.updateGroup(id, trimmed, currentDescription)
+                ui.update { it.copy(isRenaming = false, renameError = null) }
+            } catch (e: Exception) {
+                ui.update {
+                    it.copy(
+                        isRenaming = false,
+                        renameError = e.message ?: "그룹 이름 변경에 실패했습니다"
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearRenameError() {
+        ui.update { it.copy(renameError = null) }
     }
 
     override fun onCleared() {

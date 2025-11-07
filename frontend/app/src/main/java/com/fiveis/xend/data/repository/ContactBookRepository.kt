@@ -257,6 +257,19 @@ class ContactBookRepository(
         groupDao.deleteById(groupId)
     }
 
+    suspend fun updateGroup(groupId: Long, name: String, description: String = "") {
+        val payload = mapOf("name" to name, "description" to description)
+        val response = api.updateGroup(groupId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update group info failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+        // 로컬 반영
+        groupDao.updateGroupInfo(groupId, name, description)
+    }
+
     suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
         val req = PromptOptionRequest(key = key, name = name, prompt = prompt)
         val res = api.addPromptOption(req)

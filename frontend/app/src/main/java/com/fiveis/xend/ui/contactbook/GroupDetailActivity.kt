@@ -71,7 +71,9 @@ class GroupDetailActivity : ComponentActivity() {
                             Intent(this, ContactDetailActivity::class.java)
                                 .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
                         )
-                    }
+                    },
+                    onRenameGroup = { vm.renameGroup(it) },
+                    onClearRenameError = { vm.clearRenameError() }
                 )
 
                 if (state.isLoading && state.group == null) {

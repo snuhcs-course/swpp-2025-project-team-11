@@ -18,18 +18,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,9 +57,27 @@ fun GroupDetailScreen(
     uiState: GroupDetailUiState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onMemberClick: (Contact) -> Unit
+    onMemberClick: (Contact) -> Unit,
+    onRenameGroup: (String) -> Unit,
+    onClearRenameError: () -> Unit
 ) {
     val group = uiState.group
+    var showRenameDialog by rememberSaveable { mutableStateOf(false) }
+    var renameField by rememberSaveable { mutableStateOf("") }
+    var renameSubmitted by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isRenaming, uiState.renameError, showRenameDialog) {
+        if (!showRenameDialog) return@LaunchedEffect
+        if (renameSubmitted && !uiState.isRenaming) {
+            if (uiState.renameError == null) {
+                showRenameDialog = false
+                renameSubmitted = false
+                onClearRenameError()
+            } else {
+                renameSubmitted = false
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -61,7 +87,7 @@ fun GroupDetailScreen(
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "뒤로가기")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
                 }
             },
             title = { Text("그룹 정보", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
@@ -101,7 +127,18 @@ fun GroupDetailScreen(
                     )
                     Spacer(Modifier.size(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(group.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = themeColor)
+                        Text(
+                            group.name,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColor,
+                            modifier = Modifier.clickable {
+                                renameField = group.name
+                                renameSubmitted = false
+                                onClearRenameError()
+                                showRenameDialog = true
+                            }
+                        )
                         if (group.description?.isNotBlank() ?: false) {
                             Text(
                                 group.description,
@@ -113,11 +150,11 @@ fun GroupDetailScreen(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Divider()
+                HorizontalDivider()
                 Spacer(Modifier.height(8.dp))
-                Text("멤버 ${group.members.size}명", fontWeight = FontWeight.SemiBold)
 
                 // 멤버 목록
+                Text("멤버 ${group.members.size}명", fontWeight = FontWeight.SemiBold)
                 LazyColumn(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 1.dp,
@@ -133,6 +170,31 @@ fun GroupDetailScreen(
         }
 
         PromptOptionsCard(options = group.options)
+    }
+
+    if (showRenameDialog) {
+        val trimmed = renameField.trim()
+        RenameGroupDialog(
+            value = renameField,
+            errorMessage = uiState.renameError,
+            isProcessing = uiState.isRenaming,
+            isConfirmEnabled = trimmed.isNotBlank() && trimmed != group?.name,
+            onValueChange = {
+                renameField = it
+                if (uiState.renameError != null) onClearRenameError()
+            },
+            onDismiss = {
+                showRenameDialog = false
+                renameSubmitted = false
+                onClearRenameError()
+            },
+            onConfirm = {
+                val targetName = renameField.trim()
+                if (targetName.isBlank() || targetName == group?.name) return@RenameGroupDialog
+                renameSubmitted = true
+                onRenameGroup(targetName)
+            }
+        )
     }
 }
 
@@ -186,7 +248,7 @@ private fun PromptOptionsCard(options: List<PromptOption>) {
             }
 
             if (format.isNotEmpty()) {
-                Divider(Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 Text("형식 가이드", color = Color.Gray, fontSize = 12.sp)
                 ChipRow(format)
             }
@@ -221,4 +283,50 @@ private fun TagChip(text: String) {
             style = MaterialTheme.typography.bodySmall
         )
     }
+}
+
+@Composable
+private fun RenameGroupDialog(
+    value: String,
+    errorMessage: String?,
+    isProcessing: Boolean,
+    isConfirmEnabled: Boolean,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isProcessing) onDismiss() },
+        title = { Text("그룹 이름 수정", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    label = { Text("그룹 이름") },
+                    singleLine = true,
+                    enabled = !isProcessing
+                )
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = isConfirmEnabled && !isProcessing
+            ) { Text("저장") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isProcessing
+            ) { Text("취소") }
+        }
+    )
 }
