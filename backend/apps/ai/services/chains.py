@@ -10,6 +10,8 @@ from apps.ai.services.prompts import (
     BODY_USER,
     PLAN_SYSTEM,
     PLAN_USER,
+    PROMPT_PREVIEW_SYSTEM,
+    PROMPT_PREVIEW_USER,
     REPLY_SYSTEM,
     REPLY_USER,
     SUBJECT_SYSTEM,
@@ -69,3 +71,17 @@ _validator_model = ChatOpenAI(
 )
 
 validator_chain = _validator_prompt | _validator_model.with_structured_output(ValidationResult)
+
+_prompt_preview_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", PROMPT_PREVIEW_SYSTEM),
+        ("user", PROMPT_PREVIEW_USER),
+    ],
+    template_format="jinja2",
+)
+
+_prompt_preview_model = ChatOpenAI(
+    model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+    temperature=0.2,
+)
+prompt_preview_chain = _prompt_preview_prompt | _prompt_preview_model | StrOutputParser()

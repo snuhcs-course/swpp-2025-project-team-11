@@ -4,11 +4,14 @@ from drf_spectacular.utils import (
     OpenApiTypes,
     extend_schema,
 )
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response
 
 from ..core.mixins import AuthRequiredMixin
-from .serializers import MailGenerateRequest, ReplyGenerateRequest
+from ..core.utils.docs import extend_schema_with_common_errors
+from .serializers import MailGenerateRequest, PromptPreviewRequestSerializer, ReplyGenerateRequest
 from .services.mail_generation import stream_mail_generation, stream_mail_generation_with_plan
+from .services.prompt_preview import generate_prompt_preview
 from .services.reply import stream_reply_options_llm
 
 
@@ -309,3 +312,21 @@ class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
         resp["Cache-Control"] = "no-cache"
         resp["X-Accel-Buffering"] = "no"
         return resp
+
+
+class EmailPromptPreviewView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = PromptPreviewRequestSerializer
+
+    @extend_schema_with_common_errors(
+        summary="Preview mail-generation prompt for given recipients",
+        responses={200: {"type": "object", "properties": {"preview_text": {"type": "string"}}}},
+    )
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        preview_text = generate_prompt_preview(
+            user=request.user,
+            to_emails=serializer.validated_data["to"],
+        )
+        return Response({"preview_text": preview_text}, status=status.HTTP_200_OK)
