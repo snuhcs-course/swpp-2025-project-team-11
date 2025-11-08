@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.data.repository.ContactBookRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,11 @@ data class GroupDetailUiState(
     val group: Group? = null,
     val error: String? = null,
     val isRenaming: Boolean = false,
-    val renameError: String? = null
+    val renameError: String? = null,
+    val tonePromptOptions: List<PromptOption> = emptyList(),
+    val formatPromptOptions: List<PromptOption> = emptyList(),
+    val isPromptSaving: Boolean = false,
+    val promptOptionsError: String? = null
 )
 
 class GroupDetailViewModel(
@@ -31,6 +36,7 @@ class GroupDetailViewModel(
 
     private var observingId: Long? = null
     private var observeJob: Job? = null
+    private var promptOptionsJob: Job? = null
 
     /**
      * - DB Flow로 즉시 캐시 표시
@@ -41,6 +47,8 @@ class GroupDetailViewModel(
         observingId = id
 
         ui.update { it.copy(isLoading = true, error = null) }
+
+        ensurePromptOptionsObservation()
 
         // 1) DB Flow
         observeJob?.cancel()
@@ -88,7 +96,7 @@ class GroupDetailViewModel(
         viewModelScope.launch {
             ui.update { it.copy(isRenaming = true, renameError = null) }
             try {
-                repo.updateGroup(id, trimmedName, trimmedDescription)
+                repo.updateGroup(groupId = id, name = trimmedName, description = trimmedDescription)
                 ui.update { it.copy(isRenaming = false, renameError = null) }
             } catch (e: Exception) {
                 ui.update {
@@ -105,8 +113,77 @@ class GroupDetailViewModel(
         ui.update { it.copy(renameError = null) }
     }
 
+    fun refreshPromptOptions() {
+        viewModelScope.launch {
+            ui.update { it.copy(promptOptionsError = null) }
+            try {
+                repo.refreshPromptOptions()
+            } catch (e: Exception) {
+                ui.update { it.copy(promptOptionsError = e.message ?: "프롬프트 옵션을 불러오지 못했습니다") }
+            }
+        }
+    }
+
+    fun updateGroupPromptOptions(selectedOptionIds: List<Long>) {
+        val id = observingId ?: return
+        if (ui.value.isPromptSaving) return
+        viewModelScope.launch {
+            ui.update { it.copy(isPromptSaving = true, promptOptionsError = null) }
+            try {
+                repo.updateGroup(groupId = id, optionIds = selectedOptionIds)
+                ui.update { it.copy(isPromptSaving = false) }
+            } catch (e: Exception) {
+                ui.update {
+                    it.copy(
+                        isPromptSaving = false,
+                        promptOptionsError = e.message ?: "프롬프트 옵션 저장에 실패했습니다"
+                    )
+                }
+            }
+        }
+    }
+
+    fun addPromptOption(
+        key: String,
+        name: String,
+        prompt: String,
+        onSuccess: (PromptOption) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val created = repo.addPromptOption(key, name, prompt)
+                onSuccess(created)
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 추가에 실패했습니다"
+                ui.update { it.copy(promptOptionsError = msg) }
+                onError(msg)
+            }
+        }
+    }
+
+    fun clearPromptOptionsError() {
+        ui.update { it.copy(promptOptionsError = null) }
+    }
+
     override fun onCleared() {
         observeJob?.cancel()
+        promptOptionsJob?.cancel()
         super.onCleared()
+    }
+
+    private fun ensurePromptOptionsObservation() {
+        if (promptOptionsJob != null) return
+        promptOptionsJob = viewModelScope.launch {
+            repo.observePromptOptions().collectLatest { all ->
+                ui.update {
+                    it.copy(
+                        tonePromptOptions = all.filter { opt -> opt.key.equals("tone", ignoreCase = true) },
+                        formatPromptOptions = all.filter { opt -> opt.key.equals("format", ignoreCase = true) }
+                    )
+                }
+            }
+        }
+        refreshPromptOptions()
     }
 }

@@ -316,7 +316,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                         MemberCircle(it.name.first().toString(), StableColor.forId(it.id))
                     }
                     if (group.members.size > 3) {
-                        MemberCircle("+${group.members.size - 3}", Color.LightGray)
+                        MemberCircle("+${group.members.size - 3}", Color.Gray)
                     }
                 }
 

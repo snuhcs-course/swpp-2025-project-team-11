@@ -73,7 +73,13 @@ class GroupDetailActivity : ComponentActivity() {
                         )
                     },
                     onRenameGroup = { newName, newDesc -> vm.renameGroup(newName, newDesc) },
-                    onClearRenameError = { vm.clearRenameError() }
+                    onClearRenameError = { vm.clearRenameError() },
+                    onRefreshPromptOptions = { vm.refreshPromptOptions() },
+                    onSavePromptOptions = { ids -> vm.updateGroupPromptOptions(ids) },
+                    onAddPromptOption = { key, name, prompt, onSuccess, onError ->
+                        vm.addPromptOption(key, name, prompt, onSuccess, onError)
+                    },
+                    onClearPromptError = { vm.clearPromptOptionsError() }
                 )
 
                 if (state.isLoading && state.group == null) {
