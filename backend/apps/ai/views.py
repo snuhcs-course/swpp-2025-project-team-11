@@ -5,11 +5,19 @@ from drf_spectacular.utils import (
     extend_schema,
 )
 from rest_framework import generics, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from ..core.mixins import AuthRequiredMixin
 from ..core.utils.docs import extend_schema_with_common_errors
-from .serializers import MailGenerateRequest, PromptPreviewRequestSerializer, ReplyGenerateRequest
+from .serializers import (
+    AttachmentAnalyzeFromMailSerializer,
+    AttachmentAnalyzeUploadSerializer,
+    MailGenerateRequest,
+    PromptPreviewRequestSerializer,
+    ReplyGenerateRequest,
+)
+from .services.attachment_analysis import analyze_gmail_attachment, analyze_uploaded_file
 from .services.mail_generation import stream_mail_generation, stream_mail_generation_with_plan
 from .services.prompt_preview import generate_prompt_preview
 from .services.reply import stream_reply_options_llm
@@ -330,3 +338,34 @@ class EmailPromptPreviewView(AuthRequiredMixin, generics.GenericAPIView):
             to_emails=serializer.validated_data["to"],
         )
         return Response({"preview_text": preview_text}, status=status.HTTP_200_OK)
+
+
+class AttachmentAnalyzeFromMailView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = AttachmentAnalyzeFromMailSerializer
+
+    def post(self, request, *args, **kwargs):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        result = analyze_gmail_attachment(
+            request.user,
+            message_id=data["message_id"],
+            attachment_id=data["attachment_id"],
+            filename=data["filename"],
+            mime_type=data.get("mime_type", ""),
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = AttachmentAnalyzeUploadSerializer
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, *args, **kwargs):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        file_obj = ser.validated_data["file"]
+
+        result = analyze_uploaded_file(request.user, file_obj=file_obj)
+        return Response(result, status=status.HTTP_200_OK)

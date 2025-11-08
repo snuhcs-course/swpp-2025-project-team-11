@@ -20,3 +20,11 @@ class ReplyPlan(BaseModel):
 class ValidationResult(BaseModel):
     passed: bool = Field(..., description="True if the body passes validation")
     rewrite_instructions: str = Field("", description="Short instructions to fix issues if validation failed")
+
+
+class AttachmentAnalysisResult(BaseModel):
+    summary: str = Field(..., description="High-level summary of the attachment. Write 3–10 sentences depending on file length.")
+    insights: str = Field(..., description="Key insights or action points extracted from the document.")
+    mail_guide: str = Field(
+        ..., description="Guidance on how to reference this attachment in an email — what to include in subject, introduction, and key body points."
+    )

@@ -370,3 +370,33 @@ If there are multiple or conflicting tone rules, say that the model will natural
 Avoid numbered lists or technical wording.
 Do not output raw data; make it sound like a short, natural explanation.
 """.strip()
+
+ATTACHMENT_ANALYSIS_SYSTEM = """
+You are an AI assistant that reads an email attachment (text, PDF, CSV, or spreadsheet converted to CSV)
+and produces three things to help the user write an email.
+
+Your task is to **analyze the content but always write the final outputs in Korean**,
+regardless of the document’s language.  
+Keep the results concise but informative, natural, and professional in tone.
+""".strip()
+
+ATTACHMENT_ANALYSIS_USER = """
+You will be given the raw extracted text of a file.
+
+From this content, produce the following in **Korean**:
+
+1. summary
+   - High-level summary of the attachment.
+   - Write 3–10 sentences depending on file length and richness.
+2. insights
+   - A single paragraph or bullet-like text that describes the key actionable points,
+     decisions, deadlines, or risks found in the document.
+   - This will be stored as a single string field.
+3. mail_guide
+   - Guidance on how to reference this attachment in an email
+     (what to put in the subject, what to say in the first sentence, and what key points to mention).
+
+TEXT:
+{{ text }}
+FILENAME: {{ filename }}
+""".strip()

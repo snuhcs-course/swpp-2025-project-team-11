@@ -22,3 +22,14 @@ class PromptPreviewRequestSerializer(serializers.Serializer):
         child=serializers.EmailField(),
         allow_empty=False,
     )
+
+
+class AttachmentAnalyzeFromMailSerializer(serializers.Serializer):
+    message_id = serializers.CharField()
+    attachment_id = serializers.CharField()
+    filename = serializers.CharField()
+    mime_type = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AttachmentAnalyzeUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
