@@ -657,27 +657,27 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
 private fun formatDisplayDate(isoDate: String): String {
     return try {
         // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
-        val parsedDateTime = java.time.OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+        val parsedDateTime = OffsetDateTime.parse(isoDate)
+            .atZoneSameInstant(ZoneId.systemDefault())
 
-        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        val today = LocalDate.now(ZoneId.systemDefault())
         val emailDate = parsedDateTime.toLocalDate()
 
         // 2. 조건에 따라 다른 형식으로 변환
         when {
             // 오늘 받은 메일이면 시간만 표시
             emailDate.isEqual(today) -> {
-                java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
                     .format(parsedDateTime)
             }
             // 올해 받은 메일이면 월/일만 표시
             emailDate.year == today.year -> {
-                val formatter = java.time.format.DateTimeFormatter.ofPattern("M월 d일", java.util.Locale.KOREAN)
+                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
                 formatter.format(parsedDateTime)
             }
             // 작년 또는 그 이전 메일이면 연/월/일 표시
             else -> {
-                java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.SHORT)
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
                     .format(parsedDateTime)
             }
         }
