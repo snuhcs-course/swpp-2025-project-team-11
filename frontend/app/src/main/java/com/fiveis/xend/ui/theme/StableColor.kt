@@ -26,13 +26,6 @@ object StableColor {
         val minContrastOnSurface: Float = 2.6f
     )
 
-    val BluePurple = Spec(
-        hueRange = 210f..280f,
-        saturationRange = 0.50f..0.78f,
-        lightnessRangeLightTheme = 0.46f..0.62f,
-        lightnessRangeDarkTheme = 0.38f..0.55f
-    )
-
     val GreenBluePurple = Spec(
         hueRange = 150f..300f,
         saturationRange = 0.48f..0.78f,
@@ -40,7 +33,14 @@ object StableColor {
         lightnessRangeDarkTheme = 0.38f..0.55f
     )
 
-    fun forId(id: Long, isDark: Boolean, spec: Spec = GreenBluePurple, surface: Color? = null): Color {
+    val widerHue = Spec(
+        hueRange = 75f..300f,
+        saturationRange = 0.40f..0.50f,
+        lightnessRangeLightTheme = 0.46f..0.62f,
+        lightnessRangeDarkTheme = 0.38f..0.55f
+    )
+
+    fun forId(id: Long, isDark: Boolean, spec: Spec = widerHue, surface: Color? = null): Color {
         val r1 = rnd01(id, 0)
         val r2 = rnd01(id, 1)
         val r3 = rnd01(id, 2)
@@ -73,7 +73,7 @@ object StableColor {
      * 시스템 다크테마 감지 + surface 전달 없음
      */
     @Composable
-    fun forId(id: Long, spec: Spec = GreenBluePurple): Color {
+    fun forId(id: Long, spec: Spec = widerHue): Color {
         val isDark = isSystemInDarkTheme()
         return remember(id, isDark) { forId(id, isDark, spec) }
     }
