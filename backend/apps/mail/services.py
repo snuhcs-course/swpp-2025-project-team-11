@@ -227,11 +227,6 @@ class GmailService:
         filename: str,
         mime_type: str,
     ) -> dict:
-        """
-        Gmail에서 첨부 '데이터'만 가져오고,
-        파일 이름/타입은 호출자가 넘겨준 걸 우선으로 쓴다.
-        넘겨주지 않으면 timestamp 이름으로 내려준다.
-        """
         try:
             att = self.service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_id).execute()
         except Exception as e:
@@ -244,15 +239,12 @@ class GmailService:
 
         file_bytes = base64.urlsafe_b64decode(data_b64.encode("utf-8"))
 
-        # mime/type 우선순위: 요청 → 기본값
         final_mime = mime_type or "application/octet-stream"
 
-        # filename 우선순위: 요청 → timestamp
         if filename and filename.strip():
             final_name = filename.strip()
         else:
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            # 요청이 타입을 안 줬으면 확장자 추정, 그래도 없으면 .bin
             guessed_ext = mimetypes.guess_extension(final_mime) or ""
             final_name = f"{ts}{guessed_ext}"
 
