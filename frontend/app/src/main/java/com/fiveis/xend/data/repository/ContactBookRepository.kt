@@ -78,6 +78,9 @@ class ContactBookRepository(
 
     fun observeContact(id: Long): Flow<Contact?> = contactDao.observeByIdWithGroup(id).map { it?.asDomain() }
 
+    fun searchContacts(keyword: String): Flow<List<Contact>> =
+        contactDao.searchByNameOrEmail(keyword).map { list -> list.map { it.asDomain(null) } }
+
     // ----- DB 동기화(refresh) -----
 
     suspend fun refreshGroups() {
