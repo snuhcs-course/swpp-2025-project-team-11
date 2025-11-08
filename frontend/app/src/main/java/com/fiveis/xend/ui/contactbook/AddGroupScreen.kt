@@ -68,6 +68,7 @@ import com.fiveis.xend.ui.theme.TextPrimary
 @Composable
 fun AddGroupScreen(
     uiState: AddGroupUiState,
+    promptingState: PromptingUiState = PromptingUiState(),
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onGroupNameChange: (String) -> Unit,
@@ -196,7 +197,7 @@ fun AddGroupScreen(
 
             item {
                 Text(
-                    text = "그룹별 AI 프롬프팅",
+                    text = "AI 프롬프트 설정",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
@@ -206,6 +207,7 @@ fun AddGroupScreen(
             item {
                 AiPromptingCard(
                     modifier = Modifier.fillMaxWidth(),
+                    selectedState = promptingState,
                     onValueChange = onPromptOptionsChange,
                     allToneOptions = uiState.tonePromptOptions,
                     allFormatOptions = uiState.formatPromptOptions,
