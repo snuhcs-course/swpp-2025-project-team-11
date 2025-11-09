@@ -198,6 +198,9 @@ fun MailScreen(
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
                         },
+                        onScrollStopped = {
+                            showBottomBar = true
+                        },
                         contactEmails = inboxUiState.contactEmails,
                         contactsByEmail = inboxUiState.contactsByEmail
                     )

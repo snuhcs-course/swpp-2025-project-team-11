@@ -95,26 +95,39 @@ fun InboxScreen(
 ) {
     val listState = rememberLazyListState()
 
-    // 스크롤 방향 감지
+    // 스크롤 상태 감지
     var showBottomBar by remember { mutableStateOf(true) }
-    var previousIndex by remember { mutableStateOf(0) }
-    var previousScrollOffset by remember { mutableStateOf(0) }
 
     LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.isScrollInProgress
+        }.collect { isScrolling ->
+            // 스크롤이 멈추면 항상 네비게이션 바 표시
+            if (!isScrolling) {
+                showBottomBar = true
+            }
+        }
+    }
+
+    LaunchedEffect(listState) {
+        var previousIndex = 0
+        var previousScrollOffset = 0
+
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (currentIndex, currentOffset) ->
             // 맨 위에 있을 때는 항상 표시
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
-            } else {
-                // 스크롤 방향 감지
+            } else if (listState.isScrollInProgress) {
+                // 스크롤 중일 때만 방향 감지
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
 
+                // 아래로 스크롤 중이면 숨기기
                 showBottomBar = !isScrollingDown
             }
 
@@ -426,11 +439,24 @@ fun EmailListContent(
     isLoadingMore: Boolean,
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
+    onScrollStopped: () -> Unit = {},
     contactEmails: Set<String>,
     contactsByEmail: Map<String, String> = emptyMap()
 ) {
     val listState = rememberLazyListState()
 
+    // 스크롤 멈춤 감지
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.isScrollInProgress
+        }.collect { isScrolling ->
+            if (!isScrolling) {
+                onScrollStopped()
+            }
+        }
+    }
+
+    // 스크롤 위치 변경 감지
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
