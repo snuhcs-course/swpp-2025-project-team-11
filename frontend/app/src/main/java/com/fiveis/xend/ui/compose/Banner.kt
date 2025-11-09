@@ -1,9 +1,11 @@
 package com.fiveis.xend.ui.compose
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -117,7 +119,10 @@ fun Banner(
             if (actionText != null && onActionClick != null) {
                 androidx.compose.material3.TextButton(
                     onClick = onActionClick,
-                    modifier = Modifier.padding(horizontal = 4.dp)
+                    modifier = Modifier
+                        .padding(0.dp)
+                        .height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(
                         text = actionText,
