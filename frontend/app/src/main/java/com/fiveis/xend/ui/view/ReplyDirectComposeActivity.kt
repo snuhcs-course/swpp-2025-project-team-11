@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.view
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +21,7 @@ import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.compose.MailComposeViewModel
 import com.fiveis.xend.ui.compose.SendMailViewModel
 import com.fiveis.xend.ui.compose.TemplateSelectionScreen
+import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import org.json.JSONArray
@@ -113,6 +115,35 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 LaunchedEffect(generatedBody) {
                     if (generatedBody.isNotEmpty()) {
                         richTextState.setHtml(generatedBody)
+                    }
+                }
+
+                // Banner state for send results
+                var bannerState by remember { mutableStateOf<com.fiveis.xend.ui.compose.BannerState?>(null) }
+
+                LaunchedEffect(sendUiState.lastSuccessMsg) {
+                    sendUiState.lastSuccessMsg?.let {
+                        bannerState = com.fiveis.xend.ui.compose.BannerState(
+                            message = "메일 전송에 성공했습니다.",
+                            type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
+                            actionText = "홈 화면 이동하기",
+                            onActionClick = {
+                                // Navigate to MailActivity
+                                val intent = Intent(this@ReplyDirectComposeActivity, MailActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                startActivity(intent)
+                                finish()
+                            }
+                        )
+                    }
+                }
+
+                LaunchedEffect(sendUiState.error) {
+                    sendUiState.error?.let {
+                        bannerState = com.fiveis.xend.ui.compose.BannerState(
+                            message = "메일 전송에 실패했습니다. 다시 시도해주세요.",
+                            type = com.fiveis.xend.ui.compose.BannerType.ERROR
+                        )
                     }
                 }
 
@@ -210,7 +241,9 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                                 composeVm.acceptSuggestion()
                             }
                         },
-                        onAiRealtimeToggle = { aiRealtime = it }
+                        onAiRealtimeToggle = { aiRealtime = it },
+                        bannerState = bannerState,
+                        onDismissBanner = { bannerState = null }
                     )
                 }
             }

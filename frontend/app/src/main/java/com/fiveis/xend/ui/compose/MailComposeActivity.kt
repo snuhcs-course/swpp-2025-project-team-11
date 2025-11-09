@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.compose
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -56,8 +57,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -107,6 +106,7 @@ import com.fiveis.xend.ui.compose.common.AIActionRow
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.inbox.AddContactDialog
+import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.AddButtonText
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
@@ -124,7 +124,13 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class BannerState(val message: String, val type: BannerType, val autoDismiss: Boolean = false)
+data class BannerState(
+    val message: String,
+    val type: BannerType,
+    val autoDismiss: Boolean = false,
+    val actionText: String? = null,
+    val onActionClick: (() -> Unit)? = null
+)
 
 // ========================================================
 // Screen
@@ -196,6 +202,8 @@ fun EmailComposeScreen(
                             message = it.message,
                             type = it.type,
                             onDismiss = onDismissBanner,
+                            actionText = it.actionText,
+                            onActionClick = it.onActionClick,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(bottom = 16.dp)
@@ -905,14 +913,34 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
-                // Show snackbar for send results
-                val snackHost = remember { SnackbarHostState() }
-                LaunchedEffect(sendUi.lastSuccessMsg, sendUi.error) {
-                    sendUi.lastSuccessMsg?.let { snackHost.showSnackbar(it) }
-                    sendUi.error?.let { snackHost.showSnackbar("전송 실패: $it") }
+                // Update banner state for send results
+                LaunchedEffect(sendUi.lastSuccessMsg) {
+                    sendUi.lastSuccessMsg?.let {
+                        bannerState = BannerState(
+                            message = "메일 전송에 성공했습니다.",
+                            type = BannerType.SUCCESS,
+                            actionText = "홈 화면 이동하기",
+                            onActionClick = {
+                                // Navigate to MailActivity
+                                val intent = Intent(this@MailComposeActivity, MailActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                startActivity(intent)
+                                finish()
+                            }
+                        )
+                    }
                 }
 
-                Scaffold(snackbarHost = { SnackbarHost(snackHost) }) { innerPadding ->
+                LaunchedEffect(sendUi.error) {
+                    sendUi.error?.let {
+                        bannerState = BannerState(
+                            message = "메일 전송에 실패했습니다. 다시 시도해주세요.",
+                            type = BannerType.ERROR
+                        )
+                    }
+                }
+
+                Scaffold { innerPadding ->
                     if (showTemplateScreen) {
                         // 템플릿 선택 화면
                         TemplateSelectionScreen(

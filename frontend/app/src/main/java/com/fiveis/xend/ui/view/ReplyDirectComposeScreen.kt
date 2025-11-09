@@ -67,7 +67,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,28 +124,15 @@ fun ReplyDirectComposeScreen(
     onAiComplete: () -> Unit = {},
     onStopStreaming: () -> Unit = {},
     onAcceptSuggestion: () -> Unit = {},
-    onAiRealtimeToggle: (Boolean) -> Unit = {}
+    onAiRealtimeToggle: (Boolean) -> Unit = {},
+    bannerState: com.fiveis.xend.ui.compose.BannerState? = null,
+    onDismissBanner: () -> Unit = {}
 ) {
     var isMailContentExpanded by remember { mutableStateOf(false) }
-
-    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
-
-    // 전송 상태 처리
-    LaunchedEffect(sendUiState) {
-        when {
-            sendUiState.lastSuccessMsg != null -> {
-                snackbarHostState.showSnackbar(sendUiState.lastSuccessMsg)
-            }
-            sendUiState.error != null -> {
-                snackbarHostState.showSnackbar("전송 실패: ${sendUiState.error}")
-            }
-        }
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = ComposeBackground,
-        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
             TopAppBar(
@@ -227,6 +213,27 @@ fun ReplyDirectComposeScreen(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
         ) {
+            // Banner for send results
+            androidx.compose.animation.AnimatedVisibility(visible = bannerState != null) {
+                bannerState?.let {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        com.fiveis.xend.ui.compose.Banner(
+                            message = it.message,
+                            type = it.type,
+                            onDismiss = onDismissBanner,
+                            actionText = it.actionText,
+                            onActionClick = it.onActionClick,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(bottom = 16.dp)
+                        )
+                    }
+                }
+            }
+
             // Action Row (실행취소 + AI 완성)
             AIActionRow(
                 isStreaming = isStreaming,
