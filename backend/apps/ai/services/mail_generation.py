@@ -53,7 +53,7 @@ def stream_mail_generation(
         "sender_role": raw_inputs.get("sender_role"),
         "recipient_role": raw_inputs.get("recipient_role"),
         "plan_text": "",
-        "fewshots": raw_inputs.get("fewshots", []),
+        "analysis": raw_inputs.get("analysis", None),
     }
 
     try:
