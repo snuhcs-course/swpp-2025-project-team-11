@@ -5,7 +5,7 @@ from django.db.models import Count
 
 from ..contact.models import Contact
 from .models import ContactAnalysisResult, GroupAnalysisResult, MailAnalysisResult
-from .services.langchain import analyze_speech_llm, integrate_analysis
+from .services.analysis import analyze_speech_llm, integrate_analysis
 
 User = get_user_model()
 

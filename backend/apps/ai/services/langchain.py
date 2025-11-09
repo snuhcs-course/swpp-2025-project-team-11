@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
-from apps.ai.services.prompts import (
+from apps.ai.services.prompts import (  # J2 이름에서 떼기
     ANALYSIS_SYSTEM_J2,
     ANALYSIS_USER_J2,
     BODY_SYSTEM_J2,

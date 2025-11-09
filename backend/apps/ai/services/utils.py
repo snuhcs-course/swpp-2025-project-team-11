@@ -96,7 +96,7 @@ def collect_prompt_context(
         "fewshots": [],
     }
 
-    if not contacts or not unique_groups:
+    if not contacts:
         return base
 
     # ========== 단일 '등록' 수신자 ==========
