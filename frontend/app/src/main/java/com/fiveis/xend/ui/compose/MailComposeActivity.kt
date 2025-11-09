@@ -208,7 +208,8 @@ fun EmailComposeScreen(
                 isStreaming = isStreaming,
                 onUndo = onUndo,
                 onAiComplete = onAiComplete,
-                onStopStreaming = onStopStreaming
+                onStopStreaming = onStopStreaming,
+                aiCompleteEnabled = contacts.isNotEmpty()
             )
 
             SectionHeader("받는 사람")

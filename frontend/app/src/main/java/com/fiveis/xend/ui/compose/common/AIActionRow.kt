@@ -40,7 +40,8 @@ fun AIActionRow(
     onUndo: () -> Unit,
     onAiComplete: () -> Unit,
     onStopStreaming: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    aiCompleteEnabled: Boolean = true
 ) {
     Row(
         modifier = modifier
@@ -123,13 +124,17 @@ fun AIActionRow(
                 OutlinedButton(
                     onClick = onAiComplete,
                     modifier = Modifier.size(width = 96.dp, height = 35.dp),
-                    enabled = true,
+                    enabled = aiCompleteEnabled,
                     contentPadding = PaddingValues(horizontal = 15.dp),
                     shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Blue60),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (aiCompleteEnabled) Blue60 else Blue60.copy(alpha = 0.3f)
+                    ),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.Transparent,
                         contentColor = Blue60,
+                        disabledContainerColor = Color.Transparent,
                         disabledContentColor = Blue60.copy(alpha = 0.4f)
                     )
                 ) {

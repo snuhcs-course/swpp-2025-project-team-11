@@ -232,7 +232,8 @@ fun ReplyDirectComposeScreen(
                 isStreaming = isStreaming,
                 onUndo = onUndo,
                 onAiComplete = onAiComplete,
-                onStopStreaming = onStopStreaming
+                onStopStreaming = onStopStreaming,
+                aiCompleteEnabled = recipientEmail.isNotEmpty()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
