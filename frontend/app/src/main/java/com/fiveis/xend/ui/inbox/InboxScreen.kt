@@ -34,10 +34,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
@@ -531,7 +531,7 @@ private fun EmailRow(
                                 modifier = Modifier.size(20.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.PersonAdd,
+                                    imageVector = Icons.Filled.PersonAdd,
                                     contentDescription = "연락처 추가",
                                     tint = Blue80,
                                     modifier = Modifier.size(18.dp)
