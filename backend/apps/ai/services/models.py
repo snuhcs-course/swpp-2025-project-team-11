@@ -22,6 +22,15 @@ class ValidationResult(BaseModel):
     rewrite_instructions: str = Field("", description="Short instructions to fix issues if validation failed")
 
 
+class SpeechAnalysis(BaseModel):
+    lexical_style: str
+    grammar_patterns: str
+    emotional_tone: str
+    figurative_usage: str
+    long_sentence_ratio: str
+    representative_sentences: list[str] = Field(default_factory=list)
+
+
 class AttachmentAnalysisResult(BaseModel):
     summary: str = Field(..., description="High-level summary of the attachment. Write 3–10 sentences depending on file length.")
     insights: str = Field(..., description="Key insights or action points extracted from the document.")
