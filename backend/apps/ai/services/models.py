@@ -20,3 +20,12 @@ class ReplyPlan(BaseModel):
 class ValidationResult(BaseModel):
     passed: bool = Field(..., description="True if the body passes validation")
     rewrite_instructions: str = Field("", description="Short instructions to fix issues if validation failed")
+
+
+class SpeechAnalysis(BaseModel):
+    lexical_style: str
+    grammar_patterns: str
+    emotional_tone: str
+    figurative_usage: str
+    long_sentence_ratio: str
+    representative_sentences: list[str] = Field(default_factory=list)

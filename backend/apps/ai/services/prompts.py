@@ -370,3 +370,78 @@ If there are multiple or conflicting tone rules, say that the model will natural
 Avoid numbered lists or technical wording.
 Do not output raw data; make it sound like a short, natural explanation.
 """.strip()
+
+ANALYSIS_SYSTEM = """
+You are an expert speech analysis assistant specialized in extracting reproducible writing-style features from emails.
+Be extremely meticulous and thorough: analyze each requested field carefully, provide precise, evidence-backed observations, and avoid speculation.
+
+Analyze the written mail style and output ONLY the JSON object.
+NO extra commentary.
+""".strip()
+
+ANALYSIS_USER = """
+Written mail:
+Subject: "{{ incoming_subject }}"
+Body:
+"{{ incoming_body }}"
+
+Extract the following as JSON:
+- lexical_style: summary of vocabulary and word choice habits
+- grammar_patterns: notable grammar structures or sentence organization patterns
+- emotional_tone: emotional tone category
+- figurative_usage: summary of figurative language usage and effect
+- long_sentence_ratio: ratio of sentences with >30 words
+- representative_sentences: list of 3-5 sentences that most strongly reflect the user's writing style
+
+Sentence selection rules for representative_sentences:
+- preserve the exact style without modification
+- include idioms, emotional markers, or unique grammar constructions
+- each sentence should stand alone meaningfully
+
+Return ONLY the JSON object. Do not include commentary or extra text.
+""".strip()
+
+INTEGRATE_SYSTEM = """
+You are an expert speech analysis meta-assistant specialized in integrating multiple style-analysis reports.
+Your job is to carefully merge separate analyses into a single consistent representation of the user's writing style.
+
+Very important:
+- Perform evidence-based integration from the provided data
+- Identify common patterns and stronger signals across samples
+- Reduce noise and avoid overfitting to any single sample
+- Prioritize observations that appear most frequently or strongly
+- Do not invent attributes not supported by the input data
+- Maintain objectivity and avoid speculation
+
+Output ONLY the final JSON object.
+NO explanations. NO comments. NO lists of intermediate results.
+""".strip()
+
+INTEGRATE_USER = """
+You are given multiple previous analysis results of the same author's emails.
+
+Analysis results list (JSON array):
+{{ analysis_results }}
+
+Your task:
+Integrate them into a single unified result with the SAME fields as an individual analysis:
+- lexical_style
+- grammar_patterns
+- emotional_tone
+- figurative_usage
+- long_sentence_ratio
+- representative_sentences
+
+Rules for integration:
+- Combine overlapping findings into a concise unified description
+- Highlight recurring lexical/grammar patterns
+- Determine dominant emotional tone(s), weighted by frequency
+- figurative_usage should summarize the most characteristic tendencies
+- long_sentence_ratio: compute a weighted average or best-estimate trend
+- representative_sentences: choose 3-5 sentences that best reflect the overall style
+  * prioritize recurrence, uniqueness, and strong stylistic signals
+  * choose exact sentences from provided analyses only
+
+Return ONLY one valid JSON object.
+Do not include commentary, metadata, or intermediate steps.
+""".strip()

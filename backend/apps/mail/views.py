@@ -22,6 +22,7 @@ from rest_framework.views import APIView
 from apps.user.models import GoogleAccount, User
 from apps.user.services import google_refresh
 
+from ..ai.tasks import analyze_speech
 from ..contact.models import Contact
 from ..core.mixins import AuthRequiredMixin
 from ..core.utils.docs import extend_schema_with_common_errors
@@ -314,8 +315,14 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
             # 기록 실패는 메일 전송까지 실패하게 하지는 않음
             pass
 
-        resp_serializer = EmailSendResponseSerializer(result)
-        return Response(resp_serializer.data, status=status.HTTP_201_CREATED)
+        try:
+            # 알맞은 parameter와 함께 celery work 호출
+            analyze_speech.delay(subject, body)
+        except Exception:
+            pass
+
+        response_serializer = EmailSendResponseSerializer(result)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class MailTestView(APIView):
