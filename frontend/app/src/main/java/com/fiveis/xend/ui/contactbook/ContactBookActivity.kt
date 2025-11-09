@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.repository.ContactBookTab
-import com.fiveis.xend.ui.inbox.InboxActivity
+import com.fiveis.xend.ui.mail.MailActivity
 
 class ContactBookActivity : ComponentActivity() {
     companion object {
@@ -84,8 +84,8 @@ class ContactBookActivity : ComponentActivity() {
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
                     onBottomNavChange = {
-                        if (it == "inbox") {
-                            startActivity(Intent(this, InboxActivity::class.java))
+                        if (it == "mail") {
+                            startActivity(Intent(this, MailActivity::class.java))
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
                     },

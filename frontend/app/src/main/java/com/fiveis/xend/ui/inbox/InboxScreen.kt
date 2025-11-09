@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,8 +68,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.compose.Banner
+import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 @Composable
 fun InboxScreen(
@@ -79,6 +89,8 @@ fun InboxScreen(
     onRefresh: () -> Unit = {},
     onLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
+    onAddContactClick: (EmailItem) -> Unit = {},
+    onDismissSuccessBanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -149,6 +161,34 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
+
+                // Success Banner
+                AnimatedVisibility(
+                    visible = uiState.addContactSuccess,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "연락처가 추가되었습니다",
+                            type = BannerType.INFO,
+                            onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
                 if (uiState.isRefreshing && uiState.emails.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -161,11 +201,13 @@ fun InboxScreen(
                     EmailList(
                         emails = uiState.emails,
                         onEmailClick = onEmailClick,
+                        onAddContactClick = onAddContactClick,
                         onRefresh = onRefresh,
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
-                        listState = listState
+                        listState = listState,
+                        contactEmails = uiState.contactEmails
                     )
                 }
             }
@@ -283,11 +325,13 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
 private fun EmailList(
     emails: List<EmailItem>,
     onEmailClick: (EmailItem) -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    contactEmails: Set<String>
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -300,7 +344,12 @@ private fun EmailList(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             items(items = emails, key = { it.id }) { item ->
-                EmailRow(item = item, onClick = { onEmailClick(item) })
+                EmailRow(
+                    item = item,
+                    onClick = { onEmailClick(item) },
+                    onAddContactClick = onAddContactClick,
+                    contactEmails = contactEmails
+                )
                 HorizontalDivider(
                     modifier = Modifier,
                     thickness = DividerDefaults.Thickness,
@@ -361,8 +410,65 @@ private fun EmailList(
     }
 }
 
+// Extracted EmailListContent for use in MailScreen
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
+fun EmailListContent(
+    emails: List<EmailItem>,
+    onEmailClick: (EmailItem) -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean,
+    error: String?,
+    onScrollChange: (Int, Int) -> Unit = { _, _ -> },
+    contactEmails: Set<String>
+) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            onScrollChange(index, offset)
+        }
+    }
+
+    if (isRefreshing && emails.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else if (error != null && emails.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text = "Error: $error")
+        }
+    } else {
+        EmailList(
+            emails = emails,
+            onEmailClick = onEmailClick,
+            onAddContactClick = onAddContactClick,
+            onRefresh = onRefresh,
+            onLoadMore = onLoadMore,
+            isRefreshing = isRefreshing,
+            isLoadingMore = isLoadingMore,
+            listState = listState,
+            contactEmails = contactEmails
+        )
+    }
+}
+
+@Composable
+private fun EmailRow(
+    item: EmailItem,
+    onClick: () -> Unit,
+    onAddContactClick: (EmailItem) -> Unit,
+    contactEmails: Set<String>
+) {
+    // Extract email from "Name <email>" format
+    val senderEmail = extractSenderEmailFromRow(item.fromEmail)
+    val isContact = senderEmail.lowercase() in contactEmails
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -394,20 +500,41 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = extractSenderName(item.fromEmail),
-                        color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    Row(
                         modifier = Modifier.weight(1f, fill = false),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = extractSenderName(item.fromEmail),
+                            color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        // Add Contact Button - only show if not already a contact
+                        if (!isContact) {
+                            IconButton(
+                                onClick = { onAddContactClick(item) },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.PersonAdd,
+                                    contentDescription = "연락처 추가",
+                                    tint = Blue80,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(Modifier.width(8.dp))
 // 날짜 포매팅 해야함
                     Text(
-                        text = item.date,
+                        text = formatDisplayDate(item.date),
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -480,6 +607,25 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect("sent") }
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Send,
+                    contentDescription = "보낸메일함",
+                    tint = if (selected == "sent") Blue60 else Color(0xFF1E293B),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "보낸메일",
+                    color = if (selected == "sent") Blue60 else Color(0xFF1E293B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.clickable { onSelect("contacts") }
             ) {
                 Icon(
@@ -499,9 +645,51 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
+private fun formatDisplayDate(isoDate: String): String {
+    return try {
+        // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
+        val parsedDateTime = java.time.OffsetDateTime.parse(isoDate)
+            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+
+        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        val emailDate = parsedDateTime.toLocalDate()
+
+        // 2. 조건에 따라 다른 형식으로 변환
+        when {
+            // 오늘 받은 메일이면 시간만 표시
+            emailDate.isEqual(today) -> {
+                java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+                    .format(parsedDateTime)
+            }
+            // 올해 받은 메일이면 월/일만 표시
+            emailDate.year == today.year -> {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("M월 d일", java.util.Locale.KOREAN)
+                formatter.format(parsedDateTime)
+            }
+            // 작년 또는 그 이전 메일이면 연/월/일 표시
+            else -> {
+                java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.SHORT)
+                    .format(parsedDateTime)
+            }
+        }
+    } catch (e: Exception) {
+        // 변환 실패 시 날짜 부분만 표시
+        isoDate.substringBefore("T")
+    }
+}
+
 // Helper function to extract sender name from "Name <email>" format
 private fun extractSenderName(fromEmail: String): String {
     val nameRegex = "(.+?)\\s*<".toRegex()
     val matchResult = nameRegex.find(fromEmail)
-    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+    val name = matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+    // Remove surrounding quotes if present
+    return name.trim('"', '\'')
+}
+
+// Helper function to extract email address from "Name <email>" format
+private fun extractSenderEmailFromRow(fromEmail: String): String {
+    val emailRegex = "<(.+?)>".toRegex()
+    val matchResult = emailRegex.find(fromEmail)
+    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
 }

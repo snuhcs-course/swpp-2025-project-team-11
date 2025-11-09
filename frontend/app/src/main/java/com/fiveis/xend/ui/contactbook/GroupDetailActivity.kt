@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,7 +13,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
@@ -48,7 +52,8 @@ class GroupDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val groupColor = StableColor.forId(groupId)
 
-                val vm: GroupDetailViewModel = viewModel()
+                val viewModelFactory = remember { GroupDetailViewModelFactory(application) }
+                val vm: GroupDetailViewModel = viewModel(factory = viewModelFactory)
                 LaunchedEffect(groupId) { vm.load(groupId, force = true) }
                 val state by vm.uiState.collectAsStateWithLifecycle()
 
@@ -77,5 +82,17 @@ class GroupDetailActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+private class GroupDetailViewModelFactory(
+    private val application: Application
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(GroupDetailViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return GroupDetailViewModel(application) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

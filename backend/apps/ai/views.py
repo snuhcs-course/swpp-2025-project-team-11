@@ -1,16 +1,18 @@
-# Create your views here.
-# apps/ai/views.py
 from django.http import StreamingHttpResponse
 from drf_spectacular.utils import (
     OpenApiExample,
     OpenApiTypes,
     extend_schema,
 )
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response
 
 from ..core.mixins import AuthRequiredMixin
-from .serializers import MailGenerateRequest, ReplyGenerateRequest
-from .services.langchain import stream_mail_generation, stream_reply_options_llm
+from ..core.utils.docs import extend_schema_with_common_errors
+from .serializers import MailGenerateRequest, PromptPreviewRequestSerializer, ReplyGenerateRequest
+from .services.mail_generation import stream_mail_generation, stream_mail_generation_with_plan
+from .services.prompt_preview import generate_prompt_preview
+from .services.reply import stream_reply_options_llm
 
 
 class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
@@ -114,6 +116,126 @@ class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
         return resp
 
 
+class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = MailGenerateRequest
+
+    @extend_schema(
+        operation_id="mail_generate_with_plan_stream",
+        summary="Generate mail via streaming (SSE) **with plan**",
+        description=(
+            "주어진 입력을 바탕으로 **SSE**(`text/event-stream`)로 메일 생성 과정을 전송합니다.\n\n"
+            "이 엔드포인트는 일반 메일 생성 스트리밍과 달리 **본문을 쓰기 전에 LLM이 작성한 계획(plan)을 먼저** 스트리밍합니다.\n"
+            "클라이언트는 plan 단계를 UI에 미리 보여주고, 이어서 본문(body) 델타를 수신할 수 있습니다.\n\n"
+            "이벤트 순서는 다음과 같습니다:\n"
+            "1. `ready` – 연결 및 재시도 힌트\n"
+            "2. `plan.start` – 플랜 스트리밍 시작 알림\n"
+            "3. `plan.delta` × N – 플랜을 단락/번호별로 스트리밍 (idx는 1부터)\n"
+            "4. `plan.done` – 플랜 스트리밍 종료\n"
+            "5. `subject` – 언마스크된 최종 제목 1회 전송\n"
+            "6. `body.start` – 본문 스트리밍 시작 알림\n"
+            "7. `body.delta` × N – 본문 텍스트 조각(언마스크) 스트리밍, seq는 0부터\n"
+            "8. `body.done` – 본문 스트리밍 종료\n"
+            "9. (옵션) `patched` – LLM validator가 본문을 보정한 경우 보정된 전체 텍스트 전송\n"
+            "10. `done` – 모든 처리가 끝났음을 알리는 종료 이벤트\n\n"
+            "에러가 발생하면 `error` 이벤트가 먼저 오고 이후 `done` 으로 종료됩니다."
+        ),
+        request=MailGenerateRequest,
+        responses={
+            200: ("text/event-stream", None),
+        },
+        examples=[
+            OpenApiExample(
+                "SSE success stream (with plan)",
+                response_only=True,
+                value=(
+                    "event: ready\n"
+                    'data: {"ts":1731234567890}\n'
+                    "retry: 5000\n"
+                    "\n"
+                    "event: plan.start\n"
+                    "id: plan-0\n"
+                    "data: {}\n"
+                    "\n"
+                    "event: plan.delta\n"
+                    "id: plan-1\n"
+                    'data: {"idx":1, "text":"[1] 인사 및 수업 정보 언급\\n"}\n'
+                    "\n"
+                    "event: plan.delta\n"
+                    "id: plan-2\n"
+                    'data: {"idx":2, "text":"[2] 결석 사유(예비군) 명시\\n"}\n'
+                    "\n"
+                    "event: plan.done\n"
+                    "id: plan-done\n"
+                    "data: {}\n"
+                    "\n"
+                    "event: subject\n"
+                    "id: 0\n"
+                    'data: {"title":"11월 5일 예비군 사유 결석 관련 출석 인정 요청"}\n'
+                    "\n"
+                    "event: body.start\n"
+                    "id: 1\n"
+                    "data: {}\n"
+                    "\n"
+                    "event: body.delta\n"
+                    "id: 2\n"
+                    'data: {"seq":0, "text":"조교님 안녕하세요. ... "}\n'
+                    "\n"
+                    "event: body.delta\n"
+                    "id: 3\n"
+                    'data: {"seq":1, "text":"금일(11월 5일) 예비군 훈련으로 부득이하게 수업에 참석하지 못하였습니다. "}\n'
+                    "\n"
+                    "event: body.done\n"
+                    "id: 4\n"
+                    'data: {"text":"\\n"}\n'
+                    "\n"
+                    "event: patched\n"
+                    "id: 5\n"
+                    'data: {"text":"조교님 안녕하세요... (보정된 전체 본문)"}\n'
+                    "\n"
+                    "event: done\n"
+                    "id: 6\n"
+                    'data: {"reason":"stop"}\n'
+                    "\n"
+                ),
+            ),
+            OpenApiExample(
+                "SSE error stream (with plan)",
+                response_only=True,
+                value=(
+                    "event: ready\n"
+                    'data: {"ts":1731234567890}\n'
+                    "retry: 5000\n"
+                    "\n"
+                    "event: error\n"
+                    "id: 1\n"
+                    'data: {"message":"Upstream LLM timeout"}\n'
+                    "\n"
+                    "event: done\n"
+                    "id: 2\n"
+                    'data: {"reason":"stop"}\n'
+                    "\n"
+                ),
+            ),
+        ],
+    )
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        gen = stream_mail_generation_with_plan(
+            user=request.user,
+            subject=data.get("subject"),
+            body=data.get("body"),
+            to_emails=data.get("to_emails"),
+        )
+
+        resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp
+
+
 class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = ReplyGenerateRequest
 
@@ -190,3 +312,21 @@ class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
         resp["Cache-Control"] = "no-cache"
         resp["X-Accel-Buffering"] = "no"
         return resp
+
+
+class EmailPromptPreviewView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = PromptPreviewRequestSerializer
+
+    @extend_schema_with_common_errors(
+        summary="Preview mail-generation prompt for given recipients",
+        responses={200: {"type": "object", "properties": {"preview_text": {"type": "string"}}}},
+    )
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        preview_text = generate_prompt_preview(
+            user=request.user,
+            to_emails=serializer.validated_data["to"],
+        )
+        return Response({"preview_text": preview_text}, status=status.HTTP_200_OK)

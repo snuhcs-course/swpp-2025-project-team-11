@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EmailDao {
-    @Query("SELECT * FROM emails ORDER BY date DESC")
+    @Query("SELECT * FROM emails ORDER BY cachedAt DESC")
     fun getAllEmails(): Flow<List<EmailItem>>
+
+    @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY date DESC")
+    fun getEmailsByLabel(label: String): Flow<List<EmailItem>>
 
     @Query("SELECT * FROM emails WHERE id = :emailId")
     suspend fun getEmailById(emailId: String): EmailItem?
@@ -41,7 +44,7 @@ interface EmailDao {
      * 1. Backend sending consistent ISO 8601 format, or
      * 2. Adding a separate timestamp field for sorting
      */
-    @Query("SELECT dateRaw FROM emails ORDER BY cachedAt DESC LIMIT 1")
+    @Query("SELECT date FROM emails ORDER BY cachedAt DESC LIMIT 1")
     suspend fun getLatestEmailDate(): String?
 
     @Query(

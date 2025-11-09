@@ -1,17 +1,21 @@
+import urllib
 from email.utils import parseaddr
 
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.db import transaction
+from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
     OpenApiTypes,
+    extend_schema,
     inline_serializer,
 )
 from googleapiclient.errors import HttpError
 from rest_framework import generics, serializers, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -24,6 +28,7 @@ from ..core.mixins import AuthRequiredMixin
 from ..core.utils.docs import extend_schema_with_common_errors
 from .models import SentMail
 from .serializers import (
+    AttachmentQuerySerializer,
     EmailDetailSerializer,
     EmailListQuerySerializer,
     EmailListSerializer,
@@ -32,7 +37,15 @@ from .serializers import (
     EmailSendResponseSerializer,
     EmailSendSerializer,
 )
-from .services import GmailService, get_email_detail_logic, list_emails_logic, list_newer_emails_logic, mark_read_logic, send_email_logic
+from .services import (
+    GmailService,
+    get_attachment_logic,
+    get_email_detail_logic,
+    list_emails_logic,
+    list_newer_emails_logic,
+    mark_read_logic,
+    send_email_logic,
+)
 
 
 class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
@@ -67,7 +80,7 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description='Comma-separated labels (e.g., "INBOX,UNREAD"). Default: "INBOX"',
+                description='Comma-separated labels (e.g., "INBOX,UNREAD,SENT"). Default: "INBOX"',
             ),
             OpenApiParameter(
                 name="since_date",
@@ -215,6 +228,7 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
     """
 
     serializer_class = EmailSendSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema_with_common_errors(
         summary="Send email",
@@ -225,14 +239,25 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
     def post(self, request):
         user = request.user
 
-        # Validate request data
+        # 1) 본문 필드 검증
         serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        # Send email via Gmail API with decorator
+        # 2) form-data로 올라온 실제 파일들
+        uploaded_files = request.FILES.getlist("attachments")
+        attachments = []
+
+        for f in uploaded_files:
+            attachments.append(
+                {
+                    "filename": f.name,
+                    "mime_type": f.content_type or "application/octet-stream",
+                    "content": f.read(),  # bytes
+                }
+            )
+
         try:
-            data = serializer.validated_data
             result = send_email_logic(
                 user,
                 to=data["to"],
@@ -241,28 +266,23 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
                 subject=data["subject"],
                 body=data["body"],
                 is_html=data.get("is_html", True),
+                attachments=attachments,
             )
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except HttpError as e:
             if e.resp.status == 403:
                 return Response(
-                    {"detail": "Google Rate limit exceeded or permission denied"},
+                    {"detail": "Google rate limit exceeded or permission denied"},
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
             elif e.resp.status == 401:
                 return Response({"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
             elif e.resp.status == 400:
                 return Response({"detail": "Invalid email format"}, status=status.HTTP_400_BAD_REQUEST)
-            return Response(
-                {"detail": f"Gmail API error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"detail": f"Gmail API error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response(
-                {"detail": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"detail": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         try:
             to_list = data.get("to", []) or []
@@ -275,12 +295,10 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
 
             if to_emails:
                 contacts = list(Contact.objects.filter(user=user, email__in=to_emails).only("id"))
-
                 if contacts:
                     now = timezone.now()
                     subject = (data.get("subject") or "")[:300]
                     body = data.get("body") or ""
-
                     rows = [
                         SentMail(
                             user=user,
@@ -294,6 +312,7 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
                     with transaction.atomic():
                         SentMail.objects.bulk_create(rows, batch_size=1000)
         except Exception:
+            # 기록 실패는 메일 전송까지 실패하게 하지는 않음
             pass
 
         try:
@@ -415,3 +434,96 @@ class EmailMarkReadView(AuthRequiredMixin, generics.GenericAPIView):
                 {"detail": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class EmailAttachmentDownloadView(AuthRequiredMixin, generics.GenericAPIView):
+    """
+    GET /api/mail/emails/<message_id>/attachments/<attachment_id>/
+    """
+
+    query_serializer_class = AttachmentQuerySerializer
+
+    @extend_schema(
+        summary="Download email attachment",
+        description=(
+            "Download a specific attachment from a Gmail message.\n\n"
+            "The response is a binary file stream with appropriate Content-Type "
+            "and Content-Disposition headers set for download."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="message_id",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.PATH,
+                description="Gmail message ID",
+            ),
+            OpenApiParameter(
+                name="attachment_id",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.PATH,
+                description="Attachment ID (from message.attachments[].attachment_id)",
+            ),
+            # query params
+            OpenApiParameter(
+                name="filename",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="다운로드 시 사용할 파일 이름",
+            ),
+            OpenApiParameter(
+                name="mime_type",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="응답 Content-Type (예: application/pdf, image/jpeg)",
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                description="Binary file response (Content-Type and filename vary by attachment)",
+                response=OpenApiTypes.BINARY,
+            ),
+            401: OpenApiResponse(description="Authentication failed or token expired"),
+            404: OpenApiResponse(description="Attachment not found"),
+            429: OpenApiResponse(description="Rate limit exceeded or permission denied"),
+            500: OpenApiResponse(description="Unexpected server error"),
+        },
+    )
+    def get(self, request, message_id: str, attachment_id: str):
+        user = request.user
+
+        qs = self.query_serializer_class(data=request.query_params)
+        qs.is_valid(raise_exception=True)
+        filename = qs.validated_data.get("filename")
+        mime_type = qs.validated_data["mime_type"]
+
+        try:
+            att = get_attachment_logic(
+                user,
+                message_id=message_id,
+                attachment_id=attachment_id,
+                filename=filename,
+                mime_type=mime_type,
+            )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except HttpError as e:
+            if e.resp.status == 404:
+                return Response({"detail": "Attachment not found"}, status=status.HTTP_404_NOT_FOUND)
+            elif e.resp.status == 403:
+                return Response({"detail": "Permission denied or rate limit exceeded"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            return Response({"detail": "Gmail API error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        data = att["data"]
+        print(att)
+        filename = att["filename"]
+        mime_type = att.get("mime_type") or "application/octet-stream"
+        ascii_filename = filename.encode("ascii", "ignore").decode() or "download"
+        quoted = urllib.parse.quote(filename)
+
+        resp = HttpResponse(data, content_type=mime_type)
+        resp["Content-Disposition"] = f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{quoted}"
+        return resp

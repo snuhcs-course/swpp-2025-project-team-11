@@ -41,11 +41,11 @@ class InboxRepositoryTest {
             createMockEmailItem("1"),
             createMockEmailItem("2")
         )
-        every { emailDao.getAllEmails() } returns flowOf(mockEmails)
+        every { emailDao.getEmailsByLabel("INBOX") } returns flowOf(mockEmails)
 
         val result = repository.getCachedEmails()
 
-        coVerify { emailDao.getAllEmails() }
+        coVerify { emailDao.getEmailsByLabel("INBOX") }
     }
 
     @Test
@@ -79,8 +79,8 @@ class InboxRepositoryTest {
             )
         )
 
-        every { emailDao.getAllEmails() } returns flowOf(emptyList())
-        coEvery { mailApiService.getEmails("INBOX", 20, null) } returns mockResponse
+        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
         coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
 
@@ -101,8 +101,8 @@ class InboxRepositoryTest {
             )
         )
 
-        every { emailDao.getAllEmails() } returns flowOf(emptyList())
-        coEvery { mailApiService.getEmails("INBOX", 20, null) } returns mockResponse
+        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
 
         val result = repository.refreshEmails("INBOX", 20)
 
@@ -118,8 +118,8 @@ class InboxRepositoryTest {
             "Server error".toResponseBody()
         )
 
-        every { emailDao.getAllEmails() } returns flowOf(emptyList())
-        coEvery { mailApiService.getEmails("INBOX", 20, null) } returns mockResponse
+        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
 
         val result = repository.refreshEmails("INBOX", 20)
 
@@ -130,8 +130,8 @@ class InboxRepositoryTest {
     fun refresh_emails_returns_failure_when_response_body_is_null() = runTest {
         val mockResponse = Response.success<MailListResponse>(null)
 
-        every { emailDao.getAllEmails() } returns flowOf(emptyList())
-        coEvery { mailApiService.getEmails("INBOX", 20, null) } returns mockResponse
+        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
 
         val result = repository.refreshEmails("INBOX", 20)
 
@@ -141,17 +141,10 @@ class InboxRepositoryTest {
 
     @Test
     fun refresh_emails_with_existing_emails_fetches_new_ones_until_overlap() = runTest {
-        val existingEmails = listOf(
-            createMockEmailItem("3"),
-            createMockEmailItem("4")
-        )
+        val latestDate = "2025-01-01T00:00:00Z"
         val newEmails = listOf(
             createMockEmailItem("1"),
             createMockEmailItem("2")
-        )
-        val overlapEmails = listOf(
-            createMockEmailItem("2"),
-            createMockEmailItem("3")
         )
 
         val firstResponse = Response.success(
@@ -163,34 +156,28 @@ class InboxRepositoryTest {
         )
         val secondResponse = Response.success(
             MailListResponse(
-                messages = overlapEmails,
-                nextPageToken = "token2",
-                resultSizeEstimate = 2
+                messages = emptyList(),
+                nextPageToken = null,
+                resultSizeEstimate = 0
             )
         )
 
-        every { emailDao.getAllEmails() } returns flowOf(existingEmails)
-        coEvery { mailApiService.getEmails("INBOX", 20, null) } returns firstResponse
-        coEvery { mailApiService.getEmails("INBOX", 20, "token1") } returns secondResponse
+        coEvery { emailDao.getLatestEmailDate() } returns latestDate
+        coEvery { mailApiService.getEmails("INBOX", 20, null, latestDate) } returns firstResponse
+        coEvery { mailApiService.getEmails("INBOX", 20, "token1", latestDate) } returns secondResponse
         coEvery { emailDao.insertEmails(any()) } returns Unit
-        coEvery { emailDao.getEmailCount() } returns 4
+        coEvery { emailDao.getEmailCount() } returns 2
 
         val result = repository.refreshEmails("INBOX", 20)
 
         assertTrue(result.isSuccess)
-        assertEquals("token2", result.getOrNull())
-        coVerify {
-            emailDao.insertEmails(
-                match { emails ->
-                    emails.size == 3 && emails.map { it.id }.toSet() == setOf("1", "2")
-                }
-            )
-        }
+        assertEquals(null, result.getOrNull())
+        coVerify(atLeast = 1) { emailDao.insertEmails(newEmails) }
     }
 
     @Test
     fun refresh_emails_stops_fetching_when_no_more_pages() = runTest {
-        val existingEmails = listOf(createMockEmailItem("3"))
+        val latestDate = "2025-01-01T00:00:00Z"
         val newEmails = listOf(createMockEmailItem("1"))
 
         val response = Response.success(
@@ -201,16 +188,16 @@ class InboxRepositoryTest {
             )
         )
 
-        every { emailDao.getAllEmails() } returns flowOf(existingEmails)
-        coEvery { mailApiService.getEmails("INBOX", 20, null) } returns response
+        coEvery { emailDao.getLatestEmailDate() } returns latestDate
+        coEvery { mailApiService.getEmails("INBOX", 20, null, latestDate) } returns response
         coEvery { emailDao.insertEmails(any()) } returns Unit
-        coEvery { emailDao.getEmailCount() } returns 2
+        coEvery { emailDao.getEmailCount() } returns 1
 
         val result = repository.refreshEmails("INBOX", 20)
 
         assertTrue(result.isSuccess)
         assertEquals(null, result.getOrNull())
-        coVerify(exactly = 1) { mailApiService.getEmails(any(), any(), any()) }
+        coVerify(exactly = 1) { mailApiService.getEmails(any(), any(), any(), any()) }
     }
 
     @Test

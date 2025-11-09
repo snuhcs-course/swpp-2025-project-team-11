@@ -15,11 +15,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
 import com.fiveis.xend.ui.search.SearchActivity
+import com.fiveis.xend.ui.sent.SentActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.ui.view.MailDetailActivity
 
@@ -60,14 +62,63 @@ class InboxActivity : ComponentActivity() {
                     onRefresh = viewModel::refreshEmails,
                     onLoadMore = viewModel::loadMoreEmails,
                     onBottomNavChange = {
-                        if (it == "contacts") {
-                            startActivity(Intent(this, ContactBookActivity::class.java))
-                            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                        when (it) {
+                            "sent" -> {
+                                startActivity(Intent(this, SentActivity::class.java))
+                                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                            }
+                            "contacts" -> {
+                                startActivity(Intent(this, ContactBookActivity::class.java))
+                                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                            }
                         }
+                    },
+                    onAddContactClick = { email ->
+                        viewModel.showAddContactDialog(email)
+                    },
+                    onDismissSuccessBanner = {
+                        viewModel.dismissSuccessBanner()
                     }
                 )
+
+                // Show Add Contact Dialog
+                if (uiState.showAddContactDialog) {
+                    uiState.selectedEmailForContact?.let { email ->
+                        AddContactDialog(
+                            senderName = extractSenderName(email.fromEmail),
+                            senderEmail = extractSenderEmail(email.fromEmail),
+                            groups = uiState.groups,
+                            onDismiss = { viewModel.dismissAddContactDialog() },
+                            onConfirm = { name, emailAddr, senderRole, recipientRole, personalPrompt, groupId ->
+                                viewModel.addContact(
+                                    name,
+                                    emailAddr,
+                                    senderRole,
+                                    recipientRole,
+                                    personalPrompt,
+                                    groupId
+                                )
+                            }
+                        )
+                    }
+                }
             }
         }
+    }
+
+    private fun extractSenderName(fromEmail: String): String {
+        val nameRegex = "(.+?)\\s*<".toRegex()
+        val matchResult = nameRegex.find(fromEmail)
+        val name = matchResult?.groupValues?.get(1)?.trim()
+            ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+        // Remove surrounding quotes if present
+        return name.trim('"', '\'')
+    }
+
+    private fun extractSenderEmail(fromEmail: String): String {
+        val emailRegex = "<(.+?)>".toRegex()
+        val matchResult = emailRegex.find(fromEmail)
+        return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
     }
 }
 
@@ -77,8 +128,9 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
             @Suppress("UNCHECKED_CAST")
             val mailApiService = RetrofitClient.getMailApiService(context)
             val database = AppDatabase.getDatabase(context)
-            val repository = InboxRepository(mailApiService, database.emailDao())
-            return InboxViewModel(repository) as T
+            val inboxRepository = InboxRepository(mailApiService, database.emailDao())
+            val contactRepository = ContactBookRepository(context)
+            return InboxViewModel(inboxRepository, contactRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
