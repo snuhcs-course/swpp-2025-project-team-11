@@ -1,8 +1,14 @@
+import hashlib
+import io
 import json
+import os
+import tempfile
 from typing import Any
 
+import pandas as pd
 from django.db.models import Prefetch
 from django.db.models.functions import Length
+from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFPlumberLoader, TextLoader
 
 from apps.contact.models import Contact, PromptOption
 from apps.mail.models import SentMail
@@ -199,3 +205,79 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
         "language": language,
         "fewshots": ctx.get("fewshots"),
     }
+
+
+def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
+    """
+    Supported:
+    - PDF: LangChain PDFPlumberLoader (text/table friendly, no ML)
+    - DOCX: Docx2txtLoader
+    - TXT: TextLoader
+    - CSV: CSVLoader
+    - Excel: pandas → CSV
+    """
+    mt = (mime_type or "").lower()
+    suffix = filename.lower()
+
+    # ===== PDF =====
+    if mt == "application/pdf" or suffix.endswith(".pdf"):
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pdf") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = PDFPlumberLoader(tmp_path)
+            docs = loader.load()
+            return "\n\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== DOCX =====
+    if mt in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",) or suffix.endswith(".docx"):
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".docx") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = Docx2txtLoader(tmp_path)
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== TEXT =====
+    if mt.startswith("text/") or suffix.endswith(".txt"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = TextLoader(tmp_path, encoding="utf-8")
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== CSV =====
+    if mt in ("text/csv", "application/csv") or suffix.endswith(".csv"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = CSVLoader(file_path=tmp_path, encoding="utf-8")
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs[:100] if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== Excel =====
+    if mt in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    ) or suffix.endswith((".xlsx", ".xls")):
+        df = pd.read_excel(io.BytesIO(data))
+        return df.head(100).to_csv(index=False)
+
+    # ===== fallback =====
+    return data.decode("utf-8", errors="ignore")
+
+
+def hash_bytes(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()
