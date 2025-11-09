@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -31,23 +30,30 @@ class MailComposeViewModel(
     val ui: StateFlow<MailComposeUiState> = _ui
 
     private val bodyBuffer = StringBuilder()
-    private var throttleJob: Job? = null
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
+
+    // Undo snapshot
+    private var undoSnapshot: UndoSnapshot? = null
+
+    data class UndoSnapshot(
+        val subject: String,
+        val bodyHtml: String
+    )
+
+    fun saveUndoSnapshot(subject: String, bodyHtml: String) {
+        undoSnapshot = UndoSnapshot(subject, bodyHtml)
+    }
+
+    fun undo(): UndoSnapshot? {
+        val snapshot = undoSnapshot
+        undoSnapshot = null
+        return snapshot
+    }
 
     fun startStreaming(payload: JSONObject) {
         bodyBuffer.clear()
         _ui.value = MailComposeUiState(isStreaming = true)
-
-        // 80ms 스로틀로 화면 반영, 깜빡임 방지
-        throttleJob?.cancel()
-        throttleJob = viewModelScope.launch {
-            while (isActive) {
-                delay(80)
-                val text = bodyBuffer.toString().replace("\n", "<br>")
-                _ui.update { it.copy(bodyRendered = text) }
-            }
-        }
 
         api.start(
             payload = payload,
@@ -58,11 +64,10 @@ class MailComposeViewModel(
                 bodyBuffer.append(text)
             },
             onDone = {
-                throttleJob?.cancel()
-                _ui.update { it.copy(isStreaming = false, bodyRendered = bodyBuffer.toString().replace("\n", "<br>")) }
+                val finalText = bodyBuffer.toString().replace("\n", "<br>")
+                _ui.update { it.copy(isStreaming = false, bodyRendered = finalText) }
             },
             onError = { msg ->
-                throttleJob?.cancel()
                 _ui.update { it.copy(isStreaming = false, error = msg) }
             }
         )
@@ -70,7 +75,6 @@ class MailComposeViewModel(
 
     fun stopStreaming() {
         api.stop()
-        throttleJob?.cancel()
         _ui.update { it.copy(isStreaming = false) }
     }
 

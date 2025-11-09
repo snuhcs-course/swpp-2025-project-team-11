@@ -20,7 +20,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 
 private val loggingInterceptor = HttpLoggingInterceptor().apply {
-    level = HttpLoggingInterceptor.Level.BODY
+    level = HttpLoggingInterceptor.Level.BASIC
 }
 
 class MailComposeSseClient(
@@ -30,7 +30,7 @@ class MailComposeSseClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.SECONDS) // 무한 읽기
         .connectTimeout(15, TimeUnit.SECONDS)
-        .addInterceptor(loggingInterceptor)
+//        .addInterceptor(loggingInterceptor)
         .addInterceptor { chain ->
             val accessToken = tokenManager.getAccessToken()
             val request = if (accessToken != null) {

@@ -15,3 +15,10 @@ class ReplyGenerateRequest(serializers.Serializer):
     subject = serializers.CharField(allow_blank=True, required=True)
     body = serializers.CharField(allow_blank=True, required=True)
     to_email = serializers.EmailField(required=True, allow_blank=False)
+
+
+class PromptPreviewRequestSerializer(serializers.Serializer):
+    to = serializers.ListField(
+        child=serializers.EmailField(),
+        allow_empty=False,
+    )

@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -50,76 +53,96 @@ fun ContactDetailScreen(
 ) {
     val contact = uiState.contact
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8F8F8))) {
-        TopAppBar(
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "뒤로가기")
-                }
-            },
-            title = { Text("연락처 정보", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
-        )
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "뒤로가기")
+                    }
+                },
+                title = { Text("연락처 정보", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+            )
+        }
+    ) { innerPadding ->
+        val contentModifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8F8F8))
+            .padding(innerPadding)
+            .navigationBarsPadding()
 
         if (contact == null) {
-            Surface(
+            Column(
+                modifier = contentModifier,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    tonalElevation = 1.dp
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(uiState.error ?: "불러오는 중...", color = Color.Gray)
+                    }
+                }
+            }
+            return@Scaffold
+        }
+
+        Column(modifier = contentModifier) {
+            // 헤더
+            Card(
                 modifier = Modifier
                     .padding(16.dp)
+                    .fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(themeColor)
+                        )
+                        Spacer(Modifier.size(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            if (contact.email.isNotBlank()) Text(contact.email, color = Color.Gray)
+                        }
+                    }
+                }
+            }
+
+            uiState.contact.group?.let { g ->
+                GroupBriefCard(
+                    group = g,
+                    onClick = { onOpenGroup(g.id) }
+                )
+            }
+
+            // 세부 정보
+            Surface(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 tonalElevation = 1.dp
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(uiState.error ?: "불러오는 중...", color = Color.Gray)
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoRow("관계", contact.context?.recipientRole ?: "-")
+                    Divider()
+                    InfoRow("개인 프롬프트", contact.context?.personalPrompt ?: "-")
                 }
             }
-            return
-        }
 
-        // 헤더
-        Card(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f)),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(themeColor)
-                    )
-                    Spacer(Modifier.size(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        if (contact.email.isNotBlank()) Text(contact.email, color = Color.Gray)
-                    }
-                }
-            }
-        }
-
-        uiState.contact.group?.let { g ->
-            GroupBriefCard(
-                group = g,
-                onClick = { onOpenGroup(g.id) }
-            )
-        }
-
-        // 세부 정보
-        Surface(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 1.dp
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoRow("관계", contact.context?.recipientRole ?: "-")
-                Divider()
-                InfoRow("개인 프롬프트", contact.context?.personalPrompt ?: "-")
-            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

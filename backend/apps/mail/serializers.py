@@ -1,6 +1,13 @@
 from rest_framework import serializers
 
 
+class EmailAttachmentSerializer(serializers.Serializer):
+    attachment_id = serializers.CharField()
+    filename = serializers.CharField()
+    mime_type = serializers.CharField()
+    size = serializers.IntegerField(allow_null=True, required=False)
+
+
 class EmailListSerializer(serializers.Serializer):
     """Email list response serializer"""
 
@@ -14,6 +21,7 @@ class EmailListSerializer(serializers.Serializer):
     body = serializers.CharField()
     is_unread = serializers.BooleanField()
     label_ids = serializers.ListField(child=serializers.CharField())
+    attachments = EmailAttachmentSerializer(many=True, required=False)
 
 
 class EmailDetailSerializer(serializers.Serializer):
@@ -30,6 +38,7 @@ class EmailDetailSerializer(serializers.Serializer):
     snippet = serializers.CharField()
     is_unread = serializers.BooleanField()
     label_ids = serializers.ListField(child=serializers.CharField())
+    attachments = EmailAttachmentSerializer(many=True, required=False)
 
 
 class EmailSendSerializer(serializers.Serializer):
@@ -56,6 +65,11 @@ class EmailSendSerializer(serializers.Serializer):
     subject = serializers.CharField(max_length=500, help_text="Email subject")
     body = serializers.CharField(help_text="Email body (HTML or plain text)")
     is_html = serializers.BooleanField(required=False, default=True, help_text="Treat body as HTML")
+    attachments = serializers.ListField(
+        child=serializers.FileField(),
+        required=False,
+        allow_empty=True,
+    )
 
     def validate(self, attrs):
         def _dedup(emails):
@@ -109,3 +123,14 @@ class EmailMarkReadRequestSerializer(serializers.Serializer):
 class EmailMarkReadResponseSerializer(serializers.Serializer):
     id = serializers.CharField()
     labelIds = serializers.ListField(child=serializers.CharField())
+
+
+class AttachmentQuerySerializer(serializers.Serializer):
+    filename = serializers.CharField(
+        required=True,
+        allow_blank=True,
+    )
+    mime_type = serializers.CharField(
+        required=True,
+        help_text="application/pdf, image/jpeg, etc",
+    )

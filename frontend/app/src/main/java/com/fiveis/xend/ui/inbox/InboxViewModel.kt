@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,14 +21,22 @@ data class InboxUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val loadMoreNextPageToken: String? = null,
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val showAddContactDialog: Boolean = false,
+    val selectedEmailForContact: EmailItem? = null,
+    val groups: List<Group> = emptyList(),
+    val addContactSuccess: Boolean = false,
+    val addContactError: String? = null,
+    // 연락처에 있는 이메일 주소들
+    val contactEmails: Set<String> = emptySet()
 )
 
 /**
  * Inbox 화면 ViewModel
  */
 class InboxViewModel(
-    private val repository: InboxRepository
+    private val repository: InboxRepository,
+    private val contactRepository: ContactBookRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InboxUiState())
@@ -35,8 +45,28 @@ class InboxViewModel(
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
         loadCachedEmails()
+        loadGroups()
+        observeContacts()
         // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
         silentRefreshEmails()
+    }
+
+    private fun loadGroups() {
+        viewModelScope.launch {
+            contactRepository.observeGroups().collect { groups ->
+                _uiState.update { it.copy(groups = groups) }
+            }
+        }
+    }
+
+    private fun observeContacts() {
+        viewModelScope.launch {
+            contactRepository.observeContacts().collect { contacts ->
+                val contactEmailsSet = contacts.map { it.email.lowercase() }.toSet()
+                Log.d("InboxViewModel", "Contact emails updated: ${contactEmailsSet.size} contacts")
+                _uiState.update { it.copy(contactEmails = contactEmailsSet) }
+            }
+        }
     }
 
     private fun loadCachedEmails() {
@@ -188,5 +218,85 @@ class InboxViewModel(
      */
     fun onEmailClick(email: EmailItem) {
         // TODO: 이메일 상세 화면으로 이동
+    }
+
+    /**
+     * 연락처 추가 다이얼로그 표시
+     */
+    fun showAddContactDialog(email: EmailItem) {
+        _uiState.update {
+            it.copy(
+                showAddContactDialog = true,
+                selectedEmailForContact = email,
+                addContactSuccess = false,
+                addContactError = null
+            )
+        }
+    }
+
+    /**
+     * 연락처 추가 다이얼로그 닫기
+     */
+    fun dismissAddContactDialog() {
+        _uiState.update {
+            it.copy(
+                showAddContactDialog = false,
+                selectedEmailForContact = null,
+                addContactSuccess = false,
+                addContactError = null
+            )
+        }
+    }
+
+    /**
+     * 성공 배너 닫기
+     */
+    fun dismissSuccessBanner() {
+        _uiState.update {
+            it.copy(addContactSuccess = false)
+        }
+    }
+
+    /**
+     * 연락처 추가
+     */
+    fun addContact(
+        name: String,
+        email: String,
+        senderRole: String?,
+        recipientRole: String,
+        personalPrompt: String?,
+        groupId: Long?
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d("InboxViewModel", "Adding contact: name=$name, email=$email")
+                contactRepository.addContact(
+                    name = name,
+                    email = email,
+                    groupId = groupId,
+                    senderRole = senderRole,
+                    recipientRole = recipientRole,
+                    personalPrompt = personalPrompt
+                )
+                Log.d("InboxViewModel", "Contact added successfully")
+                _uiState.update {
+                    it.copy(
+                        addContactSuccess = true,
+                        addContactError = null,
+                        showAddContactDialog = false,
+                        selectedEmailForContact = null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("InboxViewModel", "Failed to add contact", e)
+                _uiState.update {
+                    it.copy(
+                        addContactSuccess = false,
+                        addContactError = e.message ?: "연락처 추가 실패"
+                    )
+                }
+            }
+        }
     }
 }
