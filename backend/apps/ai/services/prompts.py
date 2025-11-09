@@ -72,14 +72,31 @@ Compose a polished, well-structured email body in {{ language }} that matches th
 Do not include a subject line or extra commentary.
 Avoid unnecessary blank lines when information is missing.
 
-{%- if fewshots %}
-Below are examples of previous emails written by the same user.
-Mimic their tone, phrasing, and natural flow.
-{%- for body in fewshots %}
-<example {{ loop.index }}>
-{{ body }}
-</example>
+{%- if analysis %}
+Below is the user's analyzed writing style from their past emails.
+Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
+
+<analysis>
+Lexical Style:
+{{ analysis.lexical_style }}
+
+Grammar Patterns:
+{{ analysis.grammar_patterns }}
+
+Emotional Tone:
+{{ analysis.emotional_tone }}
+
+Figurative Usage:
+{{ analysis.figurative_usage }}
+
+Long Sentence Ratio:
+{{ analysis.long_sentence_ratio }}
+
+Representative Sentences:
+{%- for sentence in analysis.representative_sentences %}
+- {{ sentence }}
 {%- endfor %}
+</analysis>
 {%- endif %}
 
 {%- if recipients %}
@@ -267,16 +284,31 @@ You are writing as the {{ sender_role or "sender" }} to the {{ recipient_role or
 Use this information only to guide contextual understanding — do not inject politeness or tone unless it matches the user-provided instructions.
 {%- endif %}
 
-{%- if fewshots %}
-Below are examples of how this user usually writes.  
-Use them only to understand structure and flow (e.g., greeting → purpose → detail → request → closing).  
-Do NOT copy sentences or tone unless it aligns with the user’s style instructions above.
+{%- if analysis %}
+Below is the user's analyzed writing style from their past emails.
+Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
 
-{%- for body in fewshots %}
-<example {{ loop.index }}>
-{{ body }}
-</example>
+<analysis>
+Lexical Style:
+{{ analysis.lexical_style }}
+
+Grammar Patterns:
+{{ analysis.grammar_patterns }}
+
+Emotional Tone:
+{{ analysis.emotional_tone }}
+
+Figurative Usage:
+{{ analysis.figurative_usage }}
+
+Long Sentence Ratio:
+{{ analysis.long_sentence_ratio }}
+
+Representative Sentences:
+{%- for sentence in analysis.representative_sentences %}
+- {{ sentence }}
 {%- endfor %}
+</analysis>
 {%- endif %}
 
 The user may have given a subject/body draft. Keep the plan semantically consistent with that draft.  
