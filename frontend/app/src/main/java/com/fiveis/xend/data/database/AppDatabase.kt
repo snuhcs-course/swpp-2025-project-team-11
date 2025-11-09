@@ -12,6 +12,7 @@ import com.fiveis.xend.data.database.entity.ContactEntity
 import com.fiveis.xend.data.database.entity.GroupEntity
 import com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef
 import com.fiveis.xend.data.database.entity.PromptOptionEntity
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 
 /**
@@ -21,13 +22,14 @@ import com.fiveis.xend.data.model.EmailItem
 @Database(
     entities = [
         EmailItem::class,
+        DraftItem::class,
         GroupEntity::class,
         ContactEntity::class,
         ContactContextEntity::class,
         PromptOptionEntity::class,
         GroupPromptOptionCrossRef::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -143,6 +145,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from v3 to v4:
+         * - Create drafts table
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `drafts` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `subject` TEXT NOT NULL,
+                        `body` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL
+                    )"""
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 val newInstance = Room.databaseBuilder(
@@ -150,7 +169,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "xend_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .fallbackToDestructiveMigration() // Add this line
                     .build()
                 instance = newInstance
                 newInstance

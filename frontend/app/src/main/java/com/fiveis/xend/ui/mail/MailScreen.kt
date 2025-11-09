@@ -82,6 +82,8 @@ fun MailScreen(
     onSentLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
     onDismissSuccessBanner: () -> Unit = {},
+    showDraftSavedBanner: Boolean,
+    onDismissDraftSavedBanner: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(MailTab.INBOX) }
@@ -147,7 +149,7 @@ fun MailScreen(
                     onProfile = onOpenProfile
                 )
 
-                // Success Banner
+                // Success Banner (for Add Contact)
                 AnimatedVisibility(
                     visible = inboxUiState.addContactSuccess,
                     enter = slideInVertically(
@@ -167,6 +169,33 @@ fun MailScreen(
                             message = "연락처가 추가되었습니다",
                             type = BannerType.INFO,
                             onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
+                // Draft Saved Banner
+                AnimatedVisibility(
+                    visible = showDraftSavedBanner,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "임시 저장되었습니다.",
+                            type = BannerType.SUCCESS,
+                            onDismiss = onDismissDraftSavedBanner,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(top = 8.dp, bottom = 8.dp)

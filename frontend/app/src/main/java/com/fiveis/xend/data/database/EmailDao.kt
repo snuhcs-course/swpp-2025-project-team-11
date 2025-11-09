@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 import kotlinx.coroutines.flow.Flow
 
@@ -56,4 +57,20 @@ interface EmailDao {
         """
     )
     fun searchEmails(query: String): Flow<List<EmailItem>>
+
+    // Drafts
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDraft(draft: DraftItem): Long
+
+    @Query("SELECT * FROM drafts WHERE id = :id")
+    suspend fun getDraft(id: Long): DraftItem?
+
+    @Query("SELECT * FROM drafts WHERE recipients LIKE '%' || :recipientEmail || '%' ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getDraftByRecipient(recipientEmail: String): DraftItem?
+
+    @Query("SELECT * FROM drafts ORDER BY timestamp DESC")
+    fun getAllDrafts(): Flow<List<DraftItem>>
+
+    @Query("DELETE FROM drafts WHERE id = :id")
+    suspend fun deleteDraft(id: Long)
 }

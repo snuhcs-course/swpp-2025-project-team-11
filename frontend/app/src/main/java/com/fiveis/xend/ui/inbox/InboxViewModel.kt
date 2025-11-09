@@ -30,7 +30,9 @@ data class InboxUiState(
     // 연락처에 있는 이메일 주소들
     val contactEmails: Set<String> = emptySet(),
     // 이메일 주소를 key로 하는 연락처 맵 (이름 표시용)
-    val contactsByEmail: Map<String, String> = emptyMap()
+    val contactsByEmail: Map<String, String> = emptyMap(),
+    // 임시 저장 성공 배너 표시 여부
+    val showDraftSavedBanner: Boolean = false
 )
 
 /**
@@ -263,6 +265,20 @@ class InboxViewModel(
         _uiState.update {
             it.copy(addContactSuccess = false)
         }
+    }
+
+    /**
+     * 임시 저장 성공 배너 표시
+     */
+    fun showDraftSavedBanner() {
+        _uiState.update { it.copy(showDraftSavedBanner = true) }
+    }
+
+    /**
+     * 임시 저장 성공 배너 닫기
+     */
+    fun dismissDraftSavedBanner() {
+        _uiState.update { it.copy(showDraftSavedBanner = false) }
     }
 
     /**

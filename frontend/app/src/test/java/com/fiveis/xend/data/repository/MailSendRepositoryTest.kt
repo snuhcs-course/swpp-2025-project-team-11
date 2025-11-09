@@ -1,7 +1,6 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
-import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.RetrofitClient
@@ -10,6 +9,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
+import io.mockk.slot
 import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -18,6 +18,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import okhttp3.MultipartBody
+import okio.Buffer
 import retrofit2.Response
 
 class MailSendRepositoryTest {
@@ -54,24 +56,20 @@ class MailSendRepositoryTest {
         )
 
         val mockResponse = Response.success(201, expectedResponse)
+        val partsSlot = slot<List<MultipartBody.Part>>()
         coEvery {
-            mailApiService.sendEmail(
-                payload = MailSendRequest(to = to, subject = subject, body = body)
-            )
+            mailApiService.sendEmail(parts = capture(partsSlot))
         } returns mockResponse
 
         val result = repository.sendEmail(to, subject, body)
 
         assertEquals(expectedResponse, result)
-        coVerify {
-            mailApiService.sendEmail(
-                payload = match { request ->
-                    request.to == to &&
-                        request.subject == subject &&
-                        request.body == body
-                }
-            )
-        }
+        val captured = partsSlot.captured
+        assertEquals(subject, captured.valueFor("subject"))
+        assertEquals(body, captured.valueFor("body"))
+        assertEquals("true", captured.valueFor("is_html"))
+        assertEquals(listOf("test@example.com"), captured.valuesFor("to"))
+        coVerify { mailApiService.sendEmail(parts = any()) }
     }
 
     @Test
@@ -86,21 +84,18 @@ class MailSendRepositoryTest {
         )
 
         val mockResponse = Response.success(201, expectedResponse)
+        val partsSlot = slot<List<MultipartBody.Part>>()
         coEvery {
-            mailApiService.sendEmail(payload = any())
+            mailApiService.sendEmail(parts = capture(partsSlot))
         } returns mockResponse
 
         val result = repository.sendEmail(to, subject, body)
 
         assertEquals(expectedResponse, result)
-        coVerify {
-            mailApiService.sendEmail(
-                payload = match { request ->
-                    request.to == to &&
-                        request.to.size == 2
-                }
-            )
-        }
+        val captured = partsSlot.captured
+        assertEquals(2, captured.valuesFor("to").size)
+        assertEquals(to, captured.valuesFor("to"))
+        coVerify { mailApiService.sendEmail(parts = any()) }
     }
 
     @Test
@@ -110,9 +105,7 @@ class MailSendRepositoryTest {
         val body = "Test Body"
 
         val mockResponse = Response.success<SendResponse>(201, null)
-        coEvery {
-            mailApiService.sendEmail(payload = any())
-        } returns mockResponse
+        coEvery { mailApiService.sendEmail(parts = any()) } returns mockResponse
 
         val exception = try {
             repository.sendEmail(to, subject, body)
@@ -137,9 +130,7 @@ class MailSendRepositoryTest {
         )
 
         val mockResponse = Response.success(200, expectedResponse)
-        coEvery {
-            mailApiService.sendEmail(payload = any())
-        } returns mockResponse
+        coEvery { mailApiService.sendEmail(parts = any()) } returns mockResponse
 
         val exception = try {
             repository.sendEmail(to, subject, body)
@@ -162,9 +153,7 @@ class MailSendRepositoryTest {
             400,
             "Bad request".toResponseBody()
         )
-        coEvery {
-            mailApiService.sendEmail(payload = any())
-        } returns mockResponse
+        coEvery { mailApiService.sendEmail(parts = any()) } returns mockResponse
 
         val exception = try {
             repository.sendEmail(to, subject, body)
@@ -188,9 +177,7 @@ class MailSendRepositoryTest {
             500,
             errorMessage.toResponseBody()
         )
-        coEvery {
-            mailApiService.sendEmail(payload = any())
-        } returns mockResponse
+        coEvery { mailApiService.sendEmail(parts = any()) } returns mockResponse
 
         val exception = try {
             repository.sendEmail(to, subject, body)
@@ -202,5 +189,27 @@ class MailSendRepositoryTest {
         assertTrue(exception != null)
         assertTrue(exception?.message?.contains("HTTP 500") == true)
         assertTrue(exception?.message?.contains(errorMessage) == true)
+    }
+
+    private fun List<MultipartBody.Part>.valuesFor(name: String): List<String> =
+        filter { it.partName() == name }
+            .map { it.bodyAsString() }
+
+    private fun List<MultipartBody.Part>.valueFor(name: String): String? =
+        valuesFor(name).firstOrNull()
+
+    private fun MultipartBody.Part.partName(): String? {
+        val header = headers?.get("Content-Disposition") ?: return null
+        return header.split(";")
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("name=") }
+            ?.substringAfter("name=\"")
+            ?.substringBefore("\"")
+    }
+
+    private fun MultipartBody.Part.bodyAsString(): String {
+        val buffer = Buffer()
+        body.writeTo(buffer)
+        return buffer.readUtf8()
     }
 }
