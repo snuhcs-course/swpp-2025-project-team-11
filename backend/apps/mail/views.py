@@ -317,9 +317,9 @@ class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
 
         try:
             # 알맞은 parameter와 함께 celery work 호출
-            analyze_speech.delay(subject, body)
-        except Exception:
-            pass
+            analyze_speech.delay(user.id, subject, body, list(to_emails))
+        except Exception as e:
+            print(f"[DEBUG] {e}", flush=True)
 
         response_serializer = EmailSendResponseSerializer(result)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
