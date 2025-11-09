@@ -13,8 +13,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.ui.theme.StableColor
 
 class ContactDetailActivity : ComponentActivity() {
@@ -47,7 +49,17 @@ class ContactDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val contactColor = StableColor.forId(contactId)
 
-                val vm: ContactDetailViewModel = viewModel()
+                val factory = object : ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                        return ContactDetailViewModel(
+                            application,
+                            ContactBookRepository(applicationContext)
+                        ) as T
+                    }
+                }
+
+                val vm: ContactDetailViewModel = viewModel(factory = factory)
                 LaunchedEffect(contactId) { vm.load(contactId) }
                 val state by vm.uiState.collectAsState()
 

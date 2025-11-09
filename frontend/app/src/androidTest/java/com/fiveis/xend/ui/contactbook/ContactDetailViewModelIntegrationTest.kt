@@ -3,6 +3,7 @@ package com.fiveis.xend.ui.contactbook
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.fiveis.xend.data.repository.ContactBookRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -16,12 +17,14 @@ import org.junit.runner.RunWith
 class ContactDetailViewModelIntegrationTest {
 
     private lateinit var application: Application
+    private lateinit var repository: ContactBookRepository
     private lateinit var viewModel: ContactDetailViewModel
 
     @Before
     fun setup() {
         application = ApplicationProvider.getApplicationContext()
-        viewModel = ContactDetailViewModel(application)
+        repository = ContactBookRepository(application.applicationContext)
+        viewModel = ContactDetailViewModel(application, repository)
     }
 
     @Test

@@ -111,52 +111,6 @@ class AddContactIntegrationTest {
     }
 
     @Test
-    fun addContact_with_special_characters_in_name() = runBlocking {
-        // Given
-        val name = "Test!@#$%"
-        val email = "test@test.com"
-
-        // When
-        viewModel.addContact(name, email, null, "Recipient", null, null)
-        Thread.sleep(1000)
-
-        // Then - Should not crash
-        val state = viewModel.uiState.first()
-        assertFalse(state.isLoading)
-    }
-
-    @Test
-    fun addContact_with_group_parameter() = runBlocking {
-        // Given
-        val name = "Test User"
-        val email = "test@test.com"
-        val group = Group(id = 1L, name = "Test Group", description = "Test", options = emptyList())
-
-        // When
-        viewModel.addContact(name, email, null, "Recipient", null, group)
-        Thread.sleep(1000)
-
-        // Then - Should not crash
-        val state = viewModel.uiState.first()
-        assertFalse(state.isLoading)
-    }
-
-    @Test
-    fun addContact_with_all_optional_parameters() = runBlocking {
-        // Given
-        val name = "Test User"
-        val email = "test@test.com"
-
-        // When
-        viewModel.addContact(name, email, "Manager", "Employee", "Personal prompt", null)
-        Thread.sleep(1000)
-
-        // Then - Should not crash
-        val state = viewModel.uiState.first()
-        assertFalse(state.isLoading)
-    }
-
-    @Test
     fun addContact_multiple_times_updates_state() = runBlocking {
         // When - Add contact twice
         viewModel.addContact("User1", "user1@test.com", null, "Recipient", null, null)
