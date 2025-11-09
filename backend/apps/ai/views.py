@@ -348,13 +348,17 @@ class AttachmentAnalyzeFromMailView(AuthRequiredMixin, generics.GenericAPIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
-        result = analyze_gmail_attachment(
-            request.user,
-            message_id=data["message_id"],
-            attachment_id=data["attachment_id"],
-            filename=data["filename"],
-            mime_type=data.get("mime_type", ""),
-        )
+        try:
+            result = analyze_gmail_attachment(
+                request.user,
+                message_id=data["message_id"],
+                attachment_id=data["attachment_id"],
+                filename=data["filename"],
+                mime_type=data.get("mime_type", ""),
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(result, status=status.HTTP_200_OK)
 
 
@@ -367,5 +371,9 @@ class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
         ser.is_valid(raise_exception=True)
         file_obj = ser.validated_data["file"]
 
-        result = analyze_uploaded_file(request.user, file_obj=file_obj)
+        try:
+            result = analyze_uploaded_file(request.user, file_obj=file_obj)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(result, status=status.HTTP_200_OK)

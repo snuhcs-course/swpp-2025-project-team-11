@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 from django.db.models import Prefetch
 from django.db.models.functions import Length
-from langchain_community.document_loaders import CSVLoader, PDFPlumberLoader, TextLoader
+from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFPlumberLoader, TextLoader
 
 from apps.contact.models import Contact, PromptOption
 from apps.mail.models import SentMail
@@ -211,6 +211,7 @@ def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
     """
     Supported:
     - PDF: LangChain PDFPlumberLoader (text/table friendly, no ML)
+    - DOCX: Docx2txtLoader
     - TXT: TextLoader
     - CSV: CSVLoader
     - Excel: pandas → CSV
@@ -218,15 +219,27 @@ def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
     mt = (mime_type or "").lower()
     suffix = filename.lower()
 
-    # ===== PDF (LangChain PDFPlumberLoader) =====
+    # ===== PDF =====
     if mt == "application/pdf" or suffix.endswith(".pdf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pdf") as tmp:
             tmp.write(data)
             tmp_path = tmp.name
         try:
             loader = PDFPlumberLoader(tmp_path)
             docs = loader.load()
             return "\n\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== DOCX =====
+    if mt in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",) or suffix.endswith(".docx"):
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".docx") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = Docx2txtLoader(tmp_path)
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs if d.page_content)
         finally:
             os.remove(tmp_path)
 
@@ -242,6 +255,7 @@ def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
         finally:
             os.remove(tmp_path)
 
+    # ===== CSV =====
     if mt in ("text/csv", "application/csv") or suffix.endswith(".csv"):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
             tmp.write(data)
