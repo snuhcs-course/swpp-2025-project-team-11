@@ -15,23 +15,37 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,10 +66,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.theme.BackgroundLight
+import com.fiveis.xend.ui.theme.BorderGray
+import com.fiveis.xend.ui.theme.Gray200
+import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Gray600
+import com.fiveis.xend.ui.theme.Purple60
+import com.fiveis.xend.ui.theme.Slate900
 import com.fiveis.xend.ui.theme.StableColor
+import com.fiveis.xend.ui.theme.TextPrimary
+import com.fiveis.xend.ui.theme.ToolbarIconTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,14 +91,23 @@ fun ContactDetailScreen(
     onRefresh: () -> Unit,
     onOpenGroup: (Long) -> Unit,
     onComposeMail: (Contact) -> Unit,
-    onUpdateContact: (String, String) -> Unit,
+    onUpdateContact: (String, String, String?, String?, String?, Long?) -> Unit,
     onClearEditError: () -> Unit
 ) {
     val contact = uiState.contact
+    val groups = uiState.groups
     var showEditDialog by rememberSaveable { mutableStateOf(false) }
     var editNameField by rememberSaveable { mutableStateOf("") }
     var editEmailField by rememberSaveable { mutableStateOf("") }
     var editSubmitted by rememberSaveable { mutableStateOf(false) }
+    var editSenderMode by rememberSaveable { mutableStateOf(RoleInputMode.PRESET) }
+    var editSenderPreset by rememberSaveable { mutableStateOf<String?>(null) }
+    var editSenderManual by rememberSaveable { mutableStateOf("") }
+    var editRecipientMode by rememberSaveable { mutableStateOf(RoleInputMode.PRESET) }
+    var editRecipientPreset by rememberSaveable { mutableStateOf<String?>(null) }
+    var editRecipientManual by rememberSaveable { mutableStateOf("") }
+    var editPersonalPromptField by rememberSaveable { mutableStateOf("") }
+    var editSelectedGroupId by rememberSaveable { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(uiState.isUpdating, uiState.updateError, showEditDialog) {
         if (!showEditDialog) return@LaunchedEffect
@@ -147,7 +182,7 @@ fun ContactDetailScreen(
                 colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f)),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(Modifier.padding(16.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -172,6 +207,36 @@ fun ContactDetailScreen(
                             onClick = {
                                 editNameField = contact.name
                                 editEmailField = contact.email
+                                val senderValue = contact.context?.senderRole.orEmpty()
+                                if (senderValue.isBlank()) {
+                                    editSenderMode = RoleInputMode.PRESET
+                                    editSenderPreset = null
+                                    editSenderManual = ""
+                                } else if (senderRoleOptionExamples.contains(senderValue)) {
+                                    editSenderMode = RoleInputMode.PRESET
+                                    editSenderPreset = senderValue
+                                    editSenderManual = ""
+                                } else {
+                                    editSenderMode = RoleInputMode.MANUAL
+                                    editSenderPreset = null
+                                    editSenderManual = senderValue
+                                }
+                                val recipientValue = contact.context?.recipientRole.orEmpty()
+                                if (recipientValue.isBlank()) {
+                                    editRecipientMode = RoleInputMode.PRESET
+                                    editRecipientPreset = null
+                                    editRecipientManual = ""
+                                } else if (recipientRoleOptionExamples.contains(recipientValue)) {
+                                    editRecipientMode = RoleInputMode.PRESET
+                                    editRecipientPreset = recipientValue
+                                    editRecipientManual = ""
+                                } else {
+                                    editRecipientMode = RoleInputMode.MANUAL
+                                    editRecipientPreset = null
+                                    editRecipientManual = recipientValue
+                                }
+                                editPersonalPromptField = contact.context?.personalPrompt.orEmpty()
+                                editSelectedGroupId = contact.group?.id
                                 editSubmitted = false
                                 onClearEditError()
                                 showEditDialog = true
@@ -180,27 +245,7 @@ fun ContactDetailScreen(
                             Icon(Icons.Outlined.Edit, contentDescription = "연락처 정보 수정")
                         }
                     }
-                }
-            }
-
-            uiState.contact.group?.let { g ->
-                GroupBriefCard(
-                    group = g,
-                    onClick = { onOpenGroup(g.id) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 세부 정보
-            Surface(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                tonalElevation = 1.dp
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Spacer(Modifier.height(8.dp))
                     Row {
                         InfoRow(
                             contact.name + " 님께 나는",
@@ -217,14 +262,60 @@ fun ContactDetailScreen(
                     InfoRow("개인 프롬프트", contact.context?.personalPrompt.orEmpty())
                 }
             }
+
+            uiState.contact.group?.let { g ->
+                GroupBriefCard(
+                    group = g,
+                    onClick = { onOpenGroup(g.id) }
+                )
+            }
+//
+//            Spacer(modifier = Modifier.height(16.dp))
+//
+//            // 세부 정보
+//            Surface(
+//                modifier = Modifier
+//                    .padding(horizontal = 16.dp)
+//                    .fillMaxWidth(),
+//                shape = RoundedCornerShape(16.dp),
+//                tonalElevation = 1.dp
+//            ) {
+//                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+//                }
+//            }
         }
     }
 
     if (showEditDialog) {
-        val isConfirmEnabled = editNameField.isNotBlank() && editEmailField.isNotBlank()
+        val trimmedName = editNameField.trim()
+        val trimmedEmail = editEmailField.trim()
+        val finalSenderRole = when (editSenderMode) {
+            RoleInputMode.PRESET -> editSenderPreset?.takeIf { it.isNotBlank() }
+            RoleInputMode.MANUAL -> editSenderManual.trim().takeIf { it.isNotBlank() }
+        }
+        val finalRecipientRole = when (editRecipientMode) {
+            RoleInputMode.PRESET -> editRecipientPreset?.takeIf { it.isNotBlank() }
+            RoleInputMode.MANUAL -> editRecipientManual.trim().takeIf { it.isNotBlank() }
+        }
+        val selectedGroup = groups.firstOrNull { it.id == editSelectedGroupId }
+            ?: contact?.group?.takeIf { it.id == editSelectedGroupId }
+        val selectedGroupName = selectedGroup?.name ?: "그룹 없음"
+        val isConfirmEnabled = trimmedName.isNotBlank() &&
+            trimmedEmail.contains("@") &&
+            finalRecipientRole != null
+
         EditContactDialog(
             name = editNameField,
             email = editEmailField,
+            senderMode = editSenderMode,
+            senderPreset = editSenderPreset,
+            senderManual = editSenderManual,
+            recipientMode = editRecipientMode,
+            recipientPreset = editRecipientPreset,
+            recipientManual = editRecipientManual,
+            personalPrompt = editPersonalPromptField,
+            selectedGroupName = selectedGroupName,
+            groups = groups,
             errorMessage = uiState.updateError,
             isProcessing = uiState.isUpdating,
             isConfirmEnabled = isConfirmEnabled,
@@ -236,6 +327,28 @@ fun ContactDetailScreen(
                 editEmailField = it
                 if (uiState.updateError != null) onClearEditError()
             },
+            onSenderModeChange = { mode ->
+                editSenderMode = mode
+                if (mode == RoleInputMode.PRESET) {
+                    editSenderManual = ""
+                } else {
+                    editSenderPreset = null
+                }
+            },
+            onSenderPresetChange = { editSenderPreset = it },
+            onSenderManualChange = { editSenderManual = it },
+            onRecipientModeChange = { mode ->
+                editRecipientMode = mode
+                if (mode == RoleInputMode.PRESET) {
+                    editRecipientManual = ""
+                } else {
+                    editRecipientPreset = null
+                }
+            },
+            onRecipientPresetChange = { editRecipientPreset = it },
+            onRecipientManualChange = { editRecipientManual = it },
+            onPersonalPromptChange = { editPersonalPromptField = it },
+            onGroupSelected = { editSelectedGroupId = it },
             onDismiss = {
                 if (!uiState.isUpdating) {
                     showEditDialog = false
@@ -244,11 +357,16 @@ fun ContactDetailScreen(
                 }
             },
             onConfirm = {
-                val trimmedName = editNameField.trim()
-                val trimmedEmail = editEmailField.trim()
-                if (trimmedName.isBlank() || trimmedEmail.isBlank()) return@EditContactDialog
+                val recipientRole = finalRecipientRole ?: return@EditContactDialog
                 editSubmitted = true
-                onUpdateContact(trimmedName, trimmedEmail)
+                onUpdateContact(
+                    trimmedName,
+                    trimmedEmail,
+                    finalSenderRole,
+                    recipientRole,
+                    editPersonalPromptField.trim().ifBlank { null },
+                    editSelectedGroupId
+                )
             }
         )
     }
@@ -322,66 +440,491 @@ private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditContactDialog(
     name: String,
     email: String,
+    senderMode: RoleInputMode,
+    senderPreset: String?,
+    senderManual: String,
+    recipientMode: RoleInputMode,
+    recipientPreset: String?,
+    recipientManual: String,
+    personalPrompt: String,
+    selectedGroupName: String,
+    groups: List<Group>,
     errorMessage: String?,
     isProcessing: Boolean,
     isConfirmEnabled: Boolean,
     onNameChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
+    onSenderModeChange: (RoleInputMode) -> Unit,
+    onSenderPresetChange: (String?) -> Unit,
+    onSenderManualChange: (String) -> Unit,
+    onRecipientModeChange: (RoleInputMode) -> Unit,
+    onRecipientPresetChange: (String?) -> Unit,
+    onRecipientManualChange: (String) -> Unit,
+    onPersonalPromptChange: (String) -> Unit,
+    onGroupSelected: (Long?) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    AlertDialog(
+    val directInputLabel = "직접 입력"
+    val senderRoleOptions = senderRoleOptionExamples + directInputLabel
+    val recipientRoleOptions = recipientRoleOptionExamples + directInputLabel
+    val scrollState = rememberScrollState()
+    var isSenderExpanded by remember { mutableStateOf(false) }
+    var isRecipientExpanded by remember { mutableStateOf(false) }
+    var isGroupExpanded by remember { mutableStateOf(false) }
+
+    Dialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
-        title = { Text("연락처 정보 수정", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column {
-                    Text("이름", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.90f)
+                .widthIn(max = 720.dp),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(Color.White)
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "연락처 정보 수정",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        enabled = !isProcessing,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "닫기",
+                            tint = Gray600
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                ) {
+                    Text("이름", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = name,
                         onValueChange = onNameChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        placeholder = {
+                            Text(
+                                text = "이름을 입력하세요",
+                                style = LocalTextStyle.current.copy(fontSize = 12.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         enabled = !isProcessing,
-                        placeholder = { Text("이름을 입력하세요", color = Color.Gray) }
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = BackgroundLight,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
+                        )
                     )
-                }
-                Column {
-                    Text("이메일", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("이메일", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = email,
                         onValueChange = onEmailChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        placeholder = {
+                            Text(
+                                text = "example@email.com",
+                                style = LocalTextStyle.current.copy(fontSize = 12.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         enabled = !isProcessing,
-                        placeholder = { Text("이메일을 입력하세요", color = Color.Gray) }
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = BackgroundLight,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
+                        )
                     )
-                }
-                if (!errorMessage.isNullOrBlank()) {
-                    Text(
-                        errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("관계", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        ExposedDropdownMenuBox(
+                            expanded = isSenderExpanded,
+                            onExpandedChange = { if (!isProcessing) isSenderExpanded = !isSenderExpanded },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            OutlinedTextField(
+                                value = when (senderMode) {
+                                    RoleInputMode.PRESET -> senderPreset ?: "나"
+                                    RoleInputMode.MANUAL -> directInputLabel
+                                },
+                                onValueChange = {},
+                                readOnly = true,
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Group,
+                                        contentDescription = null,
+                                        tint = ToolbarIconTint,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSenderExpanded)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .height(48.dp),
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !isProcessing,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = BackgroundLight,
+                                    unfocusedContainerColor = BackgroundLight,
+                                    unfocusedBorderColor = Gray200,
+                                    focusedBorderColor = Purple60,
+                                    focusedTextColor = Slate900,
+                                    unfocusedTextColor = Gray600
+                                )
+                            )
+                            ExposedDropdownMenu(
+                                expanded = isSenderExpanded,
+                                onDismissRequest = { isSenderExpanded = false }
+                            ) {
+                                senderRoleOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option, fontSize = 13.sp) },
+                                        onClick = {
+                                            isSenderExpanded = false
+                                            if (option == directInputLabel) {
+                                                onSenderModeChange(RoleInputMode.MANUAL)
+                                                onSenderPresetChange(null)
+                                            } else {
+                                                onSenderModeChange(RoleInputMode.PRESET)
+                                                onSenderPresetChange(option)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+
+                        ExposedDropdownMenuBox(
+                            expanded = isRecipientExpanded,
+                            onExpandedChange = { if (!isProcessing) isRecipientExpanded = !isRecipientExpanded },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            OutlinedTextField(
+                                value = when (recipientMode) {
+                                    RoleInputMode.PRESET -> recipientPreset ?: "상대방"
+                                    RoleInputMode.MANUAL -> directInputLabel
+                                },
+                                onValueChange = {},
+                                readOnly = true,
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Group,
+                                        contentDescription = null,
+                                        tint = ToolbarIconTint,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientExpanded)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .height(48.dp),
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !isProcessing,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = BackgroundLight,
+                                    unfocusedContainerColor = BackgroundLight,
+                                    unfocusedBorderColor = Gray200,
+                                    focusedBorderColor = Purple60,
+                                    focusedTextColor = Slate900,
+                                    unfocusedTextColor = Gray600
+                                )
+                            )
+                            ExposedDropdownMenu(
+                                expanded = isRecipientExpanded,
+                                onDismissRequest = { isRecipientExpanded = false }
+                            ) {
+                                recipientRoleOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option, fontSize = 13.sp) },
+                                        onClick = {
+                                            isRecipientExpanded = false
+                                            if (option == directInputLabel) {
+                                                onRecipientModeChange(RoleInputMode.MANUAL)
+                                                onRecipientPresetChange(null)
+                                            } else {
+                                                onRecipientModeChange(RoleInputMode.PRESET)
+                                                onRecipientPresetChange(option)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (senderMode == RoleInputMode.MANUAL || recipientMode == RoleInputMode.MANUAL) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth()) {
+                            if (senderMode == RoleInputMode.MANUAL) {
+                                OutlinedTextField(
+                                    value = senderManual,
+                                    onValueChange = onSenderManualChange,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    placeholder = {
+                                        Text(
+                                            text = "나의 역할",
+                                            style = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                            color = Gray400
+                                        )
+                                    },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                    singleLine = true,
+                                    enabled = !isProcessing,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedBorderColor = BorderGray,
+                                        focusedBorderColor = Purple60
+                                    )
+                                )
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+
+                            Spacer(Modifier.width(8.dp))
+
+                            if (recipientMode == RoleInputMode.MANUAL) {
+                                OutlinedTextField(
+                                    value = recipientManual,
+                                    onValueChange = onRecipientManualChange,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    placeholder = {
+                                        Text(
+                                            text = "상대방 역할",
+                                            style = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                            color = Gray400
+                                        )
+                                    },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                    singleLine = true,
+                                    enabled = !isProcessing,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedBorderColor = BorderGray,
+                                        focusedBorderColor = Purple60
+                                    )
+                                )
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("관계 프롬프팅(선택사항)", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = personalPrompt,
+                        onValueChange = onPersonalPromptChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
+                        placeholder = {
+                            Text(
+                                text = "상대방과의 관계를 설명해 주세요",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                color = Gray400
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                        enabled = !isProcessing,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = BackgroundLight,
+                            unfocusedBorderColor = Gray200,
+                            focusedBorderColor = Purple60
+                        ),
+                        maxLines = 3
                     )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("그룹 선택", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    ExposedDropdownMenuBox(
+                        expanded = isGroupExpanded,
+                        onExpandedChange = { if (!isProcessing) isGroupExpanded = !isGroupExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedGroupName,
+                            onValueChange = {},
+                            readOnly = true,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.FolderOpen,
+                                    contentDescription = null,
+                                    tint = Gray600,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = isGroupExpanded)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                                .height(48.dp),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isProcessing,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = BackgroundLight,
+                                unfocusedContainerColor = BackgroundLight,
+                                unfocusedBorderColor = Gray200,
+                                focusedBorderColor = Purple60
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = isGroupExpanded,
+                            onDismissRequest = { isGroupExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("그룹 없음", fontSize = 13.sp) },
+                                onClick = {
+                                    onGroupSelected(null)
+                                    isGroupExpanded = false
+                                }
+                            )
+                            groups.forEach { g ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                Modifier
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(StableColor.forId(g.id))
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                g.name,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        onGroupSelected(g.id)
+                                        isGroupExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (!errorMessage.isNullOrBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            errorMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                enabled = isConfirmEnabled && !isProcessing
-            ) {
-                Text("저장")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isProcessing) {
-                Text("취소")
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        enabled = !isProcessing,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("취소", fontSize = 14.sp, color = Gray600)
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Button(
+                        onClick = onConfirm,
+                        enabled = isConfirmEnabled && !isProcessing,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Purple60,
+                            disabledContainerColor = Gray200
+                        )
+                    ) {
+                        if (isProcessing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
+                }
             }
         }
-    )
+    }
 }

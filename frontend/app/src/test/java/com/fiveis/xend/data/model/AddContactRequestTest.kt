@@ -117,7 +117,7 @@ class AddContactRequestContextTest {
     fun create_context_with_default_values() {
         val context = AddContactRequestContext()
 
-        assertEquals("Mail writer", context.senderRole)
+        assertEquals("", context.senderRole)
         assertEquals("", context.recipientRole)
         assertEquals("", context.relationshipDetails)
         assertEquals("", context.personalPrompt)
@@ -195,9 +195,9 @@ class AddContactRequestContextTest {
     }
 
     @Test
-    fun default_sender_role_is_mail_writer() {
+    fun default_sender_role_is_empty() {
         val context = AddContactRequestContext()
 
-        assertEquals("Mail writer", context.senderRole)
+        assertEquals("", context.senderRole)
     }
 }

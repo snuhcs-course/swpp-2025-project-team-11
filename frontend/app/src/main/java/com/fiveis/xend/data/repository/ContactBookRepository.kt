@@ -240,11 +240,27 @@ class ContactBookRepository(
         }
     }
 
-    suspend fun updateContact(contactId: Long, name: String, email: String) {
-        val payload = mapOf<String, Any?>(
+    suspend fun updateContact(
+        contactId: Long,
+        name: String,
+        email: String,
+        senderRole: String?,
+        recipientRole: String?,
+        personalPrompt: String?,
+        groupId: Long?
+    ) {
+        val payload = mutableMapOf<String, Any?>(
             "name" to name,
-            "email" to email
+            "email" to email,
+            "group_id" to groupId
         )
+        val contextPayload = mutableMapOf<String, Any?>()
+        if (senderRole != null) contextPayload["sender_role"] = senderRole
+        if (recipientRole != null) contextPayload["recipient_role"] = recipientRole
+        if (personalPrompt != null) contextPayload["personal_prompt"] = personalPrompt
+        if (contextPayload.isNotEmpty()) {
+            payload["context"] = contextPayload
+        }
         val response = api.updateContact(contactId, payload)
         if (!response.isSuccessful) {
             val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"

@@ -82,7 +82,9 @@ class ContactDetailActivity : ComponentActivity() {
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
-                    onUpdateContact = { name, email -> vm.updateContact(name, email) },
+                    onUpdateContact = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                        vm.updateContact(name, email, senderRole, recipientRole, personalPrompt, groupId)
+                    },
                     onClearEditError = { vm.clearUpdateError() }
                 )
 
