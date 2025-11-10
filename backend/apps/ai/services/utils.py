@@ -1,11 +1,16 @@
+import hashlib
+import io
 import json
+import os
+import tempfile
 from typing import Any
 
+import pandas as pd
 from django.db.models import Prefetch
-from django.db.models.functions import Length
+from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFPlumberLoader, TextLoader
 
+from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.contact.models import Contact, PromptOption
-from apps.mail.models import SentMail
 
 
 def sse_event(name, payload, *, eid=None, retry_ms=None):
@@ -26,9 +31,7 @@ def heartbeat():
 def collect_prompt_context(
     user,
     to_emails: list[str],
-    include_fewshots: bool = True,
-    fewshot_k: int = 3,
-    min_body_len: int = 0,  # 0이면 길이 제한 없음 (예: 80~120 추천)
+    include_analysis: bool = True,
     recipient_label_fmt: str = "Recipient {i}",
 ) -> dict[str, Any]:
     """
@@ -93,10 +96,10 @@ def collect_prompt_context(
         "sender_role": None,
         "recipient_role": None,
         "language": None,
-        "fewshots": [],
+        "analysis": None,
     }
 
-    if not contacts or not unique_groups:
+    if not contacts:
         return base
 
     # ========== 단일 '등록' 수신자 ==========
@@ -116,8 +119,8 @@ def collect_prompt_context(
             "language": _clean(getattr(ctx, "language_preference", None)),
         }
 
-        if include_fewshots:
-            out["fewshots"] = _fetch_fewshot_bodies_for_single(user, c, fewshot_k, min_body_len)
+        if include_analysis:
+            out["analysis"] = _fetch_analysis_for_single(user, c)
         return out
 
     # ========== 여러 명, 같은 그룹 ==========
@@ -129,8 +132,8 @@ def collect_prompt_context(
             "group_description": _clean(g.description),
             "prompt_options": serialize_opts(get_group_opts(g)),
         }
-        if include_fewshots:
-            out["fewshots"] = _fetch_fewshot_bodies_for_group(user, g, fewshot_k, min_body_len)
+        if include_analysis:
+            out["analysis"] = _fetch_analysis_for_group(user, g)
         return out
 
     # ========== 여러 그룹: 공통 옵션 교집합 ==========
@@ -151,22 +154,38 @@ def collect_prompt_context(
     }
 
 
-def _fetch_fewshot_bodies_for_single(user, contact, k: int, min_body_len: int) -> list[str]:
-    qs = SentMail.objects.filter(user=user, contact=contact).exclude(body__isnull=True).exclude(body__exact="").order_by("-sent_at")
-    if min_body_len > 0:
-        qs = qs.annotate(body_len=Length("body")).filter(body_len__gte=min_body_len)
-    bodies = list(qs.values_list("body", flat=True)[:k])
+def _fetch_analysis_for_single(user, contact) -> dict | None:
+    # (user, contact) 조합은 최대 1개
+    obj = ContactAnalysisResult.objects.filter(user=user, contact=contact).first()
+    if obj:
+        return {
+            "lexical_style": obj.lexical_style,
+            "grammar_patterns": obj.grammar_patterns,
+            "emotional_tone": obj.emotional_tone,
+            "figurative_usage": obj.figurative_usage,
+            "long_sentence_ratio": obj.long_sentence_ratio,
+            "representative_sentences": obj.representative_sentences,
+        }
 
-    if not bodies and getattr(contact, "group_id", None):
-        bodies = _fetch_fewshot_bodies_for_group(user, contact.group, k, min_body_len)
-    return bodies
+    if getattr(contact, "group_id", None):
+        return _fetch_analysis_for_group(user, contact.group)
+
+    return None
 
 
-def _fetch_fewshot_bodies_for_group(user, group, k: int, min_body_len: int) -> list[str]:
-    qs = SentMail.objects.filter(user=user, contact__group=group).exclude(body__isnull=True).exclude(body__exact="").order_by("-sent_at")
-    if min_body_len > 0:
-        qs = qs.annotate(body_len=Length("body")).filter(body_len__gte=min_body_len)
-    return list(qs.values_list("body", flat=True)[:k])
+def _fetch_analysis_for_group(user, group) -> dict | None:
+    obj = GroupAnalysisResult.objects.filter(user=user, group=group).first()
+    if not obj:
+        return None
+
+    return {
+        "lexical_style": obj.lexical_style,
+        "grammar_patterns": obj.grammar_patterns,
+        "emotional_tone": obj.emotional_tone,
+        "figurative_usage": obj.figurative_usage,
+        "long_sentence_ratio": obj.long_sentence_ratio,
+        "representative_sentences": obj.representative_sentences,
+    }
 
 
 DEFAULT_LANGUAGE = "user's original language"
@@ -197,5 +216,81 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
         "sender_role": _clean(ctx.get("sender_role")),
         "recipient_role": _clean(ctx.get("recipient_role")),
         "language": language,
-        "fewshots": ctx.get("fewshots"),
+        "analysis": ctx.get("analysis"),
     }
+
+
+def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
+    """
+    Supported:
+    - PDF: LangChain PDFPlumberLoader (text/table friendly, no ML)
+    - DOCX: Docx2txtLoader
+    - TXT: TextLoader
+    - CSV: CSVLoader
+    - Excel: pandas → CSV
+    """
+    mt = (mime_type or "").lower()
+    suffix = filename.lower()
+
+    # ===== PDF =====
+    if mt == "application/pdf" or suffix.endswith(".pdf"):
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pdf") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = PDFPlumberLoader(tmp_path)
+            docs = loader.load()
+            return "\n\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== DOCX =====
+    if mt in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",) or suffix.endswith(".docx"):
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".docx") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = Docx2txtLoader(tmp_path)
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== TEXT =====
+    if mt.startswith("text/") or suffix.endswith(".txt"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = TextLoader(tmp_path, encoding="utf-8")
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== CSV =====
+    if mt in ("text/csv", "application/csv") or suffix.endswith(".csv"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            loader = CSVLoader(file_path=tmp_path, encoding="utf-8")
+            docs = loader.load()
+            return "\n".join(d.page_content for d in docs[:100] if d.page_content)
+        finally:
+            os.remove(tmp_path)
+
+    # ===== Excel =====
+    if mt in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    ) or suffix.endswith((".xlsx", ".xls")):
+        df = pd.read_excel(io.BytesIO(data))
+        return df.head(100).to_csv(index=False)
+
+    # ===== fallback =====
+    return data.decode("utf-8", errors="ignore")
+
+
+def hash_bytes(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()

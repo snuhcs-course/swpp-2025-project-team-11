@@ -2,8 +2,12 @@
 
 import base64
 import datetime
+import html
 import logging
+import mimetypes
+from email import encoders
 from email.header import Header
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import parsedate_to_datetime
@@ -176,6 +180,8 @@ class GmailService:
             logging.warning(f"Failed to parse date '{date_str}' for message {message['id']}: {e}")
             received_at = None
 
+        attachments = self._get_attachments_meta(message["payload"])
+
         return {
             "id": message["id"],
             "thread_id": message["threadId"],
@@ -188,6 +194,66 @@ class GmailService:
             "date_raw": date_str,
             "body": body,
             "is_unread": "UNREAD" in message.get("labelIds", []),
+            "attachments": attachments,
+        }
+
+    def _get_attachments_meta(self, payload: dict) -> list[dict]:
+        results: list[dict] = []
+
+        def _walk(part: dict):
+            if part.get("parts"):
+                for p in part["parts"]:
+                    _walk(p)
+
+            filename = part.get("filename")
+            body = part.get("body", {})
+            attachment_id = body.get("attachmentId")
+            if filename and attachment_id:
+                results.append(
+                    {
+                        "attachment_id": attachment_id,
+                        "filename": filename,
+                        "mime_type": part.get("mimeType", "application/octet-stream"),
+                        "size": body.get("size"),
+                    }
+                )
+
+        _walk(payload)
+        return results
+
+    def get_attachment(
+        self,
+        message_id: str,
+        attachment_id: str,
+        filename: str,
+        mime_type: str,
+    ) -> dict:
+        try:
+            att = self.service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_id).execute()
+        except Exception as e:
+            logging.warning(f"Failed to fetch attachment {attachment_id} for message {message_id}: {e}")
+            raise
+
+        data_b64 = att.get("data")
+        if not data_b64:
+            raise ValueError("No attachment data returned from Gmail")
+
+        file_bytes = base64.urlsafe_b64decode(data_b64.encode("utf-8"))
+
+        final_mime = mime_type or "application/octet-stream"
+
+        if filename and filename.strip():
+            final_name = filename.strip()
+        else:
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            guessed_ext = mimetypes.guess_extension(final_mime) or ""
+            final_name = f"{ts}{guessed_ext}"
+
+        return {
+            "data": file_bytes,
+            "filename": final_name,
+            "mime_type": final_mime,
+            "size": len(file_bytes),
         }
 
     def _get_body(self, payload: dict) -> str:
@@ -249,6 +315,7 @@ class GmailService:
         is_html: bool = True,
         cc: list[str] | None = None,
         bcc: list[str] | None = None,
+        attachments: list[dict] | None = None,
     ):
         """
         Send an email via Gmail API
@@ -268,27 +335,53 @@ class GmailService:
         try:
             cc = cc or []
             bcc = bcc or []
+            attachments = attachments or []
 
             if is_html:
-                html_body = body
+                html_body = html.unescape(body)
                 text_body = html_to_text(body)
             else:
-                text_body = body
+                text_body = html.unescape(body)
                 html_body = text_to_html(body)
 
-            message = MIMEMultipart("alternative")
-            message["Subject"] = str(Header(subject, "utf-8"))
-            message["To"] = ", ".join(to)
+            outer = MIMEMultipart("mixed")
+            outer["Subject"] = str(Header(subject, "utf-8"))
+            outer["To"] = ", ".join(to)
             if cc:
-                message["Cc"] = ", ".join(cc)
+                outer["Cc"] = ", ".join(cc)
             if bcc:
-                message["Bcc"] = ", ".join(bcc)
+                outer["Bcc"] = ", ".join(bcc)
 
-            # 순서 중요: plain 먼저, html 나중
-            message.attach(MIMEText(text_body, "plain", "utf-8"))
-            message.attach(MIMEText(html_body, "html", "utf-8"))
+            alt = MIMEMultipart("alternative")
+            alt.attach(MIMEText(text_body, "plain", "utf-8"))
+            alt.attach(MIMEText(html_body, "html", "utf-8"))
 
-            raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+            outer.attach(alt)
+
+            for att in attachments:
+                filename = att.get("filename") or "attachment"
+                mime_type = att.get("mime_type")
+                content = att.get("content")
+
+                if isinstance(content, str):
+                    file_bytes = base64.b64decode(content)
+                else:
+                    file_bytes = content
+
+                if not mime_type:
+                    mime_type, _ = mimetypes.guess_type(filename)
+                if not mime_type:
+                    mime_type = "application/octet-stream"
+
+                main_type, sub_type = mime_type.split("/", 1)
+
+                part = MIMEBase(main_type, sub_type)
+                part.set_payload(file_bytes)
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", filename))
+                outer.attach(part)
+
+            raw = base64.urlsafe_b64encode(outer.as_bytes()).decode("utf-8")
             result = self.service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
             return {
@@ -417,7 +510,7 @@ def get_email_detail_logic(access_token, message_id):
 
 
 @google_token_required
-def send_email_logic(access_token, to, subject, body, is_html=True, cc=None, bcc=None):
+def send_email_logic(access_token, to, subject, body, is_html=True, cc=None, bcc=None, attachments=None):
     """Helper function to send email using Google access token"""
     gmail_service = GmailService(access_token)
     return gmail_service.send_message(
@@ -427,6 +520,7 @@ def send_email_logic(access_token, to, subject, body, is_html=True, cc=None, bcc
         subject=subject,
         body=body,
         is_html=is_html,
+        attachments=attachments or [],
     )
 
 
@@ -438,3 +532,9 @@ def mark_read_logic(access_token, message_id, is_read):
         return gmail_service.mark_as_read(message_id)
     else:
         return gmail_service.mark_as_unread(message_id)
+
+
+@google_token_required
+def get_attachment_logic(access_token, message_id: str, attachment_id: str, filename: str, mime_type: str):
+    gmail_service = GmailService(access_token)
+    return gmail_service.get_attachment(message_id, attachment_id, filename, mime_type)

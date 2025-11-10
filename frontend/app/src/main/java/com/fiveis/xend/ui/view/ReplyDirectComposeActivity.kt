@@ -23,6 +23,7 @@ import com.fiveis.xend.ui.compose.SendMailViewModel
 import com.fiveis.xend.ui.compose.TemplateSelectionScreen
 import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.XendTheme
+import com.fiveis.xend.utils.EmailUtils
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,7 +44,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         val generatedBody = intent.getStringExtra("generated_body") ?: ""
 
         // 이메일 주소 추출 ("이름 <email@example.com>" 형식에서 이메일만 추출)
-        val recipientEmail = extractEmailAddress(recipientEmailRaw)
+        val recipientEmail = EmailUtils.extractEmailAddress(recipientEmailRaw)
 
         setContent {
             XendTheme {
@@ -84,14 +85,6 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 // Enable/disable realtime mode
                 LaunchedEffect(aiRealtime) {
                     composeVm.enableRealtimeMode(aiRealtime)
-                }
-
-                // Set recipient context for AI (답장이므로 원본 메일 정보 포함)
-                LaunchedEffect(recipientEmail, originalBody) {
-                    composeVm.setRecipientContext(
-                        emails = listOf(recipientEmail),
-                        replyBody = originalBody
-                    )
                 }
 
                 // Monitor text changes for realtime suggestions
@@ -248,15 +241,5 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    /**
-     * 이메일 주소 추출 헬퍼 함수
-     * "이름 <email@example.com>" 또는 "<email@example.com>" 형식에서 이메일만 추출
-     */
-    private fun extractEmailAddress(emailString: String): String {
-        val regex = "<([^>]+)>".toRegex()
-        val match = regex.find(emailString)
-        return match?.groupValues?.get(1)?.trim() ?: emailString.trim()
     }
 }

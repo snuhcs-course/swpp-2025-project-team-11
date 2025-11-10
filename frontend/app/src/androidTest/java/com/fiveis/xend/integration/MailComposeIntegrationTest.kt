@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
+import com.fiveis.xend.data.model.toMultipartParts
 import com.fiveis.xend.data.repository.MailSendRepository
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.MailComposeSseClient
@@ -69,16 +70,16 @@ class MailComposeIntegrationTest {
         )
 
         coEvery {
-            mailApiService.sendEmail(any())
+            mailApiService.sendEmail(parts = any())
         } returns Response.success(201, mockResponse)
 
-        val result = mailApiService.sendEmail(
-            MailSendRequest(
-                to = listOf("test@example.com"),
-                subject = "Test Subject",
-                body = "Test Body"
-            )
+        val request = MailSendRequest(
+            to = listOf("test@example.com"),
+            subject = "Test Subject",
+            body = "Test Body"
         )
+
+        val result = mailApiService.sendEmail(request.toMultipartParts())
 
         assertTrue(result.isSuccessful)
         assertEquals(201, result.code())
@@ -239,16 +240,16 @@ class MailComposeIntegrationTest {
         repository = MailSendRepository(context)
 
         coEvery {
-            mailApiService.sendEmail(any())
+            mailApiService.sendEmail(parts = any())
         } returns Response.error(400, mockk(relaxed = true))
 
-        val result = mailApiService.sendEmail(
-            MailSendRequest(
-                to = listOf("test@example.com"),
-                subject = "Test",
-                body = "Test"
-            )
+        val request = MailSendRequest(
+            to = listOf("test@example.com"),
+            subject = "Test",
+            body = "Test"
         )
+
+        val result = mailApiService.sendEmail(request.toMultipartParts())
 
         assertFalse(result.isSuccessful)
         assertEquals(400, result.code())
@@ -315,16 +316,16 @@ class MailComposeIntegrationTest {
         )
 
         coEvery {
-            mailApiService.sendEmail(any())
+            mailApiService.sendEmail(parts = any())
         } returns Response.success(201, mockResponse)
 
-        val result = mailApiService.sendEmail(
-            MailSendRequest(
-                to = listOf("test1@example.com", "test2@example.com", "test3@example.com"),
-                subject = "Test Subject",
-                body = "Test Body"
-            )
+        val request = MailSendRequest(
+            to = listOf("test1@example.com", "test2@example.com", "test3@example.com"),
+            subject = "Test Subject",
+            body = "Test Body"
         )
+
+        val result = mailApiService.sendEmail(request.toMultipartParts())
 
         assertTrue(result.isSuccessful)
         assertEquals("msg789", result.body()?.id)

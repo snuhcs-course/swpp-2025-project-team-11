@@ -43,17 +43,6 @@ services:
       bash -c "poetry run celery -A config.celery beat --loglevel=info"
     depends_on:
       - server
-
-  celery_flower:
-    build: *server-build
-    command: >
-      bash -c "poetry run celery -A config.celery flower --port=5555 --basic-auth=fiveis:fiveis"
-    ports:
-      - "5555:5555"
-    depends_on:
-      - server
-      - redis
-      - celery_worker
  
   nginx:
     image: nginx:1.27-alpine
