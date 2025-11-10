@@ -1,7 +1,10 @@
 package com.fiveis.xend.ui.compose
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
@@ -13,11 +16,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,11 +38,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatColorText
 import androidx.compose.material.icons.filled.FormatItalic
@@ -49,10 +48,8 @@ import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,15 +58,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -77,6 +72,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -106,15 +102,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.BuildConfig
+import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
+import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
+import com.fiveis.xend.network.RetrofitClient
+import com.fiveis.xend.ui.compose.common.AIActionRow
+import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
+import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.inbox.AddContactDialog
+import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.AddButtonText
-import com.fiveis.xend.ui.theme.BannerBorder
-import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.ComposeBackground
@@ -124,17 +126,20 @@ import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
-import com.fiveis.xend.ui.theme.UndoBorder
 import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditorDefaults
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class BannerState(val message: String, val type: BannerType, val autoDismiss: Boolean = false)
+data class BannerState(
+    val message: String,
+    val type: BannerType,
+    val autoDismiss: Boolean = false,
+    val actionText: String? = null,
+    val onActionClick: (() -> Unit)? = null
+)
 
 // ========================================================
 // Screen
@@ -206,6 +211,8 @@ fun EmailComposeScreen(
                             message = it.message,
                             type = it.type,
                             onDismiss = onDismissBanner,
+                            actionText = it.actionText,
+                            onActionClick = it.onActionClick,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(bottom = 16.dp)
@@ -214,11 +221,12 @@ fun EmailComposeScreen(
                 }
             }
 
-            ComposeActionRow(
+            AIActionRow(
                 isStreaming = isStreaming,
                 onUndo = onUndo,
                 onAiComplete = onAiComplete,
-                onStopStreaming = onStopStreaming
+                onStopStreaming = onStopStreaming,
+                aiCompleteEnabled = contacts.isNotEmpty()
             )
 
             SectionHeader("받는 사람")
@@ -246,10 +254,9 @@ fun EmailComposeScreen(
                 isRealtimeOn = aiRealtime,
                 onToggle = onAiRealtimeToggle
             )
-            RichTextEditorCard(
+            AIEnhancedRichTextEditor(
                 richTextState = richTextState,
                 isStreaming = isStreaming,
-                onTapComplete = onAiComplete,
                 suggestionText = suggestionText,
                 onAcceptSuggestion = onAcceptSuggestion
             )
@@ -374,106 +381,6 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun ComposeActionRow(
-    isStreaming: Boolean,
-    onUndo: () -> Unit,
-    onAiComplete: () -> Unit,
-    onStopStreaming: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 15.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedButton(
-            onClick = onUndo,
-            modifier = Modifier.size(width = 94.dp, height = 35.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, UndoBorder),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = UndoBorder,
-                disabledContentColor = UndoBorder.copy(alpha = 0.2f)
-            )
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Undo,
-                    contentDescription = "실행취소",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "실행취소",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF64748B)
-                    )
-                )
-            }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedVisibility(visible = isStreaming) {
-                OutlinedButton(
-                    onClick = onStopStreaming,
-
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, BannerBorder),
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    modifier = Modifier.size(width = 104.dp, height = 35.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = BannerText,
-                        disabledContentColor = BannerText.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = "중지", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "중지",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-            }
-            OutlinedButton(
-                onClick = onAiComplete,
-                modifier = Modifier.size(width = 96.dp, height = 35.dp),
-                enabled = !isStreaming,
-                contentPadding = PaddingValues(horizontal = 15.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Blue60),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Blue60,
-                    disabledContentColor = Blue60.copy(alpha = 0.4f)
-                )
-            ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    "AI 완성",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SectionHeader(text: String) {
     Text(
         text = text,
@@ -485,30 +392,6 @@ private fun SectionHeader(text: String) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
     )
-}
-
-@Composable
-private fun BodyHeader(isRealtimeOn: Boolean, onToggle: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "본문",
-            style = MaterialTheme.typography.titleSmall.copy(
-                color = Color(0xFF64748B),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        )
-        RealtimeToggleChip(
-            isChecked = isRealtimeOn,
-            onToggle = onToggle
-        )
-    }
 }
 
 @Composable
@@ -816,127 +699,6 @@ private fun RichTextEditorControls(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RichTextEditorCard(
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
-    isStreaming: Boolean,
-    onTapComplete: () -> Unit,
-    suggestionText: String = "",
-    onAcceptSuggestion: () -> Unit = {}
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeSurface
-    ) {
-        Column {
-            RichTextEditorControls(state = richTextState)
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                colors = RichTextEditorDefaults.richTextEditorColors(
-                    containerColor = Color.White
-                ),
-                placeholder = {
-                    Text(
-                        text = "내용을 입력하세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                    )
-                }
-            )
-
-            SuggestionPreviewPanel(
-                suggestionText = suggestionText
-            )
-
-            // "탭 완성" button now accepts the suggestion, and only appears when there is one.
-            if (suggestionText.isNotEmpty()) {
-                ComposeTapCompleteButton(onClick = onAcceptSuggestion)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestionPreviewPanel(suggestionText: String) {
-    if (suggestionText.isEmpty()) return
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-        ) {
-            Text(
-                text = suggestionText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = TextSecondary.copy(alpha = 0.75f),
-                    fontStyle = FontStyle.Italic
-                ),
-                modifier = Modifier.padding(14.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ComposeTapCompleteButton(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp, top = 8.dp),
-        horizontalArrangement = Arrangement.End
-    ) {
-        OutlinedButton(
-            onClick = onClick,
-            modifier = Modifier
-                .widthIn(min = 68.dp)
-                .height(28.dp),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, Color(0xFFC7D2FE)),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.White,
-                contentColor = Blue60
-            )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FlashOn,
-                    contentDescription = "탭 완성",
-                    tint = Blue60,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "탭 완성",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Blue60
-                    )
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun ErrorMessage(message: String) {
     Text(
@@ -1039,6 +801,12 @@ class ComposeVmFactory(
 // Activity: wire screen <-> ViewModel <-> SSE
 // ========================================================
 class MailComposeActivity : ComponentActivity() {
+
+    companion object {
+        const val REQUEST_CODE_COMPOSE = 1001
+        const val RESULT_DRAFT_SAVED = RESULT_FIRST_USER + 1
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -1080,19 +848,12 @@ class MailComposeActivity : ComponentActivity() {
                 var subject by rememberSaveable { mutableStateOf("") }
                 val richTextState = rememberRichTextState()
 
+                // Draft loading states
+                var showLoadDraftDialog by remember { mutableStateOf(false) }
+                var loadedDraft: DraftItem? by remember { mutableStateOf(null) }
+
                 var contacts by remember { mutableStateOf(emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
-
-                // When the underlying known contacts change, refresh the chips
-                LaunchedEffect(knownByEmail) {
-                    // Only run if there are temporary contacts that might need an update
-                    if (contacts.any { it.id < 0 }) {
-                        val updatedContacts = contacts.map { existingChip ->
-                            knownByEmail[existingChip.email.trim().lowercase()] ?: existingChip
-                        }
-                        contacts = updatedContacts
-                    }
-                }
 
                 var showTemplateScreen by remember { mutableStateOf(false) }
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
@@ -1121,11 +882,62 @@ class MailComposeActivity : ComponentActivity() {
                 var groups by remember { mutableStateOf<List<Group>>(emptyList()) }
                 val coroutineScope = rememberCoroutineScope()
 
-                // Load groups
+                // Save Draft Dialog states
+                var showSaveDraftDialog by remember { mutableStateOf(false) }
+                var draftSubjectToSave by remember { mutableStateOf("") }
+                var draftBodyToSave by remember { mutableStateOf("") }
+
+                // Repositories
                 val contactRepository = remember { ContactBookRepository(application.applicationContext) }
+                val inboxRepository = remember {
+                    InboxRepository(
+                        mailApiService = RetrofitClient.getMailApiService(application.applicationContext),
+                        emailDao = AppDatabase.getDatabase(application.applicationContext).emailDao()
+                    )
+                }
                 LaunchedEffect(Unit) {
                     contactRepository.observeGroups().collect { loadedGroups ->
                         groups = loadedGroups
+                    }
+                }
+
+                // Check for existing draft for the first recipient
+                LaunchedEffect(contacts) {
+                    val firstRecipientEmail = contacts.firstOrNull()?.email
+                    if (firstRecipientEmail != null) {
+                        val draft = inboxRepository.getDraftByRecipient(firstRecipientEmail)
+                        if (draft != null) {
+                            loadedDraft = draft
+                            showLoadDraftDialog = true
+                        }
+                    }
+                }
+
+                // Handle back press to show save draft dialog
+                val onBackPressedCallback = remember {
+                    object : OnBackPressedCallback(true) {
+                        override fun handleOnBackPressed() {
+                            Log.d("SaveDraftDebug", "Back button pressed in MailComposeActivity.")
+                            // Check if there's content to save
+                            val hasContent = subject.isNotBlank() || richTextState.annotatedString.text.isNotBlank()
+                            val hasRecipient = contacts.isNotEmpty() // Check for recipients
+                            Log.d("SaveDraftDebug", "hasContent: $hasContent, hasRecipient: $hasRecipient")
+                            if (hasContent && hasRecipient) { // Only show dialog if there's content AND a recipient
+                                draftSubjectToSave = subject
+                                draftBodyToSave = richTextState.toHtml()
+                                showSaveDraftDialog = true
+                                Log.d("SaveDraftDebug", "showSaveDraftDialog set to true.")
+                            } else {
+                                Log.d("SaveDraftDebug", "No content or no recipient, finishing activity.")
+                                finish()
+                            }
+                        }
+                    }
+                }
+                DisposableEffect(onBackPressedCallback) {
+                    onBackPressedDispatcher.addCallback(onBackPressedCallback)
+                    onDispose {
+                        onBackPressedCallback.remove()
                     }
                 }
 
@@ -1138,7 +950,7 @@ class MailComposeActivity : ComponentActivity() {
                     composeVm.enableRealtimeMode(aiRealtime)
                 }
 
-                // Sync state from AI ViewModel to local state
+// Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
@@ -1153,14 +965,34 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
-                // Show snackbar for send results
-                val snackHost = remember { SnackbarHostState() }
-                LaunchedEffect(sendUi.lastSuccessMsg, sendUi.error) {
-                    sendUi.lastSuccessMsg?.let { snackHost.showSnackbar(it) }
-                    sendUi.error?.let { snackHost.showSnackbar("전송 실패: $it") }
+                // Update banner state for send results
+                LaunchedEffect(sendUi.lastSuccessMsg) {
+                    sendUi.lastSuccessMsg?.let {
+                        bannerState = BannerState(
+                            message = "메일 전송에 성공했습니다.",
+                            type = BannerType.SUCCESS,
+                            actionText = "홈 화면 이동하기",
+                            onActionClick = {
+                                // Navigate to MailActivity
+                                val intent = Intent(this@MailComposeActivity, MailActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                startActivity(intent)
+                                finish()
+                            }
+                        )
+                    }
                 }
 
-                Scaffold(snackbarHost = { SnackbarHost(snackHost) }) { innerPadding ->
+                LaunchedEffect(sendUi.error) {
+                    sendUi.error?.let {
+                        bannerState = BannerState(
+                            message = "메일 전송에 실패했습니다. 다시 시도해주세요.",
+                            type = BannerType.ERROR
+                        )
+                    }
+                }
+
+                Scaffold { innerPadding ->
                     if (showTemplateScreen) {
                         // 템플릿 선택 화면
                         TemplateSelectionScreen(
@@ -1187,7 +1019,8 @@ class MailComposeActivity : ComponentActivity() {
                             isStreaming = composeUi.isStreaming,
                             error = composeUi.error,
                             sendUiState = sendUi,
-                            onBack = { finish() },
+                            // Trigger our custom back press handling
+                            onBack = { onBackPressedDispatcher.onBackPressed() },
                             onTemplateClick = { showTemplateScreen = true },
                             onUndo = {
                                 composeVm.undo()?.let { snapshot ->
@@ -1200,9 +1033,8 @@ class MailComposeActivity : ComponentActivity() {
                                 // 전체 추천 문장 적용
                                 val suggestion = composeUi.suggestionText
                                 if (suggestion.isNotEmpty()) {
-                                    val insertionIndex = with(richTextState.selection) {
-                                        if (reversed) start else end
-                                    }
+                                    // Use max for insertion point
+                                    val insertionIndex = richTextState.selection.max
                                     val currentText = richTextState.annotatedString.text
                                     val previousChar = currentText.getOrNull(insertionIndex - 1)
 
@@ -1315,6 +1147,68 @@ class MailComposeActivity : ComponentActivity() {
                                 )
                             }
                         }
+
+                        // Show Save Draft Confirmation Dialog
+                        if (showSaveDraftDialog) {
+                            SaveDraftConfirmationDialog(
+                                onDismiss = { showSaveDraftDialog = false },
+                                onSave = {
+                                    coroutineScope.launch {
+                                        val draftId = inboxRepository.saveDraft(
+                                            DraftItem(
+                                                subject = draftSubjectToSave,
+                                                body = draftBodyToSave,
+                                                recipients = contacts.map { it.email }
+                                            )
+                                        )
+                                        // Optionally show a banner for draft saved
+                                        bannerState = BannerState(
+                                            message = "임시 저장되었습니다. (ID: $draftId)",
+                                            type = BannerType.INFO,
+                                            autoDismiss = true
+                                        )
+                                        showSaveDraftDialog = false
+                                        setResult(RESULT_DRAFT_SAVED, Intent()) // Set result for parent activity
+                                        finish()
+                                    }
+                                },
+                                onDiscard = {
+                                    showSaveDraftDialog = false
+                                    finish()
+                                }
+                            )
+                        }
+
+                        // Show Load Draft Confirmation Dialog
+                        if (showLoadDraftDialog) {
+                            LoadDraftConfirmationDialog(
+                                onDismiss = { showLoadDraftDialog = false },
+                                onLoad = {
+                                    loadedDraft?.let { draft ->
+                                        subject = draft.subject
+                                        richTextState.setHtml(draft.body)
+                                        // Populate contacts from draft recipients
+                                        contacts = draft.recipients.map { email ->
+                                            val normalized = email.trim().lowercase()
+                                            knownByEmail[normalized]
+                                                ?: Contact(id = -1L, name = email, email = email, group = null)
+                                        }
+                                        coroutineScope.launch {
+                                            inboxRepository.deleteDraft(draft.id) // Delete loaded draft
+                                        }
+                                    }
+                                    showLoadDraftDialog = false
+                                },
+                                onDiscard = {
+                                    coroutineScope.launch {
+                                        loadedDraft?.let { draft ->
+                                            inboxRepository.deleteDraft(draft.id) // Delete discarded draft
+                                        }
+                                    }
+                                    showLoadDraftDialog = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1352,4 +1246,47 @@ private fun EmailComposePreview() {
             onDismissBanner = {}
         )
     }
+}
+
+@Composable
+private fun SaveDraftConfirmationDialog(onDismiss: () -> Unit, onSave: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("메일 임시 저장") },
+        text = { Text("작성 중인 메일 내용이 있습니다. 임시 저장하시겠습니까?") },
+        confirmButton = {
+            TextButton(onClick = onSave) {
+                Text("임시 저장")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDiscard) {
+                    Text("삭제")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("취소")
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun LoadDraftConfirmationDialog(onDismiss: () -> Unit, onLoad: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("임시 저장된 메일 불러오기") },
+        text = { Text("이전에 작성하던 메일이 있습니다. 불러오시겠습니까?") },
+        confirmButton = {
+            TextButton(onClick = onLoad) {
+                Text("불러오기")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소")
+            }
+        }
+    )
 }

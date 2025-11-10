@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -58,7 +57,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.ui.theme.AddButtonBackground
-import com.fiveis.xend.ui.theme.BackgroundGray
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray200
@@ -168,16 +166,16 @@ fun AddContactScreen(
                     ) { Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
             )
-        },
-        bottomBar = {
-            Column {
-                Divider(color = BackgroundGray, thickness = 1.dp)
-                BottomNavBar(
-                    selected = "contacts",
-                    onSelect = onBottomNavChange
-                )
-            }
         }
+//        bottomBar = {
+//            Column {
+//                Divider(color = BackgroundGray, thickness = 1.dp)
+//                BottomNavBar(
+//                    selected = "contacts",
+//                    onSelect = onBottomNavChange
+//                )
+//            }
+//        }
     ) { padding ->
         Column(
             modifier = Modifier

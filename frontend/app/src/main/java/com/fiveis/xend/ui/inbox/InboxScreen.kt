@@ -34,10 +34,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
@@ -95,26 +95,39 @@ fun InboxScreen(
 ) {
     val listState = rememberLazyListState()
 
-    // 스크롤 방향 감지
+    // 스크롤 상태 감지
     var showBottomBar by remember { mutableStateOf(true) }
-    var previousIndex by remember { mutableStateOf(0) }
-    var previousScrollOffset by remember { mutableStateOf(0) }
 
     LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.isScrollInProgress
+        }.collect { isScrolling ->
+            // 스크롤이 멈추면 항상 네비게이션 바 표시
+            if (!isScrolling) {
+                showBottomBar = true
+            }
+        }
+    }
+
+    LaunchedEffect(listState) {
+        var previousIndex = 0
+        var previousScrollOffset = 0
+
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (currentIndex, currentOffset) ->
             // 맨 위에 있을 때는 항상 표시
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
-            } else {
-                // 스크롤 방향 감지
+            } else if (listState.isScrollInProgress) {
+                // 스크롤 중일 때만 방향 감지
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
 
+                // 아래로 스크롤 중이면 숨기기
                 showBottomBar = !isScrollingDown
             }
 
@@ -207,7 +220,8 @@ fun InboxScreen(
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
                         listState = listState,
-                        contactEmails = uiState.contactEmails
+                        contactEmails = uiState.contactEmails,
+                        contactsByEmail = uiState.contactsByEmail
                     )
                 }
             }
@@ -331,7 +345,8 @@ private fun EmailList(
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
     listState: androidx.compose.foundation.lazy.LazyListState,
-    contactEmails: Set<String>
+    contactEmails: Set<String>,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -348,7 +363,8 @@ private fun EmailList(
                     item = item,
                     onClick = { onEmailClick(item) },
                     onAddContactClick = onAddContactClick,
-                    contactEmails = contactEmails
+                    contactEmails = contactEmails,
+                    contactsByEmail = contactsByEmail
                 )
                 HorizontalDivider(
                     modifier = Modifier,
@@ -423,10 +439,24 @@ fun EmailListContent(
     isLoadingMore: Boolean,
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
-    contactEmails: Set<String>
+    onScrollStopped: () -> Unit = {},
+    contactEmails: Set<String>,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     val listState = rememberLazyListState()
 
+    // 스크롤 멈춤 감지
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.isScrollInProgress
+        }.collect { isScrolling ->
+            if (!isScrolling) {
+                onScrollStopped()
+            }
+        }
+    }
+
+    // 스크롤 위치 변경 감지
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
@@ -453,7 +483,8 @@ fun EmailListContent(
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
             listState = listState,
-            contactEmails = contactEmails
+            contactEmails = contactEmails,
+            contactsByEmail = contactsByEmail
         )
     }
 }
@@ -463,11 +494,15 @@ private fun EmailRow(
     item: EmailItem,
     onClick: () -> Unit,
     onAddContactClick: (EmailItem) -> Unit,
-    contactEmails: Set<String>
+    contactEmails: Set<String>,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     // Extract email from "Name <email>" format
     val senderEmail = extractSenderEmailFromRow(item.fromEmail)
     val isContact = senderEmail.lowercase() in contactEmails
+
+    // Use contact name if available, otherwise use original sender name
+    val displayName = contactsByEmail[senderEmail.lowercase()] ?: extractSenderName(item.fromEmail)
 
     Box(
         modifier = Modifier
@@ -506,7 +541,7 @@ private fun EmailRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = extractSenderName(item.fromEmail),
+                            text = displayName,
                             color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -522,7 +557,7 @@ private fun EmailRow(
                                 modifier = Modifier.size(20.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.PersonAdd,
+                                    imageVector = Icons.Filled.PersonAdd,
                                     contentDescription = "연락처 추가",
                                     tint = Blue80,
                                     modifier = Modifier.size(18.dp)
@@ -648,27 +683,27 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
 private fun formatDisplayDate(isoDate: String): String {
     return try {
         // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
-        val parsedDateTime = java.time.OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+        val parsedDateTime = OffsetDateTime.parse(isoDate)
+            .atZoneSameInstant(ZoneId.systemDefault())
 
-        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        val today = LocalDate.now(ZoneId.systemDefault())
         val emailDate = parsedDateTime.toLocalDate()
 
         // 2. 조건에 따라 다른 형식으로 변환
         when {
             // 오늘 받은 메일이면 시간만 표시
             emailDate.isEqual(today) -> {
-                java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
                     .format(parsedDateTime)
             }
             // 올해 받은 메일이면 월/일만 표시
             emailDate.year == today.year -> {
-                val formatter = java.time.format.DateTimeFormatter.ofPattern("M월 d일", java.util.Locale.KOREAN)
+                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
                 formatter.format(parsedDateTime)
             }
             // 작년 또는 그 이전 메일이면 연/월/일 표시
             else -> {
-                java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.SHORT)
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
                     .format(parsedDateTime)
             }
         }

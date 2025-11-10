@@ -2,6 +2,7 @@ package com.fiveis.xend.data.repository
 
 import android.util.Log
 import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
@@ -129,5 +130,26 @@ class InboxRepository(
         emailDao.insertEmails(emails)
         val count = emailDao.getEmailCount()
         Log.d("InboxRepository", "saveEmailsToCache: total emails in DB = $count")
+    }
+
+    // Drafts operations
+    suspend fun saveDraft(draft: DraftItem): Long {
+        return emailDao.insertDraft(draft)
+    }
+
+    suspend fun getDraft(id: Long): DraftItem? {
+        return emailDao.getDraft(id)
+    }
+
+    suspend fun getDraftByRecipient(recipientEmail: String): DraftItem? {
+        return emailDao.getDraftByRecipient(recipientEmail)
+    }
+
+    fun getAllDrafts(): Flow<List<DraftItem>> {
+        return emailDao.getAllDrafts()
+    }
+
+    suspend fun deleteDraft(id: Long) {
+        emailDao.deleteDraft(id)
     }
 }

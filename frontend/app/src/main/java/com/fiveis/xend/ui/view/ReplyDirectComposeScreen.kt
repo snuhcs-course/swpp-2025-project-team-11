@@ -67,11 +67,9 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +84,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.ui.compose.common.AIActionRow
+import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
+import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
@@ -114,30 +115,24 @@ fun ReplyDirectComposeScreen(
     senderEmail: String = "",
     date: String = "",
     originalBody: String = "",
-    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState()
+    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState(),
+    // AI 관련 파라미터
+    isStreaming: Boolean = false,
+    suggestionText: String = "",
+    aiRealtime: Boolean = true,
+    onUndo: () -> Unit = {},
+    onAiComplete: () -> Unit = {},
+    onStopStreaming: () -> Unit = {},
+    onAcceptSuggestion: () -> Unit = {},
+    onAiRealtimeToggle: (Boolean) -> Unit = {},
+    bannerState: com.fiveis.xend.ui.compose.BannerState? = null,
+    onDismissBanner: () -> Unit = {}
 ) {
-    var isRealtimeAiOn by rememberSaveable { mutableStateOf(true) }
-    var isStreaming by rememberSaveable { mutableStateOf(false) }
     var isMailContentExpanded by remember { mutableStateOf(false) }
-
-    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
-
-    // 전송 상태 처리
-    LaunchedEffect(sendUiState) {
-        when {
-            sendUiState.lastSuccessMsg != null -> {
-                snackbarHostState.showSnackbar(sendUiState.lastSuccessMsg)
-            }
-            sendUiState.error != null -> {
-                snackbarHostState.showSnackbar("전송 실패: ${sendUiState.error}")
-            }
-        }
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = ComposeBackground,
-        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
             TopAppBar(
@@ -218,12 +213,34 @@ fun ReplyDirectComposeScreen(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
         ) {
+            // Banner for send results
+            androidx.compose.animation.AnimatedVisibility(visible = bannerState != null) {
+                bannerState?.let {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        com.fiveis.xend.ui.compose.Banner(
+                            message = it.message,
+                            type = it.type,
+                            onDismiss = onDismissBanner,
+                            actionText = it.actionText,
+                            onActionClick = it.onActionClick,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(bottom = 16.dp)
+                        )
+                    }
+                }
+            }
+
             // Action Row (실행취소 + AI 완성)
-            DirectComposeActionRow(
+            AIActionRow(
                 isStreaming = isStreaming,
-                onUndo = { /* TODO */ },
-                onAiComplete = { /* TODO */ },
-                onStopStreaming = { isStreaming = false }
+                onUndo = onUndo,
+                onAiComplete = onAiComplete,
+                onStopStreaming = onStopStreaming,
+                aiCompleteEnabled = recipientEmail.isNotEmpty()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -269,16 +286,17 @@ fun ReplyDirectComposeScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // 본문 헤더 + 실시간 AI 토글
-            DirectComposeBodyHeader(
-                isRealtimeOn = isRealtimeAiOn,
-                onToggle = { isRealtimeAiOn = it }
+            BodyHeader(
+                isRealtimeOn = aiRealtime,
+                onToggle = onAiRealtimeToggle
             )
 
-            // Rich Text Editor
-            DirectComposeRichTextEditorCard(
+            // Rich Text Editor with AI
+            AIEnhancedRichTextEditor(
                 richTextState = richTextState,
                 isStreaming = isStreaming,
-                onTapComplete = { /* TODO */ }
+                suggestionText = suggestionText,
+                onAcceptSuggestion = onAcceptSuggestion
             )
         }
     }

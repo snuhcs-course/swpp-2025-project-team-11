@@ -1,10 +1,8 @@
 package com.fiveis.xend.ui.inbox
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.InsertChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -53,8 +50,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Group
-import com.fiveis.xend.ui.compose.Banner
-import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.contactbook.RoleInputMode
 import com.fiveis.xend.ui.contactbook.recipientRoleOptionExamples
 import com.fiveis.xend.ui.contactbook.senderRoleOptionExamples
@@ -105,7 +100,6 @@ fun AddContactDialog(
     var personalPrompt by rememberSaveable { mutableStateOf("") }
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
-    var showInfoBanner by rememberSaveable { mutableStateOf(true) }
 
     val savable = name.isNotBlank()
 
@@ -150,69 +144,25 @@ fun AddContactDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // AI 분석 안내 배너
-                if (showInfoBanner) {
-                    Banner(
-                        message = "AI 분석을 하시면 과거 주고 받은 메일을 분석하여 더 향상된 AI 메일 생성이 가능합니다",
-                        type = BannerType.INFO,
-                        onDismiss = { showInfoBanner = false },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(16.dp))
-                }
-
                 // Content - Scrollable
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Avatar + Email + Analyze Button
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = senderName,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = senderEmail,
-                                fontSize = 13.sp,
-                                color = Gray600
-                            )
-                        }
-
-                        Spacer(Modifier.width(12.dp))
-
-                        // AI 분석 버튼
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = { /* TODO: 기능 구현 예정 */ },
-                            modifier = Modifier.height(36.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White,
-                                contentColor = Purple60
-                            ),
-                            border = BorderStroke(1.dp, Purple60),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.InsertChart,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = Purple60
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "AI 분석",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    // 이름 + 이메일
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = senderName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = senderEmail,
+                            fontSize = 13.sp,
+                            color = Gray600
+                        )
                     }
 
                     Spacer(Modifier.height(20.dp))
@@ -269,7 +219,7 @@ fun AddContactDialog(
                         ) {
                             OutlinedTextField(
                                 value = when (senderMode) {
-                                    RoleInputMode.PRESET -> senderPreset ?: "관계 선택"
+                                    RoleInputMode.PRESET -> senderPreset ?: "나"
                                     RoleInputMode.MANUAL -> directInputLabel
                                 },
                                 onValueChange = {},
@@ -329,7 +279,7 @@ fun AddContactDialog(
                         ) {
                             OutlinedTextField(
                                 value = when (recipientMode) {
-                                    RoleInputMode.PRESET -> recipientPreset ?: "관계 선택"
+                                    RoleInputMode.PRESET -> recipientPreset ?: "상대방"
                                     RoleInputMode.MANUAL -> directInputLabel
                                 },
                                 onValueChange = {},

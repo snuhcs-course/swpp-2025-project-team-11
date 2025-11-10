@@ -7,6 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
@@ -26,12 +29,28 @@ import com.fiveis.xend.ui.search.SearchActivity
 import com.fiveis.xend.ui.sent.SentViewModel
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.ui.view.MailDetailActivity
+import com.fiveis.xend.utils.EmailUtils
 
 class MailActivity : ComponentActivity() {
+
+    companion object {
+        const val REQUEST_CODE_COMPOSE = 1001
+    }
+
+    private val inboxViewModel: InboxViewModel by viewModels { InboxViewModelFactory(this.applicationContext) }
+    private lateinit var composeLauncher: ActivityResultLauncher<Intent> // Declare launcher
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        composeLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == MailComposeActivity.RESULT_DRAFT_SAVED) {
+                inboxViewModel.showDraftSavedBanner()
+            }
+        }
 
         onBackPressedDispatcher.addCallback(
             this,
@@ -45,9 +64,7 @@ class MailActivity : ComponentActivity() {
 
         setContent {
             XendTheme {
-                val inboxViewModel: InboxViewModel = viewModel(
-                    factory = InboxViewModelFactory(this.applicationContext)
-                )
+                // Use already initialized ViewModel
                 val sentViewModel: SentViewModel = viewModel(
                     factory = SentViewModelFactory(this.applicationContext)
                 )
@@ -70,7 +87,7 @@ class MailActivity : ComponentActivity() {
                         startActivity(Intent(this, SearchActivity::class.java))
                     },
                     onFabClick = {
-                        startActivity(Intent(this@MailActivity, MailComposeActivity::class.java))
+                        composeLauncher.launch(Intent(this@MailActivity, MailComposeActivity::class.java))
                     },
                     onInboxRefresh = inboxViewModel::refreshEmails,
                     onInboxLoadMore = inboxViewModel::loadMoreEmails,
@@ -86,14 +103,16 @@ class MailActivity : ComponentActivity() {
                     },
                     onDismissSuccessBanner = {
                         inboxViewModel.dismissSuccessBanner()
-                    }
+                    },
+                    showDraftSavedBanner = inboxViewModel.uiState.value.showDraftSavedBanner,
+                    onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner
                 )
 
                 if (inboxUiState.showAddContactDialog) {
                     inboxUiState.selectedEmailForContact?.let { email ->
                         AddContactDialog(
-                            senderName = extractSenderName(email.fromEmail),
-                            senderEmail = extractSenderEmail(email.fromEmail),
+                            senderName = EmailUtils.extractSenderName(email.fromEmail),
+                            senderEmail = EmailUtils.extractEmailAddress(email.fromEmail),
                             groups = inboxUiState.groups,
                             onDismiss = { inboxViewModel.dismissAddContactDialog() },
                             onConfirm = { name, emailAddr, senderRole, recipientRole, personalPrompt, groupId ->
@@ -126,20 +145,6 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
-}
-
-private fun extractSenderName(fromEmail: String): String {
-    val nameRegex = "(.+?)\\s*<".toRegex()
-    val matchResult = nameRegex.find(fromEmail)
-    val name = matchResult?.groupValues?.get(1)?.trim()
-        ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
-    return name.trim('"', '\'')
-}
-
-private fun extractSenderEmail(fromEmail: String): String {
-    val emailRegex = "<(.+?)>".toRegex()
-    val matchResult = emailRegex.find(fromEmail)
-    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
 }
 
 class SentViewModelFactory(private val context: Context) : ViewModelProvider.Factory {

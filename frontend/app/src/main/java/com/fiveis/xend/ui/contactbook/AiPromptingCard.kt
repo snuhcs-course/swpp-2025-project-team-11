@@ -6,23 +6,27 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -40,11 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fiveis.xend.data.model.PromptOption
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -87,20 +93,49 @@ typealias AddPromptOptionHandler = (
 
 /**
  * ===== 메인 카드 + "수정" 버튼 =====
- * “선택된 설정 조합” 영역을 구성.
+ * “선택된 프롬프트 조합” 영역을 구성.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AiPromptingCard(
     modifier: Modifier = Modifier,
+    selectedState: PromptingUiState = PromptingUiState(),
     onValueChange: (PromptingUiState) -> Unit,
     allToneOptions: List<PromptOption> = emptyList(),
     allFormatOptions: List<PromptOption> = emptyList(),
     onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> }
 ) {
-    var uiState by remember { mutableStateOf(PromptingUiState()) }
+    val thresholdFraction = 0.20f
+
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+
+    // 드래그 중 시트의 현재 오프셋 추적
+    var lastOffsetPx by rememberSaveable { mutableStateOf(0f) }
+
+    var uiState by remember { mutableStateOf(selectedState) }
+
+    LaunchedEffect(selectedState) {
+        uiState = selectedState
+    }
     var showSheet by rememberSaveable { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target ->
+            if (target == androidx.compose.material3.SheetValue.Hidden) {
+                lastOffsetPx >= screenHeightPx * thresholdFraction
+            } else {
+                true
+            }
+        }
+    )
+
+    LaunchedEffect(sheetState) {
+        snapshotFlow { runCatching { sheetState.requireOffset() }.getOrDefault(0f) }
+            .collectLatest { lastOffsetPx = it }
+    }
+
     val scope = rememberCoroutineScope()
 
     var addDialogForKey: String? by remember { mutableStateOf(null) }
@@ -116,7 +151,7 @@ fun AiPromptingCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text("선택된 설정 조합", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("선택된 프롬프트 조합", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
             Spacer(Modifier.height(12.dp))
 
@@ -246,7 +281,7 @@ fun AiPromptingCard(
                     if (isAdding) {
                         CircularProgressIndicator(strokeWidth = 2.dp)
                     } else {
-                        Text("저장")
+                        Text("추가")
                     }
                 }
             },
@@ -270,7 +305,7 @@ private fun SummaryChip(label: String) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.titleSmall
         )
     }
 }
@@ -294,93 +329,95 @@ fun PromptingBottomSheet(
     onSelectionChange: (PromptingUiState) -> Unit,
     onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> }
 ) {
-    val scope = rememberCoroutineScope()
-
     var selectedTone by remember { mutableStateOf(initial.selectedTone) }
     var selectedFormat by remember { mutableStateOf(initial.selectedFormat) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = {}
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Text("AI 프롬프팅 설정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(
-                "그룹의 커뮤니케이션 스타일을 설정합니다",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-//            Spacer(Modifier.height(20.dp))
-//
-//            Section(
-//                title = "상황 인식 프롬프트",
-//                description = "그룹의 성격과 상황을 설정합니다",
-//                options = contextOptions,
-//                selected = selectedContext,
-//                onToggle = { id ->
-//                    selectedContext = selectedContext.toggle(id)
-//                }
-//            )
-
-            Spacer(Modifier.height(12.dp))
-            Divider()
-            Spacer(Modifier.height(12.dp))
-
-            Section(
-                title = "문체 스타일 프롬프트",
-                description = "메일의 말투와 문체를 설정합니다",
-                options = allToneOptions,
-                selected = selectedTone,
-                onToggle = { id ->
-                    selectedTone = selectedTone.toggle(id)
-                },
-                onAddNew = { onRequestAddNew("tone") },
-                onAddPromptOption = onAddPromptOption
-            )
-
-            Spacer(Modifier.height(12.dp))
-            Divider()
-            Spacer(Modifier.height(12.dp))
-
-            Section(
-                title = "형식 가이드 프롬프트",
-                description = "메일 구조와 포맷을 설정합니다",
-                options = allFormatOptions,
-                selected = selectedFormat,
-                onToggle = { id ->
-                    selectedFormat = selectedFormat.toggle(id)
-                },
-                onAddNew = { onRequestAddNew("format") },
-                onAddPromptOption = onAddPromptOption
-            )
-
-            Spacer(Modifier.height(20.dp))
-            // 하단 버튼
-            RowActionButtons(
-                onReset = {
-                    onReset()
-                    selectedTone = PromptingUiState().selectedTone
-                    selectedFormat = PromptingUiState().selectedFormat
-                    onSelectionChange(PromptingUiState())
-                },
-                onSave = {
-                    onSave(
-                        PromptingUiState(
-                            selectedTone = selectedTone,
-                            selectedFormat = selectedFormat
-                        )
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("AI 프롬프트 설정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "그룹의 커뮤니케이션 스타일을 설정합니다",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            )
-            Spacer(Modifier.height(24.dp))
-        }
-    }
+            }
 
-    // 처음 열 때 살짝 확장
-    LaunchedEffect(Unit) {
-        scope.launch { sheetState.expand() }
+            item { HorizontalDivider() }
+
+            item {
+                Section(
+                    title = "문체 스타일 프롬프트",
+                    description = "메일의 말투와 문체를 설정합니다",
+                    options = allToneOptions,
+                    selected = selectedTone,
+                    onToggle = { option ->
+                        selectedTone = selectedTone.toggle(option)
+                        onSelectionChange(
+                            PromptingUiState(
+                                selectedTone = selectedTone,
+                                selectedFormat = selectedFormat
+                            )
+                        )
+                    },
+                    onAddNew = { onRequestAddNew("tone") },
+                    onAddPromptOption = onAddPromptOption
+                )
+            }
+
+            item { HorizontalDivider() }
+
+            item {
+                Section(
+                    title = "형식 가이드 프롬프트",
+                    description = "메일의 구조와 포맷을 설정합니다",
+                    options = allFormatOptions,
+                    selected = selectedFormat,
+                    onToggle = { option ->
+                        selectedFormat = selectedFormat.toggle(option)
+                        onSelectionChange(
+                            PromptingUiState(
+                                selectedTone = selectedTone,
+                                selectedFormat = selectedFormat
+                            )
+                        )
+                    },
+                    onAddNew = { onRequestAddNew("format") },
+                    onAddPromptOption = onAddPromptOption
+                )
+            }
+
+            item {
+                RowActionButtons(
+                    onReset = {
+                        onReset()
+                        selectedTone = PromptingUiState().selectedTone
+                        selectedFormat = PromptingUiState().selectedFormat
+                        onSelectionChange(PromptingUiState())
+                    },
+                    onSave = {
+                        onSave(
+                            PromptingUiState(
+                                selectedTone = selectedTone,
+                                selectedFormat = selectedFormat
+                            )
+                        )
+                    }
+                )
+            }
+
+            item { Spacer(Modifier.height(8.dp)) }
+        }
     }
 }
 
@@ -422,9 +459,17 @@ private fun Section(
                 label = { Text(opt.name) },
                 leadingIcon = {
                     if (isSelected) {
-                        Icon(Icons.Filled.Check, contentDescription = null)
+                        Icon(
+                            Icons.Filled.CheckBox,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     } else {
-                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Icon(
+                            Icons.Filled.CheckBoxOutlineBlank,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             )
@@ -466,7 +511,11 @@ private fun Section(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Icon(
+                            Icons.Filled.CheckBoxOutlineBlank,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             )
@@ -484,16 +533,17 @@ private fun Section(
 
 @Composable
 private fun RowActionButtons(onReset: () -> Unit, onSave: () -> Unit) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedButton(onClick = onReset) { Text("초기화") }
-        Spacer(Modifier.width(12.dp))
+
         Button(
             onClick = onSave,
             modifier = Modifier.weight(1f)
-        ) { Text("설정 저장") }
+        ) { Text("저장") }
     }
 }
 

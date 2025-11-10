@@ -78,6 +78,9 @@ class ContactBookRepository(
 
     fun observeContact(id: Long): Flow<Contact?> = contactDao.observeByIdWithGroup(id).map { it?.asDomain() }
 
+    fun searchContacts(keyword: String): Flow<List<Contact>> =
+        contactDao.searchByNameOrEmail(keyword).map { list -> list.map { it.asDomain(null) } }
+
     // ----- DB 동기화(refresh) -----
 
     suspend fun refreshGroups() {
@@ -255,6 +258,38 @@ class ContactBookRepository(
         }
         // 로컬 반영 (crossRef는 FK onDelete에 따라 정리되지만, 안전하게 그룹만 지우기)
         groupDao.deleteById(groupId)
+    }
+
+    suspend fun updateGroup(
+        groupId: Long,
+        name: String? = null,
+        description: String? = null,
+        optionIds: List<Long>? = null
+    ): GroupResponse {
+        val payload = mutableMapOf<String, Any>()
+        if (name != null) payload["name"] = name
+        if (description != null) payload["description"] = description
+        if (optionIds != null) payload["option_ids"] = optionIds
+        require(payload.isNotEmpty()) { "updateGroup payload is empty" }
+
+        val response = api.updateGroup(groupId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update group info failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+        val updated = response.body() ?: error("Success but body null")
+
+        // 로컬 반영
+        db.withTransaction {
+            val (g, opts, refs) = updated.toEntities()
+            groupDao.upsertGroups(listOf(g))
+            optionDao.deleteCrossRefsByGroup(groupId)
+            if (opts.isNotEmpty()) optionDao.upsertOptions(opts)
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
+        }
+        return updated
     }
 
     suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
