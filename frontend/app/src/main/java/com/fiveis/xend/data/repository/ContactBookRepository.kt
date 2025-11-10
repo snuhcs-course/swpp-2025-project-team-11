@@ -190,7 +190,7 @@ class ContactBookRepository(
         personalPrompt: String?
     ): ContactResponse {
         val requestContext = AddContactRequestContext(
-            senderRole = senderRole ?: "Mail writer",
+            senderRole = senderRole ?: "",
             recipientRole = recipientRole,
             personalPrompt = personalPrompt ?: ""
         )
@@ -220,7 +220,7 @@ class ContactBookRepository(
     }
 
     suspend fun updateContactGroup(contactId: Long, groupId: Long) {
-        val payload = mapOf("group_id" to groupId)
+        val payload = mapOf<String, Any?>("group_id" to groupId)
         val response = api.updateContact(contactId, payload)
         if (!response.isSuccessful) {
             val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
@@ -228,8 +228,56 @@ class ContactBookRepository(
                 "Update contact group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
             )
         }
-        // 로컬 반영
-        contactDao.updateGroupId(contactId, groupId)
+        val body = response.body()
+        if (body != null) {
+            db.withTransaction {
+                val (contact, ctx) = body.toEntities()
+                contactDao.upsertContacts(listOf(contact))
+                ctx?.let { contactDao.upsertContexts(listOf(it)) }
+            }
+        } else {
+            refreshContact(contactId)
+        }
+    }
+
+    suspend fun updateContact(
+        contactId: Long,
+        name: String,
+        email: String,
+        senderRole: String?,
+        recipientRole: String?,
+        personalPrompt: String?,
+        groupId: Long?
+    ) {
+        val payload = mutableMapOf<String, Any?>(
+            "name" to name,
+            "email" to email,
+            "group_id" to groupId
+        )
+        val contextPayload = mutableMapOf<String, Any?>()
+        if (senderRole != null) contextPayload["sender_role"] = senderRole
+        if (recipientRole != null) contextPayload["recipient_role"] = recipientRole
+        if (personalPrompt != null) contextPayload["personal_prompt"] = personalPrompt
+        if (contextPayload.isNotEmpty()) {
+            payload["context"] = contextPayload
+        }
+        val response = api.updateContact(contactId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+        val body = response.body()
+        if (body != null) {
+            db.withTransaction {
+                val (contact, ctx) = body.toEntities()
+                contactDao.upsertContacts(listOf(contact))
+                ctx?.let { contactDao.upsertContexts(listOf(it)) }
+            }
+        } else {
+            refreshContact(contactId)
+        }
     }
 
     suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
