@@ -119,7 +119,6 @@ import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -792,9 +791,30 @@ class ComposeVmFactory(
 // Activity: wire screen <-> ViewModel <-> SSE
 // ========================================================
 class MailComposeActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_PREFILL_CONTACT_ID = "extra_prefill_contact_id"
+        const val EXTRA_PREFILL_CONTACT_NAME = "extra_prefill_contact_name"
+        const val EXTRA_PREFILL_CONTACT_EMAIL = "extra_prefill_contact_email"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val prefilledContact = intent?.let { incomingIntent ->
+            val email = incomingIntent.getStringExtra(EXTRA_PREFILL_CONTACT_EMAIL)?.trim().orEmpty()
+            if (email.isBlank()) {
+                null
+            } else {
+                val contactId = incomingIntent.getLongExtra(EXTRA_PREFILL_CONTACT_ID, -1L)
+                val contactName = incomingIntent.getStringExtra(EXTRA_PREFILL_CONTACT_NAME)
+                Contact(
+                    id = if (contactId >= 0) contactId else -1L,
+                    name = contactName?.takeIf { it.isNotBlank() } ?: email,
+                    email = email
+                )
+            }
+        }
 
         setContent {
             XendTheme {
@@ -833,7 +853,7 @@ class MailComposeActivity : ComponentActivity() {
                 var subject by rememberSaveable { mutableStateOf("") }
                 val richTextState = rememberRichTextState()
 
-                var contacts by remember { mutableStateOf(emptyList<Contact>()) }
+                var contacts by remember { mutableStateOf(prefilledContact?.let(::listOf) ?: emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
 
                 // When the underlying known contacts change, refresh the chips

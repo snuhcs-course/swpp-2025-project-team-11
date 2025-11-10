@@ -19,10 +19,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.PromptOption
 
@@ -49,7 +52,8 @@ fun ContactDetailScreen(
     uiState: ContactDetailUiState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onOpenGroup: (Long) -> Unit
+    onOpenGroup: (Long) -> Unit,
+    onComposeMail: (Contact) -> Unit
 ) {
     val contact = uiState.contact
 
@@ -63,7 +67,17 @@ fun ContactDetailScreen(
                         Icon(Icons.Filled.ArrowBack, contentDescription = "뒤로가기")
                     }
                 },
-                title = { Text("연락처 정보", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                title = { Text("연락처 정보", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(
+                        onClick = { contact?.let(onComposeMail) },
+                        enabled = contact != null
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 12.dp)) {
+                            Icon(Icons.Filled.Email, contentDescription = "메일 쓰기")
+                        }
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -136,9 +150,20 @@ fun ContactDetailScreen(
                 tonalElevation = 1.dp
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoRow("관계", contact.context?.recipientRole ?: "-")
-                    Divider()
-                    InfoRow("개인 프롬프트", contact.context?.personalPrompt ?: "-")
+                    Row {
+                        InfoRow(
+                            contact.name + " 님께 나는",
+                            contact.context?.senderRole ?: "-",
+                            modifier = Modifier.weight(1f)
+                        )
+                        InfoRow(
+                            "나에게 " + contact.name + " 님은",
+                            contact.context?.recipientRole ?: "-",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    HorizontalDivider()
+                    InfoRow("개인 프롬프트", contact.context?.personalPrompt.orEmpty())
                 }
             }
 
@@ -207,8 +232,8 @@ private fun TagChip(text: String) {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Column(Modifier.fillMaxWidth()) {
+private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
         Text(label, color = Color.Gray, fontSize = 12.sp)
         Spacer(Modifier.height(2.dp))
         Text(value, maxLines = 3, overflow = TextOverflow.Ellipsis)
