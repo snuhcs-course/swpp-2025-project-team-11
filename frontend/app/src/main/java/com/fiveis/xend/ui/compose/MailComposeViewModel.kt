@@ -102,17 +102,13 @@ class MailComposeViewModel(
                                 suggestionBuffer.append(" ")
                             }
                             suggestionBuffer.append(rawText)
-                        }
-                        "gpu.done" -> {
+
                             val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
                             val singleSentence = extractFirstSentence(parsed)
-
-                            suggestionBuffer.clear()
-                            if (singleSentence.isNotEmpty()) {
-                                suggestionBuffer.append(singleSentence)
-                            }
-
                             _ui.update { it.copy(suggestionText = singleSentence) }
+                        }
+                        "gpu.done" -> {
+                            suggestionBuffer.clear()
                         }
                     }
                 } catch (e: Exception) {
@@ -207,10 +203,17 @@ class MailComposeViewModel(
 
         if (normalized.isEmpty()) return ""
 
+<<<<<<< HEAD
         val terminatorIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
         val end = if (terminatorIndex == -1) normalized.length else terminatorIndex + 1
 
         return normalized.substring(0, end).trim()
+=======
+        val endIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
+        val cutoff = if (endIndex == -1) normalized.length else endIndex + 1
+
+        return normalized.substring(0, cutoff).trim()
+>>>>>>> 46c42d9 (fix: keep realtime suggestion to first sentence)
     }
 
     override fun onCleared() {
