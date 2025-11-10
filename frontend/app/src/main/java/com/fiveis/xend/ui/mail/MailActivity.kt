@@ -29,6 +29,7 @@ import com.fiveis.xend.ui.search.SearchActivity
 import com.fiveis.xend.ui.sent.SentViewModel
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.ui.view.MailDetailActivity
+import com.fiveis.xend.utils.EmailUtils
 
 class MailActivity : ComponentActivity() {
 
@@ -110,8 +111,8 @@ class MailActivity : ComponentActivity() {
                 if (inboxUiState.showAddContactDialog) {
                     inboxUiState.selectedEmailForContact?.let { email ->
                         AddContactDialog(
-                            senderName = extractSenderName(email.fromEmail),
-                            senderEmail = extractSenderEmail(email.fromEmail),
+                            senderName = EmailUtils.extractSenderName(email.fromEmail),
+                            senderEmail = EmailUtils.extractEmailAddress(email.fromEmail),
                             groups = inboxUiState.groups,
                             onDismiss = { inboxViewModel.dismissAddContactDialog() },
                             onConfirm = { name, emailAddr, senderRole, recipientRole, personalPrompt, groupId ->
@@ -144,20 +145,6 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
-}
-
-private fun extractSenderName(fromEmail: String): String {
-    val nameRegex = "(.+?)\\s*<".toRegex()
-    val matchResult = nameRegex.find(fromEmail)
-    val name = matchResult?.groupValues?.get(1)?.trim()
-        ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
-    return name.trim('"', '\'')
-}
-
-private fun extractSenderEmail(fromEmail: String): String {
-    val emailRegex = "<(.+?)>".toRegex()
-    val matchResult = emailRegex.find(fromEmail)
-    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail
 }
 
 class SentViewModelFactory(private val context: Context) : ViewModelProvider.Factory {

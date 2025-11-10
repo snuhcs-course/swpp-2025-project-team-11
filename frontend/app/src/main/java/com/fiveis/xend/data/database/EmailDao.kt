@@ -65,7 +65,9 @@ interface EmailDao {
     @Query("SELECT * FROM drafts WHERE id = :id")
     suspend fun getDraft(id: Long): DraftItem?
 
-    @Query("SELECT * FROM drafts WHERE recipients LIKE '%' || :recipientEmail || '%' ORDER BY timestamp DESC LIMIT 1")
+    @Query(
+        "SELECT * FROM drafts WHERE recipients LIKE '%\"' || :recipientEmail || '\"%' ORDER BY timestamp DESC LIMIT 1"
+    )
     suspend fun getDraftByRecipient(recipientEmail: String): DraftItem?
 
     @Query("SELECT * FROM drafts ORDER BY timestamp DESC")
