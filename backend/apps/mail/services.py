@@ -2,6 +2,7 @@
 
 import base64
 import datetime
+import html
 import logging
 import mimetypes
 from email import encoders
@@ -337,10 +338,10 @@ class GmailService:
             attachments = attachments or []
 
             if is_html:
-                html_body = body
+                html_body = html.unescape(body)
                 text_body = html_to_text(body)
             else:
-                text_body = body
+                text_body = html.unescape(body)
                 html_body = text_to_html(body)
 
             outer = MIMEMultipart("mixed")
