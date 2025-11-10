@@ -7,7 +7,6 @@ from typing import Any
 
 import pandas as pd
 from django.db.models import Prefetch
-from django.db.models.functions import Length
 from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFPlumberLoader, TextLoader
 
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
