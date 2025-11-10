@@ -86,14 +86,6 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     composeVm.enableRealtimeMode(aiRealtime)
                 }
 
-                // Set recipient context for AI (답장이므로 원본 메일 정보 포함)
-                LaunchedEffect(recipientEmail, originalBody) {
-                    composeVm.setRecipientContext(
-                        emails = listOf(recipientEmail),
-                        replyBody = originalBody
-                    )
-                }
-
                 // Monitor text changes for realtime suggestions
                 LaunchedEffect(richTextState.annotatedString.text) {
                     if (aiRealtime) {
