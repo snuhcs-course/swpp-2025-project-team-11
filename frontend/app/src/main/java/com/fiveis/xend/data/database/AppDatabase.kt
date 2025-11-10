@@ -147,7 +147,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * Migration from v3 to v4:
-         * - Create drafts table
+         * - Create drafts table with recipients column
          */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -156,6 +156,7 @@ abstract class AppDatabase : RoomDatabase() {
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         `subject` TEXT NOT NULL,
                         `body` TEXT NOT NULL,
+                        `recipients` TEXT NOT NULL,
                         `timestamp` INTEGER NOT NULL
                     )"""
                 )
