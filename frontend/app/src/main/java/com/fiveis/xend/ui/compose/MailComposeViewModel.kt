@@ -33,8 +33,7 @@ class MailComposeViewModel(
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
 
-    private var recipientEmails: List<String> = emptyList()
-    private var replyToBody: String? = null
+    // Undo snapshot
     private var undoSnapshot: UndoSnapshot? = null
 
     data class UndoSnapshot(
@@ -135,11 +134,6 @@ class MailComposeViewModel(
         _ui.update { it.copy(suggestionText = "") }
     }
 
-    fun setRecipientContext(emails: List<String>, replyBody: String? = null) {
-        recipientEmails = emails
-        replyToBody = replyBody
-    }
-
     fun onTextChanged(currentText: String) {
         if (!_ui.value.isRealtimeEnabled) return
 
@@ -149,9 +143,9 @@ class MailComposeViewModel(
         debounceJob = viewModelScope.launch {
             delay(500)
             wsClient?.sendMessage(
+                systemPrompt = "메일 초안 작성",
                 text = currentText,
-                toEmails = recipientEmails,
-                body = replyToBody
+                maxTokens = 50
             )
         }
     }

@@ -950,25 +950,18 @@ class MailComposeActivity : ComponentActivity() {
                     composeVm.enableRealtimeMode(aiRealtime)
                 }
 
-                // Update recipient context for WebSocket
-                LaunchedEffect(contacts) {
-                    composeVm.setRecipientContext(
-                        emails = contacts.map { it.email }
-                    )
+// Sync state from AI ViewModel to local state
+                LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
+                LaunchedEffect(composeUi.bodyRendered) {
+                    if (composeUi.bodyRendered.isNotEmpty()) {
+                        richTextState.setHtml(composeUi.bodyRendered)
+                    }
                 }
 
                 // Monitor text changes for realtime suggestions
                 LaunchedEffect(richTextState.annotatedString.text) {
                     if (aiRealtime) {
                         composeVm.onTextChanged(richTextState.toHtml())
-                    }
-                }
-
-                // Sync state from AI ViewModel to local state
-                LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
-                LaunchedEffect(composeUi.bodyRendered) {
-                    if (composeUi.bodyRendered.isNotEmpty()) {
-                        richTextState.setHtml(composeUi.bodyRendered)
                     }
                 }
 
