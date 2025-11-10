@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
@@ -35,7 +36,7 @@ class MailActivity : ComponentActivity() {
         const val REQUEST_CODE_COMPOSE = 1001
     }
 
-    private lateinit var inboxViewModel: InboxViewModel // Declare as member variable
+    private val inboxViewModel: InboxViewModel by viewModels { InboxViewModelFactory(this.applicationContext) }
     private lateinit var composeLauncher: ActivityResultLauncher<Intent> // Declare launcher
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,10 +63,7 @@ class MailActivity : ComponentActivity() {
 
         setContent {
             XendTheme {
-                // Initialize member variable
-                inboxViewModel = viewModel(
-                    factory = InboxViewModelFactory(this.applicationContext)
-                )
+                // Use already initialized ViewModel
                 val sentViewModel: SentViewModel = viewModel(
                     factory = SentViewModelFactory(this.applicationContext)
                 )
