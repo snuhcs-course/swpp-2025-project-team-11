@@ -751,11 +751,11 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit, onAddToContacts: (() -> 
                     "${contact.name} (${contact.email})"
                 },
                 style =
-                    if (contact.id < 0L) {
-                        MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
-                    } else {
-                        MaterialTheme.typography.labelSmall.copy(color = Blue80)
-                    },
+                if (contact.id < 0L) {
+                    MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                } else {
+                    MaterialTheme.typography.labelSmall.copy(color = Blue80)
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
