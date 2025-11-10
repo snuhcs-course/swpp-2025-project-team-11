@@ -290,19 +290,18 @@ fun ContactDetailScreen(
         val trimmedName = editNameField.trim()
         val trimmedEmail = editEmailField.trim()
         val finalSenderRole = when (editSenderMode) {
-            RoleInputMode.PRESET -> editSenderPreset?.takeIf { it.isNotBlank() }
-            RoleInputMode.MANUAL -> editSenderManual.trim().takeIf { it.isNotBlank() }
-        }
+            RoleInputMode.PRESET -> editSenderPreset?.trim()
+            RoleInputMode.MANUAL -> editSenderManual.trim()
+        } ?: ""
         val finalRecipientRole = when (editRecipientMode) {
-            RoleInputMode.PRESET -> editRecipientPreset?.takeIf { it.isNotBlank() }
-            RoleInputMode.MANUAL -> editRecipientManual.trim().takeIf { it.isNotBlank() }
-        }
+            RoleInputMode.PRESET -> editRecipientPreset?.trim()
+            RoleInputMode.MANUAL -> editRecipientManual.trim()
+        } ?: ""
         val selectedGroup = groups.firstOrNull { it.id == editSelectedGroupId }
             ?: contact?.group?.takeIf { it.id == editSelectedGroupId }
         val selectedGroupName = selectedGroup?.name ?: "그룹 없음"
         val isConfirmEnabled = trimmedName.isNotBlank() &&
-            trimmedEmail.contains("@") &&
-            finalRecipientRole != null
+            trimmedEmail.contains("@")
 
         EditContactDialog(
             name = editNameField,
@@ -357,14 +356,13 @@ fun ContactDetailScreen(
                 }
             },
             onConfirm = {
-                val recipientRole = finalRecipientRole ?: return@EditContactDialog
                 editSubmitted = true
                 onUpdateContact(
                     trimmedName,
                     trimmedEmail,
                     finalSenderRole,
-                    recipientRole,
-                    editPersonalPromptField.trim().ifBlank { null },
+                    finalRecipientRole,
+                    editPersonalPromptField.trim(),
                     editSelectedGroupId
                 )
             }
