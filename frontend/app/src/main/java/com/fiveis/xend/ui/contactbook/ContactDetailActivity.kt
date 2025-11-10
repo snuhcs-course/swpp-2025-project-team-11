@@ -81,7 +81,9 @@ class ContactDetailActivity : ComponentActivity() {
                                 .putExtra(MailComposeActivity.EXTRA_PREFILL_CONTACT_EMAIL, contact.email)
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-                    }
+                    },
+                    onUpdateContact = { name, email -> vm.updateContact(name, email) },
+                    onClearEditError = { vm.clearUpdateError() }
                 )
 
                 if (state.isLoading && state.contact == null) {

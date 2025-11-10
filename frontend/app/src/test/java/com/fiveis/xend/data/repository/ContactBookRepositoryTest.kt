@@ -792,12 +792,14 @@ class ContactBookRepositoryTest {
 
     @Test
     fun update_contact_group_success_updates_local() = runTest {
-        coEvery { contactApiService.updateContact(5L, any()) } returns Response.success(null)
-        coEvery { contactDao.updateGroupId(5L, 2L) } returns Unit
+        val response = ContactResponse(id = 5L, name = "Kim", email = "kim@example.com", group = GroupResponse(2L, "Dev"))
+        coEvery { contactApiService.updateContact(5L, any()) } returns Response.success(response)
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
+        coEvery { contactDao.upsertContexts(any()) } returns Unit
 
         repository.updateContactGroup(5L, 2L)
 
-        coVerify { contactDao.updateGroupId(5L, 2L) }
+        coVerify { contactDao.upsertContacts(match { it.single().id == 5L && it.single().groupId == 2L }) }
     }
 
     @Test
@@ -806,7 +808,19 @@ class ContactBookRepositoryTest {
 
         val e = runCatching { repository.updateContactGroup(5L, 2L) }.exceptionOrNull()
         assertTrue(e is IllegalStateException)
-        coVerify(exactly = 0) { contactDao.updateGroupId(any(), any()) }
+        coVerify(exactly = 0) { contactDao.upsertContacts(any()) }
+    }
+
+    @Test
+    fun update_contact_success_updates_local() = runTest {
+        val response = ContactResponse(id = 9L, name = "Lee", email = "lee@example.com")
+        coEvery { contactApiService.updateContact(9L, any()) } returns Response.success(response)
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
+        coEvery { contactDao.upsertContexts(any()) } returns Unit
+
+        repository.updateContact(9L, "Lee", "lee@example.com")
+
+        coVerify { contactDao.upsertContacts(match { it.single().id == 9L && it.single().name == "Lee" }) }
     }
 
     @Test

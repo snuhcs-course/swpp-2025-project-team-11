@@ -16,7 +16,9 @@ import kotlinx.coroutines.launch
 data class ContactDetailUiState(
     val isLoading: Boolean = false,
     val contact: Contact? = null,
-    val error: String? = null
+    val error: String? = null,
+    val isUpdating: Boolean = false,
+    val updateError: String? = null
 )
 
 class ContactDetailViewModel(
@@ -60,6 +62,27 @@ class ContactDetailViewModel(
                 .onSuccess { ui.update { it.copy(isLoading = false) } }
                 .onFailure { e -> ui.update { it.copy(isLoading = false, error = e.message) } }
         }
+    }
+
+    fun updateContact(name: String, email: String) {
+        val id = currentId ?: return
+        ui.update { it.copy(isUpdating = true, updateError = null) }
+        viewModelScope.launch {
+            runCatching { repo.updateContact(id, name, email) }
+                .onSuccess { ui.update { it.copy(isUpdating = false, updateError = null) } }
+                .onFailure { e ->
+                    ui.update {
+                        it.copy(
+                            isUpdating = false,
+                            updateError = e.message ?: "연락처 수정에 실패했어요."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun clearUpdateError() {
+        ui.update { it.copy(updateError = null) }
     }
 
     override fun onCleared() {

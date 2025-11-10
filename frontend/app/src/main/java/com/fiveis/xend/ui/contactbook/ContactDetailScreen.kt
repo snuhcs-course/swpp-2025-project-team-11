@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -28,11 +31,18 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.theme.StableColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,9 +64,28 @@ fun ContactDetailScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onOpenGroup: (Long) -> Unit,
-    onComposeMail: (Contact) -> Unit
+    onComposeMail: (Contact) -> Unit,
+    onUpdateContact: (String, String) -> Unit,
+    onClearEditError: () -> Unit
 ) {
     val contact = uiState.contact
+    var showEditDialog by rememberSaveable { mutableStateOf(false) }
+    var editNameField by rememberSaveable { mutableStateOf("") }
+    var editEmailField by rememberSaveable { mutableStateOf("") }
+    var editSubmitted by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isUpdating, uiState.updateError, showEditDialog) {
+        if (!showEditDialog) return@LaunchedEffect
+        if (editSubmitted && !uiState.isUpdating) {
+            if (uiState.updateError == null) {
+                showEditDialog = false
+                editSubmitted = false
+                onClearEditError()
+            } else {
+                editSubmitted = false
+            }
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -69,12 +99,12 @@ fun ContactDetailScreen(
                 },
                 title = { Text("연락처 정보", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(
+                    TextButton(
                         onClick = { contact?.let(onComposeMail) },
                         enabled = contact != null
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 12.dp)) {
-                            Icon(Icons.Filled.Email, contentDescription = "메일 쓰기")
+                            Text("메일 쓰기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -124,11 +154,30 @@ fun ContactDetailScreen(
                                 .size(42.dp)
                                 .clip(CircleShape)
                                 .background(themeColor)
-                        )
+                        ) {
+                            Icon(
+                                Icons.Filled.Person,
+                                contentDescription = "연락처",
+                                tint = Color.White,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
                         Spacer(Modifier.size(12.dp))
-                        Column(Modifier.weight(1f)) {
+                        Column(Modifier.wrapContentWidth()) {
                             Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                             if (contact.email.isNotBlank()) Text(contact.email, color = Color.Gray)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(
+                            onClick = {
+                                editNameField = contact.name
+                                editEmailField = contact.email
+                                editSubmitted = false
+                                onClearEditError()
+                                showEditDialog = true
+                            }
+                        ) {
+                            Icon(Icons.Outlined.Edit, contentDescription = "연락처 정보 수정")
                         }
                     }
                 }
@@ -140,6 +189,8 @@ fun ContactDetailScreen(
                     onClick = { onOpenGroup(g.id) }
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // 세부 정보
             Surface(
@@ -166,9 +217,40 @@ fun ContactDetailScreen(
                     InfoRow("개인 프롬프트", contact.context?.personalPrompt.orEmpty())
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showEditDialog) {
+        val isConfirmEnabled = editNameField.isNotBlank() && editEmailField.isNotBlank()
+        EditContactDialog(
+            name = editNameField,
+            email = editEmailField,
+            errorMessage = uiState.updateError,
+            isProcessing = uiState.isUpdating,
+            isConfirmEnabled = isConfirmEnabled,
+            onNameChange = {
+                editNameField = it
+                if (uiState.updateError != null) onClearEditError()
+            },
+            onEmailChange = {
+                editEmailField = it
+                if (uiState.updateError != null) onClearEditError()
+            },
+            onDismiss = {
+                if (!uiState.isUpdating) {
+                    showEditDialog = false
+                    editSubmitted = false
+                    onClearEditError()
+                }
+            },
+            onConfirm = {
+                val trimmedName = editNameField.trim()
+                val trimmedEmail = editEmailField.trim()
+                if (trimmedName.isBlank() || trimmedEmail.isBlank()) return@EditContactDialog
+                editSubmitted = true
+                onUpdateContact(trimmedName, trimmedEmail)
+            }
+        )
     }
 }
 
@@ -180,12 +262,12 @@ private fun GroupBriefCard(group: Group, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = StableColor.forId(group.id).copy(alpha = 0.08f))
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("소속 그룹", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(group.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            if (group.description?.isNotBlank() == true) Text(group.description, color = Color.Gray)
+            if (group.description?.isNotBlank() == true) Text(group.description, color = Color.DarkGray)
 
             if (group.options.isNotEmpty()) {
                 Divider(Modifier.padding(vertical = 4.dp))
@@ -234,8 +316,72 @@ private fun TagChip(text: String) {
 @Composable
 private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
-        Text(label, color = Color.Gray, fontSize = 12.sp)
+        Text(label, color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(2.dp))
         Text(value, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
+}
+
+@Composable
+private fun EditContactDialog(
+    name: String,
+    email: String,
+    errorMessage: String?,
+    isProcessing: Boolean,
+    isConfirmEnabled: Boolean,
+    onNameChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isProcessing) onDismiss() },
+        title = { Text("연락처 정보 수정", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column {
+                    Text("이름", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = onNameChange,
+                        singleLine = true,
+                        enabled = !isProcessing,
+                        placeholder = { Text("이름을 입력하세요", color = Color.Gray) }
+                    )
+                }
+                Column {
+                    Text("이메일", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = onEmailChange,
+                        singleLine = true,
+                        enabled = !isProcessing,
+                        placeholder = { Text("이메일을 입력하세요", color = Color.Gray) }
+                    )
+                }
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = isConfirmEnabled && !isProcessing
+            ) {
+                Text("저장")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isProcessing) {
+                Text("취소")
+            }
+        }
+    )
 }
