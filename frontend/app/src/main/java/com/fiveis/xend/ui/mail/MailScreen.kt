@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -81,6 +82,8 @@ fun MailScreen(
     onSentLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
     onDismissSuccessBanner: () -> Unit = {},
+    showDraftSavedBanner: Boolean,
+    onDismissDraftSavedBanner: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(MailTab.INBOX) }
@@ -104,6 +107,36 @@ fun MailScreen(
                 BottomNavBar(selected = "mail", onSelect = onBottomNavChange)
             }
         },
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    initialOffsetY = { it }
+                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
+                exit = slideOutVertically(
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    targetOffsetY = { it }
+                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
+            ) {
+                FloatingActionButton(
+                    onClick = onFabClick,
+                    modifier = Modifier
+                        .offset(y = 20.dp)
+                        .padding(bottom = 0.dp)
+                        .size(56.dp),
+                    containerColor = Blue80,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        Icons.Filled.Create,
+                        contentDescription = "새 메일 작성",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center,
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
@@ -116,7 +149,7 @@ fun MailScreen(
                     onProfile = onOpenProfile
                 )
 
-                // Success Banner
+                // Success Banner (for Add Contact)
                 AnimatedVisibility(
                     visible = inboxUiState.addContactSuccess,
                     enter = slideInVertically(
@@ -136,6 +169,33 @@ fun MailScreen(
                             message = "연락처가 추가되었습니다",
                             type = BannerType.INFO,
                             onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
+                // Draft Saved Banner
+                AnimatedVisibility(
+                    visible = showDraftSavedBanner,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "임시 저장되었습니다.",
+                            type = BannerType.SUCCESS,
+                            onDismiss = onDismissDraftSavedBanner,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(top = 8.dp, bottom = 8.dp)
@@ -167,7 +227,11 @@ fun MailScreen(
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
                         },
-                        contactEmails = inboxUiState.contactEmails
+                        onScrollStopped = {
+                            showBottomBar = true
+                        },
+                        contactEmails = inboxUiState.contactEmails,
+                        contactsByEmail = inboxUiState.contactsByEmail
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
@@ -191,37 +255,6 @@ fun MailScreen(
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
                         }
-                    )
-                }
-            }
-
-            val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-
-            AnimatedVisibility(
-                visible = showBottomBar,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(
-                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                    initialOffsetY = { it }
-                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
-                exit = slideOutVertically(
-                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                    targetOffsetY = { it }
-                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
-            ) {
-                FloatingActionButton(
-                    onClick = onFabClick,
-                    modifier = Modifier
-                        .offset(y = 28.dp)
-                        .padding(bottom = navBarPadding.calculateBottomPadding())
-                        .size(56.dp),
-                    containerColor = Blue80,
-                    contentColor = Color.White
-                ) {
-                    Icon(
-                        Icons.Filled.Create,
-                        contentDescription = "새 메일 작성",
-                        modifier = Modifier.size(24.dp)
                     )
                 }
             }

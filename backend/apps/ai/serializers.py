@@ -1,4 +1,8 @@
+import os
+
 from rest_framework import serializers
+
+from apps.ai.constants import MAX_FILE_SIZE_MB, SUPPORTED_FILE_TYPES
 
 
 class MailGenerateRequest(serializers.Serializer):
@@ -22,3 +26,24 @@ class PromptPreviewRequestSerializer(serializers.Serializer):
         child=serializers.EmailField(),
         allow_empty=False,
     )
+
+
+class AttachmentAnalyzeFromMailSerializer(serializers.Serializer):
+    message_id = serializers.CharField()
+    attachment_id = serializers.CharField()
+    filename = serializers.CharField()
+    mime_type = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AttachmentAnalyzeUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
+
+    def validate_file(self, file):
+        max_size = MAX_FILE_SIZE_MB * 1024 * 1024  # MB → bytes
+        if file.size > max_size:
+            raise serializers.ValidationError(f"File size exceeds {MAX_FILE_SIZE_MB} MB limit.")
+
+        ext = os.path.splitext(file.name)[1].lower().lstrip(".")
+        if ext not in SUPPORTED_FILE_TYPES:
+            raise serializers.ValidationError(f"Unsupported file type '.{ext}'. " f"Supported types are: {', '.join(SUPPORTED_FILE_TYPES)}")
+        return file

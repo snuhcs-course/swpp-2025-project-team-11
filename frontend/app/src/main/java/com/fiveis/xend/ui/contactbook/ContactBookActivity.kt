@@ -102,7 +102,10 @@ class ContactBookActivity : ComponentActivity() {
                     },
                     onDeleteContactClick = {
                         viewModel.onContactDelete(it.id)
-                    }
+                    },
+                    onSearchIconClick = { viewModel.startContactSearch() },
+                    onSearchClose = { viewModel.closeContactSearch() },
+                    onSearchQueryChange = viewModel::onContactSearchQueryChange
                 )
 
                 LaunchedEffect(uiState.error) {

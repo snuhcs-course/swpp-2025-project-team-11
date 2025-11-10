@@ -98,15 +98,21 @@ class MailComposeViewModel(
                             val data = json.optJSONObject("data")
                             val rawText = data?.optString("text") ?: ""
 
-                            // GPU sends word by word, append with space
                             if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
                                 suggestionBuffer.append(" ")
                             }
                             suggestionBuffer.append(rawText)
-
-                            // Parse the entire buffer
+                        }
+                        "gpu.done" -> {
                             val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
-                            _ui.update { it.copy(suggestionText = parsed) }
+                            val singleSentence = extractFirstSentence(parsed)
+
+                            suggestionBuffer.clear()
+                            if (singleSentence.isNotEmpty()) {
+                                suggestionBuffer.append(singleSentence)
+                            }
+
+                            _ui.update { it.copy(suggestionText = singleSentence) }
                         }
                     }
                 } catch (e: Exception) {
@@ -132,9 +138,10 @@ class MailComposeViewModel(
         if (!_ui.value.isRealtimeEnabled) return
 
         debounceJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
         debounceJob = viewModelScope.launch {
             delay(500)
-            suggestionBuffer.clear()
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
                 text = currentText,
@@ -190,6 +197,20 @@ class MailComposeViewModel(
             // If parsing fails, return original text
             text
         }
+    }
+
+    private fun extractFirstSentence(text: String): String {
+        val normalized = text
+            .replace("\n", " ")
+            .replace("\\s+".toRegex(), " ")
+            .trim()
+
+        if (normalized.isEmpty()) return ""
+
+        val terminatorIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
+        val end = if (terminatorIndex == -1) normalized.length else terminatorIndex + 1
+
+        return normalized.substring(0, end).trim()
     }
 
     override fun onCleared() {

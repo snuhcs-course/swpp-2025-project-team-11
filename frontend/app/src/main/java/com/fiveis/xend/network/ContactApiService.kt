@@ -44,6 +44,12 @@ interface ContactApiService {
     @DELETE("api/contact/groups/{id}/")
     suspend fun deleteGroup(@Path("id") groupId: Long): Response<Void>
 
+    @PATCH("api/contact/groups/{id}/")
+    suspend fun updateGroup(
+        @Path("id") groupId: Long,
+        @Body payload: Map<String, @JvmSuppressWildcards Any>
+    ): Response<GroupResponse>
+
     @POST("api/contact/prompt-options/")
     suspend fun addPromptOption(@Body payload: PromptOptionRequest): Response<PromptOption>
 

@@ -7,11 +7,16 @@ import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.ContactBookTab
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -20,9 +25,13 @@ data class ContactBookUiState(
     val groups: List<Group> = emptyList(),
     val contacts: List<Contact> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val isSearchMode: Boolean = false,
+    val searchQuery: String = "",
+    val searchResults: List<Contact> = emptyList()
 )
 
+@OptIn(FlowPreview::class)
 class ContactBookViewModel(
     application: Application,
     private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
@@ -31,6 +40,7 @@ class ContactBookViewModel(
 
     private val _uiState = MutableStateFlow(ContactBookUiState())
     val uiState: StateFlow<ContactBookUiState> = _uiState.asStateFlow()
+    private val contactSearchQuery = MutableStateFlow("")
 
     init {
         viewModelScope.launch {
@@ -46,6 +56,21 @@ class ContactBookViewModel(
                     _uiState.update { it.copy(contacts = contacts) }
                 }
             }
+        }
+        viewModelScope.launch {
+            contactSearchQuery
+                .debounce(300)
+                .distinctUntilChanged()
+                .flatMapLatest { query ->
+                    if (query.isBlank()) {
+                        flowOf(emptyList())
+                    } else {
+                        repository.searchContacts(query)
+                    }
+                }
+                .collectLatest { results ->
+                    _uiState.update { it.copy(searchResults = results) }
+                }
         }
         // 초기 동기화(네트워크 → DB)
         refreshAll()
@@ -123,6 +148,20 @@ class ContactBookViewModel(
                 _uiState.update { it.copy(isLoading = false, error = e.message ?: "그룹 삭제 실패") }
             }
         }
+    }
+
+    fun startContactSearch() {
+        _uiState.update { it.copy(isSearchMode = true) }
+    }
+
+    fun closeContactSearch() {
+        _uiState.update { it.copy(isSearchMode = false, searchQuery = "", searchResults = emptyList()) }
+        contactSearchQuery.value = ""
+    }
+
+    fun onContactSearchQueryChange(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+        contactSearchQuery.value = query
     }
 
     class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {

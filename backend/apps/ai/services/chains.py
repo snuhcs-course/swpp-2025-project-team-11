@@ -4,10 +4,12 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from apps.ai.services.models import SpeechAnalysis, ValidationResult
+from apps.ai.services.models import AttachmentAnalysisResult, SpeechAnalysis, ValidationResult
 from apps.ai.services.prompts import (
     ANALYSIS_SYSTEM,
     ANALYSIS_USER,
+    ATTACHMENT_ANALYSIS_SYSTEM,
+    ATTACHMENT_ANALYSIS_USER,
     BODY_SYSTEM,
     BODY_USER,
     INTEGRATE_SYSTEM,
@@ -113,3 +115,14 @@ _integrate_model = ChatOpenAI(
 )
 
 integrate_chain = _integrate_prompt | _integrate_model.with_structured_output(SpeechAnalysis)
+
+
+_attachment_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", ATTACHMENT_ANALYSIS_SYSTEM),
+        ("user", ATTACHMENT_ANALYSIS_USER),
+    ],
+    template_format="jinja2",
+)
+
+attachment_analysis_chain = _attachment_prompt | _base_model.with_structured_output(AttachmentAnalysisResult)

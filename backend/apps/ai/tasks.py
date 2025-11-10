@@ -1,7 +1,12 @@
+from datetime import timedelta
+
 from celery import shared_task
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Count
+from django.utils import timezone
+
+from apps.mail.models import AttachmentAnalysis
 
 from ..contact.models import Contact
 from .models import ContactAnalysisResult, GroupAnalysisResult, MailAnalysisResult
@@ -196,3 +201,9 @@ def delete_up_n(n=10):
     for entry in groups:
         extra_count = entry["count"] - n
         MailAnalysisResult.objects.filter(contact__group=entry["group"]).order_by("created_at")[:extra_count].delete()
+
+
+@shared_task
+def purge_old_attachment_analysis():
+    cutoff = timezone.now() - timedelta(days=1)
+    AttachmentAnalysis.objects.filter(created_at__lt=cutoff).delete()

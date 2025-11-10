@@ -2,18 +2,20 @@ package com.fiveis.xend.network
 
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
-import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
+import okhttp3.MultipartBody
 import retrofit2.Response
-import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface MailApiService {
+    @Multipart
     @POST("api/mail/emails/send/")
-    suspend fun sendEmail(@Body payload: MailSendRequest): Response<SendResponse>
+    suspend fun sendEmail(@Part parts: List<MultipartBody.Part>): Response<SendResponse>
 
     @GET("api/mail/emails/")
     suspend fun getEmails(

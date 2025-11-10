@@ -22,6 +22,8 @@ jinja2 = "^3.1.6"
 coverage = "^7.11.0"
 celery = "^5.5.3"
 flower = "^2.0.1"
+pandas = "^2.3.3"
+pdfplumber = "^0.11.7"
 
 
 [tool.poetry.group.django.dependencies]
@@ -39,17 +41,12 @@ django-celery-results = "^2.6.0"
 langchain-core = "^1.0.3"
 langchain-openai = "^1.0.2"
 langgraph = "^1.0.2"
+langchain-community = "^0.4.1"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-
-
-
-
-
 
 
 

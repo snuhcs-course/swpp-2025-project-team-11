@@ -29,3 +29,11 @@ class SpeechAnalysis(BaseModel):
     figurative_usage: str
     long_sentence_ratio: str
     representative_sentences: list[str] = Field(default_factory=list)
+
+
+class AttachmentAnalysisResult(BaseModel):
+    summary: str = Field(..., description="High-level summary of the attachment. Write 3–10 sentences depending on file length.")
+    insights: str = Field(..., description="Key insights or action points extracted from the document.")
+    mail_guide: str = Field(
+        ..., description="Guidance on how to reference this attachment in an email — what to include in subject, introduction, and key body points."
+    )

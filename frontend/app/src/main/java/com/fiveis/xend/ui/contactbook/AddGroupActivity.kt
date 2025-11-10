@@ -63,8 +63,15 @@ class AddGroupActivity : ComponentActivity() {
                 var members by remember { mutableStateOf(emptyList<com.fiveis.xend.data.model.Contact>()) }
                 var showContactSelectDialog by remember { mutableStateOf(false) }
 
+                val promptingState = remember(options) {
+                    val tones = options.filter { it.key.equals("tone", ignoreCase = true) }.toSet()
+                    val formats = options.filter { it.key.equals("format", ignoreCase = true) }.toSet()
+                    PromptingUiState(selectedTone = tones, selectedFormat = formats)
+                }
+
                 AddGroupScreen(
                     uiState = addUiState,
+                    promptingState = promptingState,
                     onBack = {
                         finish()
                         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)

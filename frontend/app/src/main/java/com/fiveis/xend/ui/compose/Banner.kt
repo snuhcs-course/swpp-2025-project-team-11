@@ -80,6 +80,8 @@ fun Banner(
     message: String,
     type: BannerType = BannerType.SUCCESS,
     onDismiss: (() -> Unit)? = null,
+    actionText: String? = null,
+    onActionClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val config = getBannerConfig(type)
@@ -112,6 +114,20 @@ fun Banner(
                 ),
                 modifier = Modifier.weight(1f)
             )
+            if (actionText != null && onActionClick != null) {
+                androidx.compose.material3.TextButton(
+                    onClick = onActionClick,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                ) {
+                    Text(
+                        text = actionText,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = config.contentColor,
+                            fontSize = 12.sp
+                        )
+                    )
+                }
+            }
             if (onDismiss != null) {
                 IconButton(
                     onClick = onDismiss,

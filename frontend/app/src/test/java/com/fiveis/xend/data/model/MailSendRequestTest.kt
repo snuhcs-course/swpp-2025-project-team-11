@@ -1,5 +1,7 @@
 package com.fiveis.xend.data.model
 
+import okhttp3.MultipartBody
+import okio.Buffer
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -159,5 +161,58 @@ class MailSendRequestTest {
 
         assertTrue(request.to.isEmpty())
         assertEquals("No recipients", request.subject)
+    }
+
+    @Test
+    fun toMultipartParts_includes_basic_fields() {
+        val request = MailSendRequest(
+            to = listOf("recipient@example.com"),
+            subject = "Multipart Subject",
+            body = "<p>Body</p>",
+            isHtml = true
+        )
+
+        val parts = request.toMultipartParts()
+        assertEquals("Multipart Subject", parts.valueFor("subject"))
+        assertEquals("<p>Body</p>", parts.valueFor("body"))
+        assertEquals("true", parts.valueFor("is_html"))
+        assertEquals(listOf("recipient@example.com"), parts.valuesFor("to"))
+    }
+
+    @Test
+    fun toMultipartParts_preserves_cc_and_bcc() {
+        val request = MailSendRequest(
+            to = listOf("to@example.com"),
+            cc = listOf("cc1@example.com", "cc2@example.com"),
+            bcc = listOf("bcc@example.com"),
+            subject = "Subject",
+            body = "Body"
+        )
+
+        val parts = request.toMultipartParts()
+        assertEquals(listOf("cc1@example.com", "cc2@example.com"), parts.valuesFor("cc"))
+        assertEquals(listOf("bcc@example.com"), parts.valuesFor("bcc"))
+    }
+
+    private fun List<MultipartBody.Part>.valuesFor(name: String): List<String> =
+        filter { it.partName() == name }
+            .map { it.bodyAsString() }
+
+    private fun List<MultipartBody.Part>.valueFor(name: String): String? =
+        valuesFor(name).firstOrNull()
+
+    private fun MultipartBody.Part.partName(): String? {
+        val disposition = headers?.get("Content-Disposition") ?: return null
+        return disposition.split(";")
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("name=") }
+            ?.substringAfter("name=\"")
+            ?.substringBefore("\"")
+    }
+
+    private fun MultipartBody.Part.bodyAsString(): String {
+        val buffer = Buffer()
+        body.writeTo(buffer)
+        return buffer.readUtf8()
     }
 }

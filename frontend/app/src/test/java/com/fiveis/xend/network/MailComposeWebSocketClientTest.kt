@@ -3,6 +3,7 @@ package com.fiveis.xend.network
 import android.content.Context
 import io.mockk.*
 import okhttp3.*
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
@@ -73,7 +74,7 @@ class MailComposeWebSocketClientTest {
         var error: String? = null
         client.connect({}, { e -> error = e }, {})
 
-        client.sendMessage("system", "text")
+        client.sendMessage(text = "text", toEmails = emptyList())
 
         assertNotNull(error)
         // Check if error message contains "WebSocket" or "연결"
@@ -92,12 +93,12 @@ class MailComposeWebSocketClientTest {
         client.connect({}, {}, {})
         listenerSlot.captured.onOpen(mockWebSocket, mockk(relaxed = true))
 
-        client.sendMessage("system prompt", "user text")
+        val recipients = listOf("recipient@example.com")
+        client.sendMessage(text = "user text", toEmails = recipients)
 
         val expectedJson = JSONObject()
-            .put("system_prompt", "system prompt")
             .put("text", "user text")
-            .put("max_tokens", 50)
+            .put("to_emails", JSONArray(recipients))
             .toString()
 
         verify { mockWebSocket.send(expectedJson) }
