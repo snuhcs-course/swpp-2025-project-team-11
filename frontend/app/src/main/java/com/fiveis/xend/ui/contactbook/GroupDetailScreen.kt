@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -206,6 +207,7 @@ fun GroupDetailScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f)),
+                    border = BorderStroke(2.dp, themeColor),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(Modifier.padding(16.dp)) {
@@ -482,7 +484,7 @@ private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: (
 
     Surface(
         shape = RoundedCornerShape(14.dp),
-        tonalElevation = 1.dp,
+        color = BackgroundLight,
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Row(
