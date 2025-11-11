@@ -20,6 +20,7 @@ import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
+import com.fiveis.xend.ui.profile.ProfileActivity
 import com.fiveis.xend.ui.search.SearchActivity
 import com.fiveis.xend.ui.sent.SentActivity
 import com.fiveis.xend.ui.theme.XendTheme
@@ -56,6 +57,11 @@ class InboxActivity : ComponentActivity() {
                     },
                     onOpenSearch = {
                         startActivity(Intent(this, SearchActivity::class.java))
+                    },
+                    onOpenProfile = {
+                        android.util.Log.d("InboxActivity", "Profile button clicked")
+                        startActivity(Intent(this, ProfileActivity::class.java))
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                     },
                     onFabClick = {
                         startActivity(Intent(this@InboxActivity, MailComposeActivity::class.java))

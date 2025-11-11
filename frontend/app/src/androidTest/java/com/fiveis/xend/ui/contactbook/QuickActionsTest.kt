@@ -19,7 +19,7 @@ class QuickActionsTest {
             QuickActions(onAddGroupClick = {})
         }
 
-        composeTestRule.onNodeWithText("+ 새 그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText(" 새 그룹").assertIsDisplayed()
     }
 
     @Test
@@ -30,7 +30,7 @@ class QuickActionsTest {
             QuickActions(onAddGroupClick = { clicked = true })
         }
 
-        composeTestRule.onNodeWithText("+ 새 그룹").performClick()
+        composeTestRule.onNodeWithText(" 새 그룹").performClick()
 
         assert(clicked)
     }
@@ -52,8 +52,8 @@ class QuickActionsTest {
             QuickActions(onAddGroupClick = { clickCount++ })
         }
 
-        composeTestRule.onNodeWithText("+ 새 그룹").performClick()
-        composeTestRule.onNodeWithText("+ 새 그룹").performClick()
+        composeTestRule.onNodeWithText(" 새 그룹").performClick()
+        composeTestRule.onNodeWithText(" 새 그룹").performClick()
 
         assert(clickCount == 2)
     }
@@ -67,7 +67,7 @@ class QuickActionsTest {
         }
 
         repeat(5) {
-            composeTestRule.onNodeWithText("+ 새 그룹").performClick()
+            composeTestRule.onNodeWithText(" 새 그룹").performClick()
         }
 
         assert(clickCount == 5)

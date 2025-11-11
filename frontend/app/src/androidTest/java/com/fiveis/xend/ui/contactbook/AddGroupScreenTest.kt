@@ -189,7 +189,7 @@ class AddGroupScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("그룹별 AI 프롬프팅").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
     }
 
     @Test
@@ -428,7 +428,7 @@ class AddGroupScreenTest {
         }
 
         // Then - Should render without crash
-        composeTestRule.onNodeWithText("그룹별 AI 프롬프팅").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
     }
 
     @Test
@@ -452,7 +452,7 @@ class AddGroupScreenTest {
         }
 
         // Then - Should render without crash
-        composeTestRule.onNodeWithText("그룹별 AI 프롬프팅").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
     }
 
     @Test
@@ -470,7 +470,7 @@ class AddGroupScreenTest {
         }
 
         // Then
-        composeTestRule.onAllNodesWithText("연락처").assertCountEquals(1)
+        composeTestRule.onNodeWithText("연락처").assertDoesNotExist()
     }
 
     @Test
@@ -705,7 +705,7 @@ class AddGroupScreenTest {
         // Then - All sections should be accessible
         composeTestRule.onNodeWithText("그룹 이름").assertIsDisplayed()
         composeTestRule.onNodeWithText("그룹 설명").assertIsDisplayed()
-        composeTestRule.onNodeWithText("그룹별 AI 프롬프팅").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
     }
 
     @Test
@@ -845,7 +845,7 @@ class AddGroupScreenTest {
         // Then
         composeTestRule.onNodeWithText("그룹 이름").assertIsDisplayed()
         composeTestRule.onNodeWithText("그룹 설명").assertIsDisplayed()
-        composeTestRule.onNodeWithText("그룹별 AI 프롬프팅").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
         composeTestRule.onNodeWithText("그룹 멤버 (0명)").assertIsDisplayed()
     }
 }

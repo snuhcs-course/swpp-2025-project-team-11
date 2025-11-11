@@ -426,7 +426,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -447,7 +453,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -469,7 +481,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = { backClicked = true },
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -492,7 +510,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -513,7 +537,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -533,7 +563,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -558,7 +594,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -582,7 +624,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -605,7 +653,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = { clickedContact = it }
+                onMemberClick = { clickedContact = it },
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -628,7 +682,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -650,7 +710,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -672,7 +738,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -693,12 +765,18 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
         // Then
-        composeTestRule.onNodeWithText("설정된 프롬프트가 없습니다").assertIsDisplayed()
+        composeTestRule.onNodeWithText("설정된 프롬프트가 없습니다", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -713,7 +791,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -734,7 +818,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -756,7 +846,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 
@@ -777,7 +873,13 @@ class DetailScreensTest {
                 uiState = uiState,
                 onBack = {},
                 onRefresh = {},
-                onMemberClick = {}
+                onMemberClick = {},
+                onRenameGroup = { _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
             )
         }
 

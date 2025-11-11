@@ -45,6 +45,7 @@ class ReplyComposeScreenTest {
         }
 
         // Then
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("김철수 (chulsoo@test.com)").assertIsDisplayed()
         composeTestRule.onNodeWithText("2024.12.19 오전 10:00").assertIsDisplayed()
     }

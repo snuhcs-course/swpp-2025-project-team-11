@@ -260,7 +260,8 @@ class ReplyDirectComposeScreenTest {
                 subject = "Test",
                 groups = emptyList(),
                 onBack = {},
-                onSend = {}
+                onSend = {},
+                suggestionText = "This is a suggestion"
             )
         }
 
@@ -488,6 +489,7 @@ class ReplyDirectComposeScreenTest {
 
         // Then
         Thread.sleep(300)
+        composeTestRule.onNodeWithText("RE: Test").assertIsDisplayed()
     }
 
     @Test
@@ -640,6 +642,7 @@ class ReplyDirectComposeScreenTest {
         }
 
         // Then
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
     }
 

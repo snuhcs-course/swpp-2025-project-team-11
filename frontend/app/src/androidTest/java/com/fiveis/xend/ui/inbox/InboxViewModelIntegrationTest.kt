@@ -6,9 +6,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailApiService
+import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -27,6 +30,7 @@ class InboxViewModelIntegrationTest {
     private lateinit var database: AppDatabase
     private lateinit var emailDao: EmailDao
     private lateinit var repository: InboxRepository
+    private lateinit var contactRepository: ContactBookRepository
     private lateinit var viewModel: InboxViewModel
     private lateinit var mockApiService: MailApiService
 
@@ -42,7 +46,10 @@ class InboxViewModelIntegrationTest {
 
         mockApiService = mockk(relaxed = true)
         repository = InboxRepository(mockApiService, emailDao)
-        viewModel = InboxViewModel(repository)
+        contactRepository = mockk()
+        coEvery { contactRepository.observeGroups() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.observeContacts() } returns MutableStateFlow(emptyList())
+        viewModel = InboxViewModel(repository, contactRepository)
     }
 
     @After

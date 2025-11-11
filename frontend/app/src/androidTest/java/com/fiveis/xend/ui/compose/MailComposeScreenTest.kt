@@ -47,7 +47,9 @@ class MailComposeScreenTest {
                 suggestionText = "",
                 onAcceptSuggestion = {},
                 aiRealtime = true,
-                onAiRealtimeToggle = {}
+                onAiRealtimeToggle = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -71,7 +73,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -100,7 +104,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onBack = { backClicked = true },
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -126,7 +132,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onTemplateClick = { templateClicked = true },
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -149,7 +157,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(isSending = false),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -173,7 +183,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(isSending = false),
-                onSend = { sendClicked = true }
+                onSend = { sendClicked = true },
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -196,7 +208,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = BannerState("연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.", BannerType.INFO),
+                onDismissBanner = {}
             )
         }
 
@@ -205,6 +219,7 @@ class MailComposeScreenTest {
 
     @Test
     fun banner_can_be_dismissed() {
+        var bannerDismissed = false
         composeTestRule.setContent {
             val richTextState = rememberRichTextState()
             EmailComposeScreen(
@@ -218,12 +233,14 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = BannerState("연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.", BannerType.INFO),
+                onDismissBanner = { bannerDismissed = true }
             )
         }
 
         composeTestRule.onNodeWithContentDescription("닫기").performClick()
-        composeTestRule.onNodeWithText("연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.").assertDoesNotExist()
+        assertTrue(bannerDismissed)
     }
 
     @Test
@@ -241,7 +258,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -264,7 +283,9 @@ class MailComposeScreenTest {
                 isStreaming = true,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -286,11 +307,13 @@ class MailComposeScreenTest {
                 isStreaming = true,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
-        composeTestRule.onNodeWithText("AI 완성").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("AI 완성").assertDoesNotExist()
     }
 
     @Test
@@ -311,7 +334,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onUndo = { undoClicked = true },
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -329,7 +354,7 @@ class MailComposeScreenTest {
                 subject = "",
                 onSubjectChange = {},
                 richTextState = richTextState,
-                contacts = emptyList(),
+                contacts = listOf(Contact(1, null, "Test", "test@example.com")),
                 onContactsChange = {},
                 newContact = TextFieldValue(""),
                 onNewContactChange = {},
@@ -337,7 +362,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onAiComplete = { aiCompleteClicked = true },
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -363,7 +390,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onStopStreaming = { stopClicked = true },
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -386,7 +415,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -410,7 +441,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -434,7 +467,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onSend = {},
-                aiRealtime = true
+                aiRealtime = true,
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -456,7 +491,9 @@ class MailComposeScreenTest {
                 isStreaming = false,
                 error = "Test error message",
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -479,7 +516,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onSend = {},
-                suggestionText = "This is a suggestion"
+                suggestionText = "This is a suggestion",
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -502,7 +541,9 @@ class MailComposeScreenTest {
                 error = null,
                 sendUiState = SendUiState(),
                 onSend = {},
-                suggestionText = "Suggestion"
+                suggestionText = "Suggestion",
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -528,7 +569,9 @@ class MailComposeScreenTest {
                 sendUiState = SendUiState(),
                 onSend = {},
                 suggestionText = "Suggestion",
-                onAcceptSuggestion = { suggestionAccepted = true }
+                onAcceptSuggestion = { suggestionAccepted = true },
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 
@@ -551,7 +594,9 @@ class MailComposeScreenTest {
                 isStreaming = true,
                 error = null,
                 sendUiState = SendUiState(),
-                onSend = {}
+                onSend = {},
+                bannerState = null,
+                onDismissBanner = {}
             )
         }
 

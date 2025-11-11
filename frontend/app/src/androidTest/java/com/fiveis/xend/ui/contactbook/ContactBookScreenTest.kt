@@ -371,7 +371,7 @@ class ContactBookScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("+ 새 그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText(" 새 그룹").assertIsDisplayed()
     }
 
     @Test
@@ -391,7 +391,7 @@ class ContactBookScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("+ 새 그룹").performClick()
+        composeTestRule.onNodeWithText(" 새 그룹").performClick()
 
         // Then
         assert(clicked)
@@ -791,7 +791,7 @@ class ContactBookScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("+ 새 그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText(" 새 그룹").assertIsDisplayed()
     }
 
     @Test
@@ -803,7 +803,7 @@ class ContactBookScreenTest {
         }
 
         // When
-        composeTestRule.onNodeWithText("+ 새 그룹").performClick()
+        composeTestRule.onNodeWithText(" 새 그룹").performClick()
 
         // Then
         assert(clicked)
@@ -918,7 +918,7 @@ class ContactBookScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("+ 새 그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText(" 새 그룹").assertIsDisplayed()
     }
 
     @Test

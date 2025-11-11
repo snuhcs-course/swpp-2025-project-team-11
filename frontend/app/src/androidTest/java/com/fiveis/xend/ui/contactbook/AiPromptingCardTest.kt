@@ -26,7 +26,7 @@ class AiPromptingCardTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -58,7 +58,7 @@ class AiPromptingCardTest {
         composeTestRule.onNodeWithText("수정").performClick()
 
         // Then - Should open bottom sheet
-        composeTestRule.onNodeWithText("AI 프롬프팅 설정").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
     }
 
     @Test
@@ -73,7 +73,7 @@ class AiPromptingCardTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -93,7 +93,7 @@ class AiPromptingCardTest {
         }
 
         // Then - Should render without crash
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -113,7 +113,7 @@ class AiPromptingCardTest {
         }
 
         // Then - Should render without crash
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -132,7 +132,7 @@ class AiPromptingCardTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -149,7 +149,7 @@ class AiPromptingCardTest {
         composeTestRule.onNodeWithText("수정").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("AI 프롬프팅 설정").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
     }
 
     @Test
@@ -234,7 +234,7 @@ class AiPromptingCardTest {
         composeTestRule.onNodeWithText("수정").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("설정 저장").assertIsDisplayed()
+        composeTestRule.onNodeWithText("저장").assertIsDisplayed()
     }
 
     @Test
@@ -268,7 +268,7 @@ class AiPromptingCardTest {
         composeTestRule.onNodeWithText("수정").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("메일 구조와 포맷을 설정합니다").assertIsDisplayed()
+        composeTestRule.onNodeWithText("메일의 구조와 포맷을 설정합니다").assertIsDisplayed()
     }
 
     @Test
@@ -303,7 +303,7 @@ class AiPromptingCardTest {
         }
 
         // Then - Should render without crash
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -321,7 +321,7 @@ class AiPromptingCardTest {
         }
 
         // Then - Should render without crash
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test
@@ -339,7 +339,7 @@ class AiPromptingCardTest {
         }
 
         // Then - Just verify it renders (callback tested indirectly)
-        composeTestRule.onNodeWithText("선택된 설정 조합").assertIsDisplayed()
+        composeTestRule.onNodeWithText("선택된 프롬프트 조합").assertIsDisplayed()
     }
 
     @Test

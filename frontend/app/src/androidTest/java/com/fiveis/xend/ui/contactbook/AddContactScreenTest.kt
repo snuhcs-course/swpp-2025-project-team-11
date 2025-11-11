@@ -463,8 +463,8 @@ class AddContactScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("메일함").assertIsDisplayed()
-        composeTestRule.onAllNodesWithText("연락처").assertCountEquals(1) // Bottom nav only (title is "연락처 추가")
+        composeTestRule.onNodeWithText("메일함").assertDoesNotExist()
+        composeTestRule.onNodeWithText("연락처").assertDoesNotExist()
     }
 
     @Test

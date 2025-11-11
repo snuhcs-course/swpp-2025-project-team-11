@@ -48,6 +48,7 @@
         <activity android:name=".ui.contactbook.AddGroupActivity" />
         <activity android:name=".ui.contactbook.GroupDetailActivity" />
         <activity android:name=".ui.contactbook.ContactDetailActivity" />
+        <activity android:name=".ui.profile.ProfileActivity" />
 
 
 
