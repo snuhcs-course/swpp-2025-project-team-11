@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -512,14 +511,14 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
-                        DropdownMenuItem(
-                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                            text = { Text("수정") },
-                            onClick = {
-                                menuExpanded = false
-                                onEdit(group)
-                            }
-                        )
+//                        DropdownMenuItem(
+//                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+//                            text = { Text("수정") },
+//                            onClick = {
+//                                menuExpanded = false
+//                                onEdit(group)
+//                            }
+//                        )
                         DropdownMenuItem(
                             leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                             text = { Text("삭제", color = Red60) },
@@ -735,14 +734,14 @@ private fun ContactRow(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
             ) {
-                DropdownMenuItem(
-                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                    text = { Text("수정") },
-                    onClick = {
-                        menuExpanded = false
-                        onEdit(contact)
-                    }
-                )
+//                DropdownMenuItem(
+//                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+//                    text = { Text("수정") },
+//                    onClick = {
+//                        menuExpanded = false
+//                        onEdit(contact)
+//                    }
+//                )
                 DropdownMenuItem(
                     leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                     text = { Text("삭제", color = Red60) },

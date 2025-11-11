@@ -83,6 +83,7 @@ class GroupDetailActivity : ComponentActivity() {
                                 .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
                         )
                     },
+                    onRemoveMember = { member -> vm.removeMemberFromGroup(member.id) },
                     onRenameGroup = { newName, newDesc -> vm.renameGroup(newName, newDesc) },
                     onClearRenameError = { vm.clearRenameError() },
                     onRefreshPromptOptions = { vm.refreshPromptOptions() },

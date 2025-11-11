@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -37,6 +40,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -71,7 +76,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Red60
 import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextSecondary
 import kotlinx.coroutines.flow.collectLatest
@@ -84,6 +91,7 @@ fun GroupDetailScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onMemberClick: (Contact) -> Unit,
+    onRemoveMember: (Contact) -> Unit,
     onRenameGroup: (String, String) -> Unit,
     onClearRenameError: () -> Unit,
     onRefreshPromptOptions: () -> Unit,
@@ -172,7 +180,8 @@ fun GroupDetailScreen(
         val screenWidth = configuration.screenWidthDp.dp
         val innerCardPadding = 32.dp // card content padding (16dp each side)
         val outerListPadding = 32.dp // LazyColumn horizontal padding (16dp each side)
-        val memberPages = remember(group.members) { group.members.chunked(4) }
+        val sortedMembers = remember(group.members) { group.members.sortedBy { it.name } }
+        val memberPages = remember(sortedMembers) { sortedMembers.chunked(4) }
         val pageWidth = remember(configuration.screenWidthDp) {
             (screenWidth - innerCardPadding - outerListPadding).coerceAtLeast(0.dp)
         }
@@ -283,7 +292,8 @@ fun GroupDetailScreen(
                                         MemberRow(
                                             member = c,
                                             modifier = Modifier.fillMaxWidth(),
-                                            onClick = { onMemberClick(c) }
+                                            onClick = { onMemberClick(c) },
+                                            onDeleteMember = { onRemoveMember(c) }
                                         )
                                     }
                                 }
@@ -466,7 +476,10 @@ fun GroupDetailScreen(
 }
 
 @Composable
-private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: () -> Unit, onDeleteMember: () -> Unit) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Surface(
         shape = RoundedCornerShape(14.dp),
         tonalElevation = 1.dp,
@@ -490,7 +503,51 @@ private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: (
                 Text(member.name, fontWeight = FontWeight.SemiBold)
                 if (member.email.isNotBlank()) Text(member.email, color = Color.Gray, fontSize = 12.sp)
             }
+
+            Box(
+                modifier = Modifier.wrapContentSize(Alignment.TopEnd)
+            ) {
+                // 우측 "..." 버튼
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "더보기(멤버 삭제)"
+                    )
+                }
+                // 오버플로우 메뉴
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                        text = { Text("멤버 삭제", color = Red60) },
+                        onClick = {
+                            menuExpanded = false
+                            showDeleteConfirm = true
+                        }
+                    )
+                }
+            }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("멤버 삭제") },
+            text = { Text("\"${member.name}\" 님을 현재 그룹에서 삭제하시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDeleteMember()
+                }) { Text("삭제", color = Red60) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("취소") }
+            },
+            containerColor = BackgroundLight
+        )
     }
 }
 

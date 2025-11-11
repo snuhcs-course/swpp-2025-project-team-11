@@ -136,6 +136,7 @@ fun AddContactScreen(
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
     val savable = name.isNotBlank() && email.contains("@")
+    val sortedGroups = remember(groups) { groups.sortedBy { it.name } }
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -553,7 +554,7 @@ fun AddContactScreen(
                             expanded = isGroupExpanded,
                             onDismissRequest = { isGroupExpanded = false }
                         ) {
-                            groups.forEach { g ->
+                            sortedGroups.forEach { g ->
                                 DropdownMenuItem(
                                     text = {
                                         Row(verticalAlignment = Alignment.CenterVertically) {

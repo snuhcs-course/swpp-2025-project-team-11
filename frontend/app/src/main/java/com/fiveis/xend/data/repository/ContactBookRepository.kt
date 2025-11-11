@@ -219,7 +219,7 @@ class ContactBookRepository(
         contactDao.deleteById(contactId)
     }
 
-    suspend fun updateContactGroup(contactId: Long, groupId: Long) {
+    suspend fun updateContactGroup(contactId: Long, groupId: Long?) {
         val payload = mapOf<String, Any?>("group_id" to groupId)
         val response = api.updateContact(contactId, payload)
         if (!response.isSuccessful) {

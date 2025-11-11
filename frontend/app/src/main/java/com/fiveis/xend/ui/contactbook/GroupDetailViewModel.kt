@@ -83,6 +83,16 @@ class GroupDetailViewModel(
         }
     }
 
+    fun removeMemberFromGroup(contactId: Long) {
+        viewModelScope.launch {
+            try {
+                repo.updateContactGroup(contactId, null)
+            } catch (e: Exception) {
+                ui.update { it.copy(error = e.message ?: "멤버 삭제에 실패했습니다") }
+            }
+        }
+    }
+
     fun renameGroup(newName: String, newDescription: String) {
         val id = observingId ?: return
         val trimmedName = newName.trim()
