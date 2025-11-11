@@ -270,6 +270,33 @@ fun ContactDetailScreen(
                     onClick = { onOpenGroup(g.id) }
                 )
             }
+
+            if (uiState.contact.group == null) {
+                Card(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Gray600.copy(alpha = 0.08f))
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("소속 그룹", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Gray600.copy(alpha = 0.08f)),
+                            border = BorderStroke(2.dp, Gray600)
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("소속된 그룹이 없습니다.", color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
 //
 //            Spacer(modifier = Modifier.height(16.dp))
 //

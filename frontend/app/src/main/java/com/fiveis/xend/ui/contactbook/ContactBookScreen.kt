@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
@@ -132,7 +133,7 @@ fun ContactBookScreen(
                                 Icon(Icons.Default.Search, contentDescription = "Search")
                             }
                             IconButton(onClick = onAddContactClick) {
-                                Icon(Icons.Default.Add, contentDescription = "Add")
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Add Contact")
                             }
                         }
                     )
@@ -195,7 +196,7 @@ fun ContactBookScreen(
                                 Icon(Icons.Default.Search, contentDescription = "Search")
                             }
                             IconButton(onClick = onAddContactClick) {
-                                Icon(Icons.Default.Add, contentDescription = "Add")
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Add Contact")
                             }
                         }
                     )
