@@ -1,14 +1,20 @@
 package com.fiveis.xend.ui.compose.common
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -41,10 +47,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
@@ -64,8 +73,11 @@ fun AIEnhancedRichTextEditor(
     onAcceptSuggestion: () -> Unit,
     onTextChanged: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    placeholder: String = "내용을 입력하세요"
+    placeholder: String = "내용을 입력하세요",
+    showInlineSwipeBar: Boolean = true
 ) {
+    val editorHeight = 320.dp
+
     // Show/remove suggestion in editor
     androidx.compose.runtime.LaunchedEffect(suggestionText) {
         if (suggestionText.isNotEmpty()) {
@@ -89,14 +101,14 @@ fun AIEnhancedRichTextEditor(
                 state = editorState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
             )
 
-            // Rich Text Editor using AndroidView with swipe button
+            // Rich Text Editor using AndroidView
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
+                    .height(editorHeight)
                     .padding(8.dp)
             ) {
                 XendRichEditorView(
@@ -104,13 +116,90 @@ fun AIEnhancedRichTextEditor(
                     placeholder = placeholder,
                     onTextChanged = onTextChanged,
                     enabled = !isStreaming,
-                    onSwipe = {
-                        editorState.acceptSuggestion()
-                        onAcceptSuggestion()
-                    },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                if (showInlineSwipeBar && suggestionText.isNotEmpty()) {
+                    SwipeBar(
+                        onSwipe = {
+                            editorState.acceptSuggestion()
+                            editorState.requestFocusAndShowKeyboard()
+                            onAcceptSuggestion()
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .zIndex(10f)
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun SwipeSuggestionOverlay(visible: Boolean, modifier: Modifier = Modifier, onSwipe: () -> Unit) {
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val navBottom = WindowInsets.navigationBars.getBottom(density)
+    val combinedBottom = maxOf(imeBottom, navBottom)
+    val bottomPadding = with(density) { combinedBottom.toDp() } + 2.dp
+
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        AnimatedVisibility(visible = visible) {
+            SwipeBar(
+                onSwipe = onSwipe,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = bottomPadding)
+            )
+        }
+    }
+}
+
+/**
+ * Swipe Bar - dedicated area for swipe gesture to accept AI suggestions
+ */
+@Composable
+private fun SwipeBar(onSwipe: () -> Unit, modifier: Modifier = Modifier) {
+    var dragAmount by remember { mutableStateOf(0f) }
+
+    Surface(
+        modifier = modifier
+            .height(48.dp)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        // Trigger swipe if dragged more than 100px to the right
+                        if (dragAmount > 100f) {
+                            onSwipe()
+                        }
+                        dragAmount = 0f
+                    },
+                    onHorizontalDrag = { _, dragDistance ->
+                        dragAmount += dragDistance
+                    }
+                )
+            },
+        // Pastel light purple/blue
+        color = Color(0xFFE8EAFF),
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "→ Swipe to apply →",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Blue60,
+                    fontWeight = FontWeight.Medium
+                )
+            )
         }
     }
 }

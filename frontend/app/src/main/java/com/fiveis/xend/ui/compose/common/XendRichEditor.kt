@@ -2,10 +2,9 @@ package com.fiveis.xend.ui.compose.common
 
 import android.content.Context
 import android.util.AttributeSet
-import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import android.webkit.JavascriptInterface
 import jp.wasabeef.richeditor.RichEditor
-import kotlin.math.abs
 
 /**
  * Extended RichEditor with cursor tracking and text insertion capabilities
@@ -16,13 +15,8 @@ class XendRichEditor @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : RichEditor(context, attrs, defStyleAttr) {
 
-    private var textChangeListener: ((String) -> Unit)? = null
+    private val textChangeListeners = mutableListOf<(String) -> Unit>()
     private var cursorPosition: Int = 0
-    private var onSwipeListener: (() -> Unit)? = null
-
-    private var touchStartX: Float = 0f
-    private var touchStartY: Float = 0f
-    private var isSwiping: Boolean = false
 
     init {
         // Enable JavaScript
@@ -31,30 +25,11 @@ class XendRichEditor @JvmOverloads constructor(
         // Add JavaScript interface for cursor tracking
         addJavascriptInterface(CursorTracker(), "CursorTracker")
 
-        // Add JavaScript interface for swipe button
-        addJavascriptInterface(AndroidInterface(), "AndroidInterface")
-
-        // Set up text change listener
-        setOnTextChangeListener { text ->
-            textChangeListener?.invoke(text)
-            updateCursorPosition()
-        }
-    }
-
-    /**
-     * Set swipe listener
-     */
-    fun setOnSwipeListener(listener: () -> Unit) {
-        onSwipeListener = listener
-    }
-
-    /**
-     * JavaScript interface for Android communication
-     */
-    inner class AndroidInterface {
-        @JavascriptInterface
-        fun onSwipe() {
-            onSwipeListener?.invoke()
+        // Perform initial setup only after the internal HTML document is loaded.
+        // This solves timing issues where settings are applied too early.
+        setOnInitialLoadListener {
+            setEditorFontSize(15)
+            setPadding(16, 16, 16, 16)
         }
     }
 
@@ -62,7 +37,12 @@ class XendRichEditor @JvmOverloads constructor(
      * Set text change listener
      */
     fun setTextChangedListener(listener: (String) -> Unit) {
-        textChangeListener = listener
+        textChangeListeners.add(listener)
+        // Set up the parent's text change listener to call our hooks
+        setOnTextChangeListener { text ->
+            textChangeListeners.forEach { it(text) }
+            updateCursorPosition()
+        }
     }
 
     /**
@@ -82,7 +62,6 @@ class XendRichEditor @JvmOverloads constructor(
                 }
             })();
         """.trimIndent()
-
         evaluateJavascript(js, null)
     }
 
@@ -116,7 +95,6 @@ class XendRichEditor @JvmOverloads constructor(
                 }
             })();
         """.trimIndent()
-
         evaluateJavascript(js, null)
     }
 
@@ -201,7 +179,7 @@ class XendRichEditor @JvmOverloads constructor(
     }
 
     /**
-     * Show suggestion text after cursor position (gray, italic style) with swipe button
+     * Show suggestion text after cursor position (gray, italic style)
      */
     fun showSuggestion(suggestionText: String) {
         val escapedText = suggestionText
@@ -213,35 +191,24 @@ class XendRichEditor @JvmOverloads constructor(
         val js = """
             (function() {
                 // Remove existing suggestion if any
-                var existing = document.getElementById('ai-suggestion-container');
+                var existing = document.getElementById('ai-suggestion');
                 if (existing) {
                     existing.remove();
                 }
-
                 var sel = window.getSelection();
                 if (!sel.rangeCount) return;
-
                 var range = sel.getRangeAt(0).cloneRange();
-
                 // Check if there's any text AFTER the cursor
                 var afterRange = range.cloneRange();
                 afterRange.selectNodeContents(document.body);
                 afterRange.setStart(range.endContainer, range.endOffset);
                 var textAfterCursor = afterRange.toString().trim();
-
                 // Only show suggestion if cursor is at the END (no text after)
                 if (textAfterCursor.length > 0) {
                     return;  // Don't show suggestion if there's text after cursor
                 }
-
                 range.collapse(false);  // Collapse to end of selection
-
-                // Create container span for suggestion + button
-                var container = document.createElement('span');
-                container.id = 'ai-suggestion-container';
-                container.style.display = 'inline';
-
-                // Create suggestion text span
+                // Create suggestion text span (no button)
                 var textSpan = document.createElement('span');
                 textSpan.id = 'ai-suggestion';
                 textSpan.contentEditable = 'false';
@@ -250,62 +217,30 @@ class XendRichEditor @JvmOverloads constructor(
                 textSpan.style.fontSize = '14px';
                 textSpan.style.userSelect = 'none';
                 textSpan.textContent = ' ' + '$escapedText';
-
-                // Create swipe button (simple and small)
-                var button = document.createElement('button');
-                button.type = 'button';
-                button.id = 'ai-swipe-button';
-                button.contentEditable = 'false';
-                button.style.marginLeft = '4px';
-                button.style.padding = '2px 6px';
-                button.style.backgroundColor = 'white';
-                button.style.color = '#6366F1';
-                button.style.border = '1px solid #C7D2FE';
-                button.style.borderRadius = '6px';
-                button.style.fontSize = '11px';
-                button.style.fontWeight = '600';
-                button.style.cursor = 'pointer';
-                button.style.outline = 'none';
-                button.textContent = '→ swipe';
-
-                // Add click event
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    AndroidInterface.onSwipe();
-                }, true);
-
-                // Assemble
-                container.appendChild(textSpan);
-                container.appendChild(button);
-
                 // Insert at current cursor position
-                range.insertNode(container);
-
+                range.insertNode(textSpan);
                 // Restore cursor position (before the suggestion)
-                range.setStartBefore(container);
+                range.setStartBefore(textSpan);
                 range.collapse(true);
                 sel.removeAllRanges();
                 sel.addRange(range);
             })();
         """.trimIndent()
-
         evaluateJavascript(js, null)
     }
 
     /**
-     * Remove suggestion text and button
+     * Remove suggestion text
      */
     fun removeSuggestion() {
         val js = """
             (function() {
-                var existing = document.getElementById('ai-suggestion-container');
+                var existing = document.getElementById('ai-suggestion');
                 if (existing) {
                     existing.remove();
                 }
             })();
         """.trimIndent()
-
         evaluateJavascript(js, null)
     }
 
@@ -315,21 +250,14 @@ class XendRichEditor @JvmOverloads constructor(
     fun acceptSuggestion() {
         val js = """
             (function() {
-                var container = document.getElementById('ai-suggestion-container');
-                if (!container) return;
-
                 var suggestion = document.getElementById('ai-suggestion');
                 if (!suggestion) return;
-
                 var text = suggestion.textContent;
-                var parent = container.parentNode;
-
+                var parent = suggestion.parentNode;
                 // Create a text node with the suggestion text
                 var textNode = document.createTextNode(text);
-
-                // Replace the container with the text node
-                parent.replaceChild(textNode, container);
-
+                // Replace the suggestion with the text node
+                parent.replaceChild(textNode, suggestion);
                 // Move cursor to after the inserted text
                 var sel = window.getSelection();
                 var range = document.createRange();
@@ -337,16 +265,16 @@ class XendRichEditor @JvmOverloads constructor(
                 range.collapse(true);
                 sel.removeAllRanges();
                 sel.addRange(range);
-
-                // Force focus on editor
-                document.body.focus();
-
+                // Force focus on the actual editor div to prevent keyboard dismissal
+                var editor = document.getElementById('editor');
+                if (editor) {
+                    editor.focus();
+                }
                 // Create temporary element at cursor to scroll into view
                 var marker = document.createElement('span');
                 marker.innerHTML = '&nbsp;';
                 range.insertNode(marker);
                 marker.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
-
                 // Remove marker and restore cursor
                 range.selectNode(marker);
                 range.deleteContents();
@@ -354,54 +282,19 @@ class XendRichEditor @JvmOverloads constructor(
                 sel.addRange(range);
             })();
         """.trimIndent()
-
         evaluateJavascript(js, null)
     }
 
     /**
-     * Check if suggestion exists
+     * Force focus on the editor and explicitly show the keyboard.
+     * This is a robust way to prevent the keyboard from being dismissed
+     * after programmatic UI changes.
      */
-    private fun hasSuggestion(callback: (Boolean) -> Unit) {
-        evaluateJavascript(
-            "(function() { return document.getElementById('ai-suggestion-container') !== null; })();"
-        ) { result ->
-            callback(result == "true")
-        }
-    }
-
-    /**
-     * Handle touch events for swipe gesture detection
-     */
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                touchStartX = event.x
-                touchStartY = event.y
-                isSwiping = false
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val deltaX = event.x - touchStartX
-                val deltaY = event.y - touchStartY
-
-                // Detect horizontal swipe (right direction)
-                if (abs(deltaX) > abs(deltaY) && deltaX > 100 && !isSwiping) {
-                    isSwiping = true
-
-                    // Check if suggestion exists before triggering swipe
-                    hasSuggestion { exists ->
-                        if (exists) {
-                            post {
-                                onSwipeListener?.invoke()
-                            }
-                        }
-                    }
-                }
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                isSwiping = false
-            }
-        }
-
-        return super.onTouchEvent(event)
+    fun requestFocusAndShowKeyboard() {
+        // 1. Request focus on the view itself
+        this.requestFocus()
+        // 2. Explicitly ask the InputMethodManager to show the keyboard
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(this, 0)
     }
 }

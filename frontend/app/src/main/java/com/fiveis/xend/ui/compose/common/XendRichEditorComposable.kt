@@ -130,6 +130,13 @@ class XendRichEditorState {
     fun acceptSuggestion() {
         editor?.acceptSuggestion()
     }
+
+    /**
+     * Request focus and show keyboard via native APIs
+     */
+    fun requestFocusAndShowKeyboard() {
+        editor?.requestFocusAndShowKeyboard()
+    }
 }
 
 /**
@@ -149,8 +156,7 @@ fun XendRichEditorView(
     modifier: Modifier = Modifier,
     placeholder: String = "내용을 입력하세요",
     onTextChanged: ((String) -> Unit)? = null,
-    enabled: Boolean = true,
-    onSwipe: (() -> Unit)? = null
+    enabled: Boolean = true
 ) {
     AndroidView(
         modifier = modifier,
@@ -158,15 +164,7 @@ fun XendRichEditorView(
             XendRichEditor(context).apply {
                 // Set placeholder
                 setPlaceholder(placeholder)
-
-                // Set editor height
-                setEditorHeight(240)
-
-                // Set font size (한글 최적화)
-                setEditorFontSize(15)
-
-                // Set padding
-                setPadding(16, 16, 16, 16)
+                // setEditorHeight(320)
 
                 // Enable focus
                 isFocusable = true
@@ -185,13 +183,6 @@ fun XendRichEditorView(
                     // Remove suggestion when user types
                     removeSuggestion()
                     onTextChanged?.invoke(html)
-                }
-
-                // Set swipe listener
-                onSwipe?.let { callback ->
-                    setOnSwipeListener {
-                        callback()
-                    }
                 }
 
                 // Store reference in state

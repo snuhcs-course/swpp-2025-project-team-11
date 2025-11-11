@@ -102,6 +102,7 @@ import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.common.AIActionRow
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.mail.MailActivity
@@ -158,7 +159,8 @@ fun EmailComposeScreen(
     onAiRealtimeToggle: (Boolean) -> Unit = {},
     onAddContactClick: ((Contact) -> Unit)? = null,
     bannerState: BannerState?,
-    onDismissBanner: () -> Unit
+    onDismissBanner: () -> Unit,
+    showInlineSwipeBar: Boolean = true
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val scrollState = rememberScrollState()
@@ -245,7 +247,8 @@ fun EmailComposeScreen(
                 editorState = editorState,
                 isStreaming = isStreaming,
                 suggestionText = suggestionText,
-                onAcceptSuggestion = onAcceptSuggestion
+                onAcceptSuggestion = onAcceptSuggestion,
+                showInlineSwipeBar = showInlineSwipeBar
             )
 
             error?.let { ErrorMessage(it) }
@@ -897,200 +900,210 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
-                Scaffold { innerPadding ->
-                    if (showTemplateScreen) {
-                        // 템플릿 선택 화면
-                        TemplateSelectionScreen(
-                            onBack = { showTemplateScreen = false },
-                            onTemplateSelected = { template ->
-                                subject = template.subject
-                                editorState.setHtml(template.body)
-                                showTemplateScreen = false
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    } else {
-                        // 메일 작성 화면
-                        EmailComposeScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            subject = subject,
-                            onSubjectChange = { subject = it },
-                            editorState = editorState,
-                            contacts = contacts,
-                            onContactsChange = { contacts = it },
-                            newContact = newContact,
-                            onNewContactChange = { newContact = it },
-                            knownContactsByEmail = knownByEmail,
-                            isStreaming = composeUi.isStreaming,
-                            error = composeUi.error,
-                            sendUiState = sendUi,
-                            // Trigger our custom back press handling
-                            onBack = { onBackPressedDispatcher.onBackPressed() },
-                            onTemplateClick = { showTemplateScreen = true },
-                            onUndo = {
-                                composeVm.undo()?.let { snapshot ->
-                                    subject = snapshot.subject
-                                    editorState.setHtml(snapshot.bodyHtml)
-                                }
-                            },
-                            suggestionText = composeUi.suggestionText,
-                            onAcceptSuggestion = {
-                                // AI suggestion accepted - clear and request new one
-                                composeVm.acceptSuggestion()
-                                // Request new suggestion immediately
-                                composeVm.requestImmediateSuggestion(editorState.getHtml())
-                            },
-                            aiRealtime = aiRealtime,
-                            onAiRealtimeToggle = { aiRealtime = it },
-                            onAiComplete = {
-                                // Save current state before AI generation
-                                composeVm.saveUndoSnapshot(
-                                    subject = subject,
-                                    bodyHtml = editorState.getHtml()
-                                )
+                val acceptSuggestion: () -> Unit = {
+                    editorState.acceptSuggestion()
+                    editorState.requestFocusAndShowKeyboard()
+                    composeVm.acceptSuggestion()
+                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                }
 
-                                val payload = JSONObject().apply {
-                                    put("subject", subject.ifBlank { "제목 생성" })
-                                    // Use HTML content for AI prompt
-                                    put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
-                                    put("to_emails", JSONArray(contacts.map { it.email }))
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Scaffold { innerPadding ->
+                        if (showTemplateScreen) {
+                            // 템플릿 선택 화면
+                            TemplateSelectionScreen(
+                                onBack = { showTemplateScreen = false },
+                                onTemplateSelected = { template ->
+                                    subject = template.subject
+                                    editorState.setHtml(template.body)
+                                    showTemplateScreen = false
+                                },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        } else {
+                            // 메일 작성 화면
+                            EmailComposeScreen(
+                                modifier = Modifier.padding(innerPadding),
+                                subject = subject,
+                                onSubjectChange = { subject = it },
+                                editorState = editorState,
+                                contacts = contacts,
+                                onContactsChange = { contacts = it },
+                                newContact = newContact,
+                                onNewContactChange = { newContact = it },
+                                knownContactsByEmail = knownByEmail,
+                                isStreaming = composeUi.isStreaming,
+                                error = composeUi.error,
+                                sendUiState = sendUi,
+                                // Trigger our custom back press handling
+                                onBack = { onBackPressedDispatcher.onBackPressed() },
+                                onTemplateClick = { showTemplateScreen = true },
+                                onUndo = {
+                                    composeVm.undo()?.let { snapshot ->
+                                        subject = snapshot.subject
+                                        editorState.setHtml(snapshot.bodyHtml)
+                                    }
+                                },
+                                suggestionText = composeUi.suggestionText,
+                                onAcceptSuggestion = acceptSuggestion,
+                                aiRealtime = aiRealtime,
+                                onAiRealtimeToggle = { aiRealtime = it },
+                                onAiComplete = {
+                                    // Save current state before AI generation
+                                    composeVm.saveUndoSnapshot(
+                                        subject = subject,
+                                        bodyHtml = editorState.getHtml()
+                                    )
+
+                                    val payload = JSONObject().apply {
+                                        put("subject", subject.ifBlank { "제목 생성" })
+                                        // Use HTML content for AI prompt
+                                        put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
+                                        put("to_emails", JSONArray(contacts.map { it.email }))
 //                                    put("relationship", "업무 관련")
 //                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
 //                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
 //                                    put("format_prompt", "문단 구분, 끝인사 포함")
 //                                    put("language", "Korean")
-                                }
-                                composeVm.startStreaming(payload)
-                            },
-                            onStopStreaming = { composeVm.stopStreaming() },
-                            onSend = {
-                                val recipient = contacts.firstOrNull()?.email
-                                if (recipient == null) {
-                                    // This case is handled by button's enabled state, but as a safeguard:
-                                    return@EmailComposeScreen
-                                }
-                                // Send HTML content
-                                sendVm.sendEmail(
-                                    to = contacts.map { it.email },
-                                    subject = subject.ifBlank { "(제목 없음)" },
-                                    body = editorState.getHtml()
-                                )
-                            },
-                            onAddContactClick = { contact ->
-                                selectedContactForDialog = contact
-                                showAddContactDialog = true
-                            },
-                            bannerState = bannerState,
-                            onDismissBanner = { bannerState = null }
-                        )
+                                    }
+                                    composeVm.startStreaming(payload)
+                                },
+                                onStopStreaming = { composeVm.stopStreaming() },
+                                onSend = {
+                                    val recipient = contacts.firstOrNull()?.email
+                                    if (recipient == null) {
+                                        // This case is handled by button's enabled state, but as a safeguard:
+                                        return@EmailComposeScreen
+                                    }
+                                    // Send HTML content
+                                    sendVm.sendEmail(
+                                        to = contacts.map { it.email },
+                                        subject = subject.ifBlank { "(제목 없음)" },
+                                        body = editorState.getHtml()
+                                    )
+                                },
+                                onAddContactClick = { contact ->
+                                    selectedContactForDialog = contact
+                                    showAddContactDialog = true
+                                },
+                                bannerState = bannerState,
+                                onDismissBanner = { bannerState = null },
+                                showInlineSwipeBar = false
+                            )
 
-                        // Show Add Contact Dialog
-                        if (showAddContactDialog) {
-                            selectedContactForDialog?.let { contact ->
-                                AddContactDialog(
-                                    senderName = "",
-                                    senderEmail = contact.email,
-                                    groups = groups,
-                                    onDismiss = {
-                                        showAddContactDialog = false
-                                        selectedContactForDialog = null
-                                    },
-                                    onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
-                                        coroutineScope.launch {
-                                            try {
-                                                contactRepository.addContact(
-                                                    name = name,
-                                                    email = email,
-                                                    groupId = groupId,
-                                                    senderRole = senderRole,
-                                                    recipientRole = recipientRole,
-                                                    personalPrompt = personalPrompt
-                                                )
-                                                showAddContactDialog = false
-                                                selectedContactForDialog = null
-                                                // Show success banner
-                                                bannerState = BannerState(
-                                                    message = "연락처가 추가되었습니다.",
-                                                    type = BannerType.SUCCESS,
-                                                    autoDismiss = true
-                                                )
-                                            } catch (e: Exception) {
-                                                // Handle error
-                                                bannerState = BannerState(
-                                                    message = "오류: ${e.message}",
-                                                    type = BannerType.ERROR,
-                                                    autoDismiss = true
-                                                )
+                            // Show Add Contact Dialog
+                            if (showAddContactDialog) {
+                                selectedContactForDialog?.let { contact ->
+                                    AddContactDialog(
+                                        senderName = "",
+                                        senderEmail = contact.email,
+                                        groups = groups,
+                                        onDismiss = {
+                                            showAddContactDialog = false
+                                            selectedContactForDialog = null
+                                        },
+                                        onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                                            coroutineScope.launch {
+                                                try {
+                                                    contactRepository.addContact(
+                                                        name = name,
+                                                        email = email,
+                                                        groupId = groupId,
+                                                        senderRole = senderRole,
+                                                        recipientRole = recipientRole,
+                                                        personalPrompt = personalPrompt
+                                                    )
+                                                    showAddContactDialog = false
+                                                    selectedContactForDialog = null
+                                                    // Show success banner
+                                                    bannerState = BannerState(
+                                                        message = "연락처가 추가되었습니다.",
+                                                        type = BannerType.SUCCESS,
+                                                        autoDismiss = true
+                                                    )
+                                                } catch (e: Exception) {
+                                                    // Handle error
+                                                    bannerState = BannerState(
+                                                        message = "오류: ${e.message}",
+                                                        type = BannerType.ERROR,
+                                                        autoDismiss = true
+                                                    )
+                                                }
                                             }
                                         }
+                                    )
+                                }
+                            }
+
+                            // Show Save Draft Confirmation Dialog
+                            if (showSaveDraftDialog) {
+                                SaveDraftConfirmationDialog(
+                                    onDismiss = { showSaveDraftDialog = false },
+                                    onSave = {
+                                        coroutineScope.launch {
+                                            val draftId = inboxRepository.saveDraft(
+                                                DraftItem(
+                                                    subject = draftSubjectToSave,
+                                                    body = draftBodyToSave,
+                                                    recipients = contacts.map { it.email }
+                                                )
+                                            )
+                                            // Optionally show a banner for draft saved
+                                            bannerState = BannerState(
+                                                message = "임시 저장되었습니다. (ID: $draftId)",
+                                                type = BannerType.INFO,
+                                                autoDismiss = true
+                                            )
+                                            showSaveDraftDialog = false
+                                            setResult(RESULT_DRAFT_SAVED, Intent()) // Set result for parent activity
+                                            finish()
+                                        }
+                                    },
+                                    onDiscard = {
+                                        showSaveDraftDialog = false
+                                        finish()
+                                    }
+                                )
+                            }
+
+                            // Show Load Draft Confirmation Dialog
+                            if (showLoadDraftDialog) {
+                                LoadDraftConfirmationDialog(
+                                    onDismiss = { showLoadDraftDialog = false },
+                                    onLoad = {
+                                        loadedDraft?.let { draft ->
+                                            subject = draft.subject
+                                            editorState.setHtml(draft.body)
+                                            // Populate contacts from draft recipients
+                                            contacts = draft.recipients.map { email ->
+                                                val normalized = email.trim().lowercase()
+                                                knownByEmail[normalized]
+                                                    ?: Contact(id = -1L, name = email, email = email, group = null)
+                                            }
+                                            coroutineScope.launch {
+                                                inboxRepository.deleteDraft(draft.id) // Delete loaded draft
+                                            }
+                                        }
+                                        showLoadDraftDialog = false
+                                    },
+                                    onDiscard = {
+                                        coroutineScope.launch {
+                                            loadedDraft?.let { draft ->
+                                                inboxRepository.deleteDraft(draft.id) // Delete discarded draft
+                                            }
+                                        }
+                                        showLoadDraftDialog = false
                                     }
                                 )
                             }
                         }
-
-                        // Show Save Draft Confirmation Dialog
-                        if (showSaveDraftDialog) {
-                            SaveDraftConfirmationDialog(
-                                onDismiss = { showSaveDraftDialog = false },
-                                onSave = {
-                                    coroutineScope.launch {
-                                        val draftId = inboxRepository.saveDraft(
-                                            DraftItem(
-                                                subject = draftSubjectToSave,
-                                                body = draftBodyToSave,
-                                                recipients = contacts.map { it.email }
-                                            )
-                                        )
-                                        // Optionally show a banner for draft saved
-                                        bannerState = BannerState(
-                                            message = "임시 저장되었습니다. (ID: $draftId)",
-                                            type = BannerType.INFO,
-                                            autoDismiss = true
-                                        )
-                                        showSaveDraftDialog = false
-                                        setResult(RESULT_DRAFT_SAVED, Intent()) // Set result for parent activity
-                                        finish()
-                                    }
-                                },
-                                onDiscard = {
-                                    showSaveDraftDialog = false
-                                    finish()
-                                }
-                            )
-                        }
-
-                        // Show Load Draft Confirmation Dialog
-                        if (showLoadDraftDialog) {
-                            LoadDraftConfirmationDialog(
-                                onDismiss = { showLoadDraftDialog = false },
-                                onLoad = {
-                                    loadedDraft?.let { draft ->
-                                        subject = draft.subject
-                                        editorState.setHtml(draft.body)
-                                        // Populate contacts from draft recipients
-                                        contacts = draft.recipients.map { email ->
-                                            val normalized = email.trim().lowercase()
-                                            knownByEmail[normalized]
-                                                ?: Contact(id = -1L, name = email, email = email, group = null)
-                                        }
-                                        coroutineScope.launch {
-                                            inboxRepository.deleteDraft(draft.id) // Delete loaded draft
-                                        }
-                                    }
-                                    showLoadDraftDialog = false
-                                },
-                                onDiscard = {
-                                    coroutineScope.launch {
-                                        loadedDraft?.let { draft ->
-                                            inboxRepository.deleteDraft(draft.id) // Delete discarded draft
-                                        }
-                                    }
-                                    showLoadDraftDialog = false
-                                }
-                            )
-                        }
                     }
                 }
+
+                SwipeSuggestionOverlay(
+                    visible = composeUi.suggestionText.isNotEmpty(),
+                    onSwipe = acceptSuggestion
+                )
             }
         }
     }

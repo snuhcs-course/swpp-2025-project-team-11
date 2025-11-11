@@ -89,7 +89,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
 
                 // Monitor text changes for realtime suggestions
                 LaunchedEffect(editorState.editor) {
-                    editorState.editor?.setOnTextChangeListener { html ->
+                    editorState.editor?.setTextChangedListener { html ->
                         if (aiRealtime) {
                             composeVm.onTextChanged(html)
                         }
