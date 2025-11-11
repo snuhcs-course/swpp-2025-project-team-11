@@ -94,6 +94,8 @@ fun ContactBookScreen(
     onSearchQueryChange: (String) -> Unit = {}
 ) {
     val selectedTab = uiState.selectedTab
+    val sortedGroups = remember(uiState.groups) { uiState.groups.sortedBy { it.name } }
+    val sortedContacts = remember(uiState.contacts) { uiState.contacts.sortedBy { it.name } }
 
     val refreshing = uiState.isLoading
     val pullState = rememberPullRefreshState(
@@ -159,9 +161,9 @@ fun ContactBookScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(uiState.groups.size) { index ->
+                        items(sortedGroups.size) { index ->
                             GroupCard(
-                                group = uiState.groups[index],
+                                group = sortedGroups[index],
                                 onClick = onGroupClick,
                                 onEdit = onEditGroupClick,
                                 onDelete = onDeleteGroupClick
@@ -236,11 +238,11 @@ fun ContactBookScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        items(uiState.contacts.size) { index ->
+                        items(sortedContacts.size) { index ->
                             ContactRow(
-                                contact = uiState.contacts[index],
-                                subtitle = uiState.contacts[index].email,
-                                color = StableColor.forId(uiState.contacts[index].id),
+                                contact = sortedContacts[index],
+                                subtitle = sortedContacts[index].email,
+                                color = StableColor.forId(sortedContacts[index].id),
                                 onClick = onContactClick,
                                 onEdit = onEditContactClick,
                                 onDelete = onDeleteContactClick

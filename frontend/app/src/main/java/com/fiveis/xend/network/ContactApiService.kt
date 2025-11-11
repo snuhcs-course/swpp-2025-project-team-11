@@ -29,7 +29,10 @@ interface ContactApiService {
     suspend fun deleteContact(@Path("id") contactId: Long): Response<Void>
 
     @PATCH("api/contact/{id}/")
-    suspend fun updateContact(@Path("id") contactId: Long, @Body payload: Map<String, Long>): Response<ContactResponse>
+    suspend fun updateContact(
+        @Path("id") contactId: Long,
+        @Body payload: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<ContactResponse>
 
     // 그룹 관련
     @POST("api/contact/groups/")

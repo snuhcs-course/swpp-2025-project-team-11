@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +17,10 @@ import kotlinx.coroutines.launch
 data class ContactDetailUiState(
     val isLoading: Boolean = false,
     val contact: Contact? = null,
-    val error: String? = null
+    val error: String? = null,
+    val isUpdating: Boolean = false,
+    val updateError: String? = null,
+    val groups: List<Group> = emptyList()
 )
 
 class ContactDetailViewModel(
@@ -29,6 +33,14 @@ class ContactDetailViewModel(
 
     private var currentId: Long? = null
     private var job: Job? = null
+
+    init {
+        viewModelScope.launch {
+            repo.observeGroups().collectLatest { groups ->
+                ui.update { it.copy(groups = groups) }
+            }
+        }
+    }
 
     fun load(id: Long, force: Boolean = false) {
         if (!force && currentId == id) return
@@ -60,6 +72,34 @@ class ContactDetailViewModel(
                 .onSuccess { ui.update { it.copy(isLoading = false) } }
                 .onFailure { e -> ui.update { it.copy(isLoading = false, error = e.message) } }
         }
+    }
+
+    fun updateContact(
+        name: String,
+        email: String,
+        senderRole: String?,
+        recipientRole: String?,
+        personalPrompt: String?,
+        groupId: Long?
+    ) {
+        val id = currentId ?: return
+        ui.update { it.copy(isUpdating = true, updateError = null) }
+        viewModelScope.launch {
+            runCatching { repo.updateContact(id, name, email, senderRole, recipientRole, personalPrompt, groupId) }
+                .onSuccess { ui.update { it.copy(isUpdating = false, updateError = null) } }
+                .onFailure { e ->
+                    ui.update {
+                        it.copy(
+                            isUpdating = false,
+                            updateError = e.message ?: "연락처 수정에 실패했어요."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun clearUpdateError() {
+        ui.update { it.copy(updateError = null) }
     }
 
     override fun onCleared() {
