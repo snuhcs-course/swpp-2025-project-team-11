@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.contactbook
 
-import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,6 +19,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.theme.StableColor
 
@@ -53,8 +53,19 @@ class ContactDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val contactColor = StableColor.forId(contactId)
 
-                val viewModelFactory = remember { ContactDetailViewModelFactory(application) }
-                val vm: ContactDetailViewModel = viewModel(factory = viewModelFactory)
+                val factory = remember {
+                    object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ContactDetailViewModel(
+                                application,
+                                ContactBookRepository(applicationContext)
+                            ) as T
+                        }
+                    }
+                }
+
+                val vm: ContactDetailViewModel = viewModel(factory = factory)
                 LaunchedEffect(contactId) { vm.load(contactId) }
                 val state by vm.uiState.collectAsState()
 
@@ -96,17 +107,5 @@ class ContactDetailActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-private class ContactDetailViewModelFactory(
-    private val application: Application
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(ContactDetailViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ContactDetailViewModel(application) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

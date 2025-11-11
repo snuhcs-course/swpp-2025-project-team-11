@@ -15,14 +15,35 @@ class TokenRefreshAuthenticator(private val context: Context, private val tokenM
     override fun authenticate(route: Route?, response: Response): Request? {
         val refreshToken = tokenManager.getRefreshToken() ?: return null
 
+        // 토큰 갱신 시작 로그
+        val currentTime = java.text.SimpleDateFormat(
+            "yyyy-MM-dd HH:mm:ss.SSS",
+            java.util.Locale.getDefault()
+        ).format(java.util.Date())
+        android.util.Log.d("TokenAuthenticator", "========== 토큰 갱신 시작 ==========")
+        android.util.Log.d("TokenAuthenticator", "현재 시각: $currentTime")
+        android.util.Log.d("TokenAuthenticator", "사용할 Refresh Token: ${refreshToken.take(30)}...")
+        android.util.Log.d("TokenAuthenticator", "만료된 Access Token: ${tokenManager.getAccessToken()?.take(30)}...")
+
         return runBlocking {
             val tokenResponse = RetrofitClient.authApiService.refreshToken(TokenRefreshRequest(refreshToken))
 
             if (tokenResponse.isSuccessful && tokenResponse.body() != null) {
                 val newTokens = tokenResponse.body()!!
+
+                // 토큰 갱신 성공 로그
+                val successTime = java.text.SimpleDateFormat(
+                    "yyyy-MM-dd HH:mm:ss.SSS",
+                    java.util.Locale.getDefault()
+                ).format(java.util.Date())
+                android.util.Log.d("TokenAuthenticator", "✅ 토큰 갱신 성공")
+                android.util.Log.d("TokenAuthenticator", "갱신 완료 시각: $successTime")
+                android.util.Log.d("TokenAuthenticator", "새 Access Token: ${newTokens.accessToken.take(30)}...")
+                android.util.Log.d("TokenAuthenticator", "새 Refresh Token: ${newTokens.refreshToken.take(30)}...")
+                android.util.Log.d("TokenAuthenticator", "==========================================")
+
                 tokenManager.saveTokens(newTokens.accessToken, newTokens.refreshToken, tokenManager.getUserEmail()!!)
                 val fullToken = "Bearer ${newTokens.accessToken}"
-                android.util.Log.d("TokenAuthenticator", "Refreshed token added to header: $fullToken")
                 response.request.newBuilder()
                     .header("Authorization", fullToken)
                     .build()

@@ -1,5 +1,6 @@
 package com.fiveis.xend.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.fiveis.xend.data.model.AuthCodeRequest
 import com.fiveis.xend.data.model.LogoutRequest
@@ -9,7 +10,7 @@ import com.fiveis.xend.network.RetrofitClient
 /**
  * 인증 관련 Repository
  */
-class AuthRepository {
+class AuthRepository(private val context: Context? = null) {
 
     private val apiService: AuthApiService = RetrofitClient.authApiService
 
@@ -55,15 +56,36 @@ class AuthRepository {
     /**
      * 서버에 로그아웃 요청
      */
-    suspend fun logout(accessToken: String?, refreshToken: String?) {
-        if (accessToken == null) return
+    suspend fun logout(refreshToken: String?): LogoutResult {
+        if (refreshToken.isNullOrEmpty()) {
+            return LogoutResult.Failure("Refresh token이 없습니다")
+        }
 
-        try {
-            val formattedToken = "Bearer $accessToken"
-            val requestBody = LogoutRequest(refresh = refreshToken ?: "")
-            apiService.logout(formattedToken, requestBody)
+        // context가 있으면 인증이 포함된 API 서비스 사용
+        val logoutApiService = if (context != null) {
+            RetrofitClient.getAuthApiService(context)
+        } else {
+            apiService
+        }
+
+        return try {
+            val requestBody = LogoutRequest(refresh = refreshToken)
+            val response = logoutApiService.logout(requestBody)
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.detail == "Successfully logged out") {
+                    LogoutResult.Success
+                } else {
+                    LogoutResult.Failure("로그아웃 응답이 올바르지 않습니다")
+                }
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "알 수 없는 오류"
+                LogoutResult.Failure("서버 오류 (HTTP ${response.code()}): $errorBody")
+            }
         } catch (e: Exception) {
-            Log.w("AuthRepository", "로그아웃 요청 실패 (무시됨)", e)
+            Log.e("AuthRepository", "로그아웃 요청 실패", e)
+            LogoutResult.Failure("로그아웃 요청 실패: ${e.message}")
         }
     }
 }
@@ -78,4 +100,12 @@ sealed class AuthResult {
     ) : AuthResult()
 
     data class Failure(val message: String) : AuthResult()
+}
+
+/**
+ * 로그아웃 결과
+ */
+sealed class LogoutResult {
+    object Success : LogoutResult()
+    data class Failure(val message: String) : LogoutResult()
 }

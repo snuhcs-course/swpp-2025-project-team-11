@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.contactbook
 
-import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,6 +19,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.ui.theme.StableColor
 
 class GroupDetailActivity : ComponentActivity() {
@@ -52,8 +52,19 @@ class GroupDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val groupColor = StableColor.forId(groupId)
 
-                val viewModelFactory = remember { GroupDetailViewModelFactory(application) }
-                val vm: GroupDetailViewModel = viewModel(factory = viewModelFactory)
+                val factory = remember {
+                    object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return GroupDetailViewModel(
+                                application,
+                                ContactBookRepository(applicationContext)
+                            ) as T
+                        }
+                    }
+                }
+
+                val vm: GroupDetailViewModel = viewModel(factory = factory)
                 LaunchedEffect(groupId) { vm.load(groupId, force = true) }
                 val state by vm.uiState.collectAsStateWithLifecycle()
 
@@ -90,17 +101,5 @@ class GroupDetailActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-private class GroupDetailViewModelFactory(
-    private val application: Application
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(GroupDetailViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return GroupDetailViewModel(application) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

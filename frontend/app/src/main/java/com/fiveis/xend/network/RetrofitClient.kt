@@ -76,6 +76,7 @@ object RetrofitClient {
             .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
+
                 val accessToken = tokenManager.getAccessToken()
                 val request = if (accessToken != null) {
                     val fullToken = "Bearer $accessToken"
@@ -116,7 +117,7 @@ object RetrofitClient {
             .build()
     }
 
-    // AuthApiService 인터페이스의 구현체 생성
+    // AuthApiService 인터페이스의 구현체 생성 (인증 없이 사용)
     val authApiService: AuthApiService by lazy {
         val client = OkHttpClient.Builder()
             .dns(customDns)
@@ -126,6 +127,11 @@ object RetrofitClient {
             .addInterceptor(loggingInterceptor)
             .build()
         getRetrofit(client).create(AuthApiService::class.java)
+    }
+
+    // AuthApiService 인터페이스의 구현체 생성 (인증 포함)
+    fun getAuthApiService(context: Context): AuthApiService {
+        return getRetrofit(getClient(context)).create(AuthApiService::class.java)
     }
 
     // [추가] MailApiService 인터페이스의 구현체 추가

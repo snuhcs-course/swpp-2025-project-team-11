@@ -106,11 +106,10 @@ class LoginViewModel(
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {
-            val accessToken = tokenManager.getAccessToken()
             val refreshToken = tokenManager.getRefreshToken()
 
             // 서버에 로그아웃 요청
-            authRepository.logout(accessToken, refreshToken)
+            authRepository.logout(refreshToken)
 
             // 로컬 토큰 삭제
             tokenManager.clearTokens()

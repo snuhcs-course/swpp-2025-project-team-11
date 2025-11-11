@@ -17,6 +17,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import androidx.test.espresso.intent.Intents
+import androidx.test.espresso.intent.Intents.intended
+import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
+import com.fiveis.xend.ui.mail.MailActivity
+import com.fiveis.xend.ui.profile.ProfileActivity
+import com.fiveis.xend.ui.sent.SentActivity
+import org.junit.Rule
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -24,6 +34,9 @@ class NavigationIntegrationTest {
 
     private lateinit var context: Context
     private lateinit var tokenManager: TokenManager
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Before
     fun setup() {
@@ -227,6 +240,26 @@ class NavigationIntegrationTest {
         scenario.onActivity { activity ->
             activity.finish()
         }
+        scenario.close()
+    }
+
+    @Test
+    fun profile_activity_launches_from_sent_activity() {
+        val scenario = ActivityScenario.launch(SentActivity::class.java)
+        Intents.init()
+        composeTestRule.onNodeWithContentDescription("Profile").performClick()
+        intended(hasComponent(ProfileActivity::class.java.name))
+        Intents.release()
+        scenario.close()
+    }
+
+    @Test
+    fun profile_activity_launches_from_mail_activity() {
+        val scenario = ActivityScenario.launch(MailActivity::class.java)
+        Intents.init()
+        composeTestRule.onNodeWithContentDescription("Profile").performClick()
+        intended(hasComponent(ProfileActivity::class.java.name))
+        Intents.release()
         scenario.close()
     }
 }

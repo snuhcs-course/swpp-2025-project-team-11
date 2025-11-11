@@ -86,6 +86,9 @@ class MailActivity : ComponentActivity() {
                     onOpenSearch = {
                         startActivity(Intent(this, SearchActivity::class.java))
                     },
+                    onOpenProfile = {
+                        startActivity(Intent(this, com.fiveis.xend.ui.profile.ProfileActivity::class.java))
+                    },
                     onFabClick = {
                         composeLauncher.launch(Intent(this@MailActivity, MailComposeActivity::class.java))
                     },
