@@ -174,6 +174,27 @@ class MailComposeViewModel(
         if (suggestion.isNotEmpty()) {
             suggestionBuffer.clear()
             _ui.update { it.copy(suggestionText = "") }
+            debounceJob?.cancel()
+        }
+    }
+
+    /**
+     * Request new suggestion immediately (for tab completion)
+     */
+    fun requestImmediateSuggestion(currentText: String) {
+        if (!_ui.value.isRealtimeEnabled) return
+
+        debounceJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
+
+        viewModelScope.launch {
+            delay(100) // Short delay to let the UI update
+            wsClient?.sendMessage(
+                systemPrompt = "메일 초안 작성",
+                text = currentText,
+                maxTokens = 50
+            )
         }
     }
 
@@ -203,17 +224,10 @@ class MailComposeViewModel(
 
         if (normalized.isEmpty()) return ""
 
-<<<<<<< HEAD
-        val terminatorIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
-        val end = if (terminatorIndex == -1) normalized.length else terminatorIndex + 1
-
-        return normalized.substring(0, end).trim()
-=======
         val endIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
         val cutoff = if (endIndex == -1) normalized.length else endIndex + 1
 
         return normalized.substring(0, cutoff).trim()
->>>>>>> 46c42d9 (fix: keep realtime suggestion to first sentence)
     }
 
     override fun onCleared() {

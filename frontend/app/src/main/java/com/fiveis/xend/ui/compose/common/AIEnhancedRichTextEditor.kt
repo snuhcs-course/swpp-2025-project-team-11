@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -41,37 +40,41 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
-import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
-import com.mohamedrejeb.richeditor.model.RichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditorDefaults
 
 /**
- * AI 기능이 포함된 Rich Text Editor
+ * AI 기능이 포함된 Rich Text Editor (XendRichEditor 기반)
  * - Rich Text 편집 기능
  * - AI 제안 미리보기
  * - 탭 완성 버튼
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AIEnhancedRichTextEditor(
-    richTextState: RichTextState,
+    editorState: XendRichEditorState,
     isStreaming: Boolean,
     suggestionText: String,
     onAcceptSuggestion: () -> Unit,
+    onTextChanged: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     placeholder: String = "내용을 입력하세요"
 ) {
+    // Show/remove suggestion in editor
+    androidx.compose.runtime.LaunchedEffect(suggestionText) {
+        if (suggestionText.isNotEmpty()) {
+            editorState.showSuggestion(suggestionText)
+        } else {
+            editorState.removeSuggestion()
+        }
+    }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -81,37 +84,32 @@ fun AIEnhancedRichTextEditor(
         color = ComposeSurface
     ) {
         Column {
-            // 서식 도구 모음
-            RichTextEditorControls(state = richTextState)
-
-            // Rich Text Editor
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+            // Rich Text Editing Controls
+            RichTextEditorControls(
+                state = editorState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                colors = RichTextEditorDefaults.richTextEditorColors(
-                    containerColor = Color.White
-                ),
-                placeholder = {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                    )
-                }
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
-            // AI 제안 미리보기
-            if (suggestionText.isNotEmpty()) {
-                SuggestionPreviewPanel(suggestionText = suggestionText)
-            }
-
-            // 탭 완성 버튼 (제안이 있을 때만 표시)
-            if (suggestionText.isNotEmpty()) {
-                TapCompleteButton(onClick = onAcceptSuggestion)
+            // Rich Text Editor using AndroidView with swipe button
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+                    .padding(8.dp)
+            ) {
+                XendRichEditorView(
+                    state = editorState,
+                    placeholder = placeholder,
+                    onTextChanged = onTextChanged,
+                    enabled = !isStreaming,
+                    onSwipe = {
+                        editorState.acceptSuggestion()
+                        onAcceptSuggestion()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -141,6 +139,124 @@ private fun SuggestionPreviewPanel(suggestionText: String) {
                 ),
                 modifier = Modifier.padding(14.dp)
             )
+        }
+    }
+}
+
+/**
+ * Rich Text 편집 컨트롤 버튼들
+ */
+@Composable
+private fun RichTextEditorControls(state: XendRichEditorState, modifier: Modifier = Modifier) {
+    var showSizeDropdown by remember { mutableStateOf(false) }
+    val fontSizes = listOf(12, 14, 16, 18, 22, 24)
+
+    var showColorDropdown by remember { mutableStateOf(false) }
+    val colors = listOf(
+        Color.Black,
+        Color.Red,
+        Color.Blue,
+        Color.Green,
+        Color(0xFF6366F1),
+        Color(0xFFEC4899)
+    )
+
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Bold button
+        IconButton(onClick = { state.toggleBold() }) {
+            Icon(
+                imageVector = Icons.Default.FormatBold,
+                contentDescription = null,
+                tint = TextSecondary
+            )
+        }
+
+        // Italic button
+        IconButton(onClick = { state.toggleItalic() }) {
+            Icon(
+                imageVector = Icons.Default.FormatItalic,
+                contentDescription = null,
+                tint = TextSecondary
+            )
+        }
+
+        // Underline button
+        IconButton(onClick = { state.toggleUnderline() }) {
+            Icon(
+                imageVector = Icons.Default.FormatUnderlined,
+                contentDescription = null,
+                tint = TextSecondary
+            )
+        }
+
+        // Strikethrough button
+        IconButton(onClick = { state.toggleStrikethrough() }) {
+            Icon(
+                imageVector = Icons.Default.FormatStrikethrough,
+                contentDescription = null,
+                tint = TextSecondary
+            )
+        }
+
+        // Font size selector
+        Box {
+            IconButton(onClick = { showSizeDropdown = true }) {
+                Icon(
+                    Icons.Default.FormatSize,
+                    contentDescription = null,
+                    tint = TextSecondary
+                )
+            }
+            DropdownMenu(
+                expanded = showSizeDropdown,
+                onDismissRequest = { showSizeDropdown = false }
+            ) {
+                fontSizes.forEach { size ->
+                    DropdownMenuItem(
+                        text = { Text("${size}sp") },
+                        onClick = {
+                            state.changeFontSize(size)
+                            showSizeDropdown = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Font color selector
+        Box {
+            IconButton(onClick = { showColorDropdown = true }) {
+                Icon(
+                    imageVector = Icons.Default.FormatColorText,
+                    contentDescription = null,
+                    tint = TextSecondary
+                )
+            }
+            DropdownMenu(
+                expanded = showColorDropdown,
+                onDismissRequest = { showColorDropdown = false }
+            ) {
+                colors.forEach { color ->
+                    DropdownMenuItem(
+                        text = { Text("Color") },
+                        onClick = {
+                            state.changeTextColor(color.toArgb())
+                            showColorDropdown = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Circle,
+                                contentDescription = null,
+                                tint = color
+                            )
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -187,108 +303,6 @@ private fun TapCompleteButton(onClick: () -> Unit) {
                         color = Blue60
                     )
                 )
-            }
-        }
-    }
-}
-
-/**
- * Rich Text Editor 서식 도구 모음
- */
-@Composable
-private fun RichTextEditorControls(state: RichTextState, modifier: Modifier = Modifier) {
-    var showSizeDropdown by remember { mutableStateOf(false) }
-    val fontSizes = listOf(14.sp, 18.sp, 22.sp)
-
-    var showColorDropdown by remember { mutableStateOf(false) }
-    val colors = listOf(Color.Black, Color.Red, Color.Blue, Color.Green)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Bold button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatBold,
-                contentDescription = "Bold",
-                tint = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) Blue60 else TextSecondary
-            )
-        }
-        // Italic button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatItalic,
-                contentDescription = "Italic",
-                tint = if (state.currentSpanStyle.fontStyle == FontStyle.Italic) Blue60 else TextSecondary
-            )
-        }
-        // Underline button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatUnderlined,
-                contentDescription = "Underline",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.Underline) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-        // Strikethrough button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatStrikethrough,
-                contentDescription = "Strikethrough",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.LineThrough) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-
-        // Font size selector
-        Box {
-            IconButton(onClick = { showSizeDropdown = true }) {
-                Icon(Icons.Default.FormatSize, contentDescription = "Font Size")
-            }
-            DropdownMenu(expanded = showSizeDropdown, onDismissRequest = { showSizeDropdown = false }) {
-                fontSizes.forEach { size ->
-                    DropdownMenuItem(text = { Text("${size.value}") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(fontSize = size))
-                        showSizeDropdown = false
-                    })
-                }
-            }
-        }
-
-        // Font color selector
-        Box {
-            IconButton(onClick = { showColorDropdown = true }) {
-                Icon(
-                    imageVector = Icons.Default.FormatColorText,
-                    contentDescription = "Font Color",
-                    tint = state.currentSpanStyle.color
-                )
-            }
-            DropdownMenu(expanded = showColorDropdown, onDismissRequest = { showColorDropdown = false }) {
-                colors.forEach { color ->
-                    DropdownMenuItem(text = { Text("Color") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(color = color))
-                        showColorDropdown = false
-                    }, leadingIcon = {
-                        Icon(Icons.Default.Circle, contentDescription = null, tint = color)
-                    })
-                }
             }
         }
     }

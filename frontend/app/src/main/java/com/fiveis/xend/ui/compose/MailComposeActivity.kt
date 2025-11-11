@@ -39,20 +39,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Attachment
-import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatColorText
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.FormatStrikethrough
-import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,13 +78,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -114,6 +102,7 @@ import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.common.AIActionRow
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.AddButtonText
@@ -127,7 +116,6 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -148,7 +136,7 @@ data class BannerState(
 fun EmailComposeScreen(
     subject: String,
     onSubjectChange: (String) -> Unit,
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
+    editorState: com.fiveis.xend.ui.compose.common.XendRichEditorState,
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
@@ -254,7 +242,7 @@ fun EmailComposeScreen(
                 onToggle = onAiRealtimeToggle
             )
             AIEnhancedRichTextEditor(
-                richTextState = richTextState,
+                editorState = editorState,
                 isStreaming = isStreaming,
                 suggestionText = suggestionText,
                 onAcceptSuggestion = onAcceptSuggestion
@@ -597,108 +585,6 @@ private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) 
 }
 
 @Composable
-private fun RichTextEditorControls(
-    state: com.mohamedrejeb.richeditor.model.RichTextState,
-    modifier: Modifier = Modifier
-) {
-    var showSizeDropdown by remember { mutableStateOf(false) }
-    val fontSizes = listOf(14.sp, 18.sp, 22.sp)
-
-    var showColorDropdown by remember { mutableStateOf(false) }
-    val colors = listOf(Color.Black, Color.Red, Color.Blue, Color.Green)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Bold button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatBold,
-                contentDescription = "Bold",
-                tint = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) Blue60 else TextSecondary
-            )
-        }
-        // Italic button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatItalic,
-                contentDescription = "Italic",
-                tint = if (state.currentSpanStyle.fontStyle == FontStyle.Italic) Blue60 else TextSecondary
-            )
-        }
-        // Underline button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatUnderlined,
-                contentDescription = "Underline",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.Underline) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-        // Strikethrough button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatStrikethrough,
-                contentDescription = "Strikethrough",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.LineThrough) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-
-        // Font size selector
-        Box {
-            IconButton(onClick = { showSizeDropdown = true }) {
-                Icon(Icons.Default.FormatSize, contentDescription = "Font Size")
-            }
-            DropdownMenu(expanded = showSizeDropdown, onDismissRequest = { showSizeDropdown = false }) {
-                fontSizes.forEach { size ->
-                    DropdownMenuItem(text = { Text("${size.value}") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(fontSize = size))
-                        showSizeDropdown = false
-                    })
-                }
-            }
-        }
-
-        // Font color selector
-        Box {
-            IconButton(onClick = { showColorDropdown = true }) {
-                Icon(
-                    imageVector = Icons.Default.FormatColorText,
-                    contentDescription = "Font Color",
-                    tint = state.currentSpanStyle.color
-                )
-            }
-            DropdownMenu(expanded = showColorDropdown, onDismissRequest = { showColorDropdown = false }) {
-                colors.forEach { color ->
-                    DropdownMenuItem(text = { Text("Color") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(color = color))
-                        showColorDropdown = false
-                    }, leadingIcon = {
-                        Icon(Icons.Default.Circle, contentDescription = null, tint = color)
-                    })
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ErrorMessage(message: String) {
     Text(
         text = message,
@@ -863,7 +749,7 @@ class MailComposeActivity : ComponentActivity() {
 
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
-                val richTextState = rememberRichTextState()
+                val editorState = rememberXendRichEditorState()
 
                 // Draft loading states
                 var showLoadDraftDialog by remember { mutableStateOf(false) }
@@ -936,12 +822,12 @@ class MailComposeActivity : ComponentActivity() {
                         override fun handleOnBackPressed() {
                             Log.d("SaveDraftDebug", "Back button pressed in MailComposeActivity.")
                             // Check if there's content to save
-                            val hasContent = subject.isNotBlank() || richTextState.annotatedString.text.isNotBlank()
+                            val hasContent = subject.isNotBlank() || editorState.getText().isNotBlank()
                             val hasRecipient = contacts.isNotEmpty() // Check for recipients
                             Log.d("SaveDraftDebug", "hasContent: $hasContent, hasRecipient: $hasRecipient")
                             if (hasContent && hasRecipient) { // Only show dialog if there's content AND a recipient
                                 draftSubjectToSave = subject
-                                draftBodyToSave = richTextState.toHtml()
+                                draftBodyToSave = editorState.getHtml()
                                 showSaveDraftDialog = true
                                 Log.d("SaveDraftDebug", "showSaveDraftDialog set to true.")
                             } else {
@@ -971,14 +857,16 @@ class MailComposeActivity : ComponentActivity() {
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
-                        richTextState.setHtml(composeUi.bodyRendered)
+                        editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
 
                 // Monitor text changes for realtime suggestions
-                LaunchedEffect(richTextState.annotatedString.text) {
-                    if (aiRealtime) {
-                        composeVm.onTextChanged(richTextState.toHtml())
+                LaunchedEffect(editorState.editor) {
+                    editorState.editor?.setOnTextChangeListener { html ->
+                        if (aiRealtime) {
+                            composeVm.onTextChanged(html)
+                        }
                     }
                 }
 
@@ -1016,7 +904,7 @@ class MailComposeActivity : ComponentActivity() {
                             onBack = { showTemplateScreen = false },
                             onTemplateSelected = { template ->
                                 subject = template.subject
-                                richTextState.setHtml(template.body)
+                                editorState.setHtml(template.body)
                                 showTemplateScreen = false
                             },
                             modifier = Modifier.padding(innerPadding)
@@ -1027,7 +915,7 @@ class MailComposeActivity : ComponentActivity() {
                             modifier = Modifier.padding(innerPadding),
                             subject = subject,
                             onSubjectChange = { subject = it },
-                            richTextState = richTextState,
+                            editorState = editorState,
                             contacts = contacts,
                             onContactsChange = { contacts = it },
                             newContact = newContact,
@@ -1042,40 +930,15 @@ class MailComposeActivity : ComponentActivity() {
                             onUndo = {
                                 composeVm.undo()?.let { snapshot ->
                                     subject = snapshot.subject
-                                    richTextState.setHtml(snapshot.bodyHtml)
+                                    editorState.setHtml(snapshot.bodyHtml)
                                 }
                             },
                             suggestionText = composeUi.suggestionText,
                             onAcceptSuggestion = {
-                                // 전체 추천 문장 적용
-                                val suggestion = composeUi.suggestionText
-                                if (suggestion.isNotEmpty()) {
-                                    // Use max for insertion point
-                                    val insertionIndex = richTextState.selection.max
-                                    val currentText = richTextState.annotatedString.text
-                                    val previousChar = currentText.getOrNull(insertionIndex - 1)
-
-                                    val normalizedSuggestion = suggestion.replace("\n", " ").trimEnd()
-                                    val suggestionFirstChar = normalizedSuggestion.firstOrNull()
-
-                                    val needsSpaceBefore =
-                                        previousChar != null &&
-                                            !previousChar.isWhitespace() &&
-                                            suggestionFirstChar != null &&
-                                            !suggestionFirstChar.isWhitespace()
-
-                                    val textToInsert = buildString {
-                                        if (needsSpaceBefore) append(' ')
-                                        append(normalizedSuggestion)
-                                    }
-
-                                    if (textToInsert.isNotEmpty()) {
-                                        richTextState.addTextAfterSelection(textToInsert)
-                                    }
-
-                                    // 추천 완료 후 클리어
-                                    composeVm.acceptSuggestion()
-                                }
+                                // AI suggestion accepted - clear and request new one
+                                composeVm.acceptSuggestion()
+                                // Request new suggestion immediately
+                                composeVm.requestImmediateSuggestion(editorState.getHtml())
                             },
                             aiRealtime = aiRealtime,
                             onAiRealtimeToggle = { aiRealtime = it },
@@ -1083,13 +946,13 @@ class MailComposeActivity : ComponentActivity() {
                                 // Save current state before AI generation
                                 composeVm.saveUndoSnapshot(
                                     subject = subject,
-                                    bodyHtml = richTextState.toHtml()
+                                    bodyHtml = editorState.getHtml()
                                 )
 
                                 val payload = JSONObject().apply {
                                     put("subject", subject.ifBlank { "제목 생성" })
                                     // Use HTML content for AI prompt
-                                    put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
+                                    put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
                                     put("to_emails", JSONArray(contacts.map { it.email }))
 //                                    put("relationship", "업무 관련")
 //                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
@@ -1110,7 +973,7 @@ class MailComposeActivity : ComponentActivity() {
                                 sendVm.sendEmail(
                                     to = contacts.map { it.email },
                                     subject = subject.ifBlank { "(제목 없음)" },
-                                    body = richTextState.toHtml()
+                                    body = editorState.getHtml()
                                 )
                             },
                             onAddContactClick = { contact ->
@@ -1203,7 +1066,7 @@ class MailComposeActivity : ComponentActivity() {
                                 onLoad = {
                                     loadedDraft?.let { draft ->
                                         subject = draft.subject
-                                        richTextState.setHtml(draft.body)
+                                        editorState.setHtml(draft.body)
                                         // Populate contacts from draft recipients
                                         contacts = draft.recipients.map { email ->
                                             val normalized = email.trim().lowercase()
@@ -1240,11 +1103,11 @@ class MailComposeActivity : ComponentActivity() {
 @Composable
 private fun EmailComposePreview() {
     MaterialTheme(colorScheme = lightColorScheme()) {
-        val richTextState = rememberRichTextState()
+        val editorState = rememberXendRichEditorState()
         EmailComposeScreen(
             subject = "초안 제목",
             onSubjectChange = {},
-            richTextState = richTextState,
+            editorState = editorState,
             contacts = listOf(Contact(0L, null, "홍길동", "test@example.com")),
 
             onContactsChange = {},

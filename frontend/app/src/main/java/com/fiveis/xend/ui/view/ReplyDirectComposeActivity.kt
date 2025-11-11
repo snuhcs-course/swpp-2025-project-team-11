@@ -21,10 +21,10 @@ import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.compose.MailComposeViewModel
 import com.fiveis.xend.ui.compose.SendMailViewModel
 import com.fiveis.xend.ui.compose.TemplateSelectionScreen
+import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.utils.EmailUtils
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -80,7 +80,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
 
                 // subject와 body 상태 관리
                 var currentSubject by rememberSaveable { mutableStateOf(initialSubject) }
-                val richTextState = rememberRichTextState()
+                val editorState = rememberXendRichEditorState()
 
                 // Enable/disable realtime mode
                 LaunchedEffect(aiRealtime) {
@@ -88,9 +88,11 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 }
 
                 // Monitor text changes for realtime suggestions
-                LaunchedEffect(richTextState.annotatedString.text) {
-                    if (aiRealtime) {
-                        composeVm.onTextChanged(richTextState.toHtml())
+                LaunchedEffect(editorState.editor) {
+                    editorState.editor?.setOnTextChangeListener { html ->
+                        if (aiRealtime) {
+                            composeVm.onTextChanged(html)
+                        }
                     }
                 }
 
@@ -100,14 +102,14 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
-                        richTextState.setHtml(composeUi.bodyRendered)
+                        editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
 
                 // AI가 생성한 본문이 있으면 초기값으로 설정
                 LaunchedEffect(generatedBody) {
                     if (generatedBody.isNotEmpty()) {
-                        richTextState.setHtml(generatedBody)
+                        editorState.setHtml(generatedBody)
                     }
                 }
 
@@ -146,7 +148,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         onBack = { showTemplateScreen = false },
                         onTemplateSelected = { template ->
                             currentSubject = template.subject
-                            richTextState.setHtml(template.body)
+                            editorState.setHtml(template.body)
                             showTemplateScreen = false
                         }
                     )
@@ -168,7 +170,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         },
                         onTemplateClick = { showTemplateScreen = true },
                         onSubjectChange = { currentSubject = it },
-                        richTextState = richTextState,
+                        editorState = editorState,
                         senderEmail = senderEmail,
                         date = date,
                         originalBody = originalBody,
@@ -180,19 +182,19 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         onUndo = {
                             composeVm.undo()?.let { snapshot ->
                                 currentSubject = snapshot.subject
-                                richTextState.setHtml(snapshot.bodyHtml)
+                                editorState.setHtml(snapshot.bodyHtml)
                             }
                         },
                         onAiComplete = {
                             // Save current state before AI generation
                             composeVm.saveUndoSnapshot(
                                 subject = currentSubject,
-                                bodyHtml = richTextState.toHtml()
+                                bodyHtml = editorState.getHtml()
                             )
 
                             val payload = JSONObject().apply {
                                 put("subject", currentSubject.ifBlank { "제목 생성" })
-                                put("body", richTextState.toHtml().ifBlank { "간단한 답장 내용" })
+                                put("body", editorState.getHtml().ifBlank { "간단한 답장 내용" })
                                 put("to_emails", JSONArray(listOf(recipientEmail)))
                                 // 답장이므로 원본 메일 정보 포함
                                 if (originalBody.isNotEmpty()) {
@@ -203,36 +205,10 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         },
                         onStopStreaming = { composeVm.stopStreaming() },
                         onAcceptSuggestion = {
-                            // 전체 추천 문장 적용
-                            val suggestion = composeUi.suggestionText
-                            if (suggestion.isNotEmpty()) {
-                                val insertionIndex = with(richTextState.selection) {
-                                    if (reversed) start else end
-                                }
-                                val currentText = richTextState.annotatedString.text
-                                val previousChar = currentText.getOrNull(insertionIndex - 1)
-
-                                val normalizedSuggestion = suggestion.replace("\n", " ").trimEnd()
-                                val suggestionFirstChar = normalizedSuggestion.firstOrNull()
-
-                                val needsSpaceBefore =
-                                    previousChar != null &&
-                                        !previousChar.isWhitespace() &&
-                                        suggestionFirstChar != null &&
-                                        !suggestionFirstChar.isWhitespace()
-
-                                val textToInsert = buildString {
-                                    if (needsSpaceBefore) append(' ')
-                                    append(normalizedSuggestion)
-                                }
-
-                                if (textToInsert.isNotEmpty()) {
-                                    richTextState.addTextAfterSelection(textToInsert)
-                                }
-
-                                // 추천 완료 후 클리어
-                                composeVm.acceptSuggestion()
-                            }
+                            // AI suggestion accepted - clear and request new one
+                            composeVm.acceptSuggestion()
+                            // Request new suggestion immediately
+                            composeVm.requestImmediateSuggestion(editorState.getHtml())
                         },
                         onAiRealtimeToggle = { aiRealtime = it },
                         bannerState = bannerState,
