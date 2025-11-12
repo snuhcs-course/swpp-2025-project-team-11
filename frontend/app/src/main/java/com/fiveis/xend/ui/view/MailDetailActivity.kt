@@ -56,6 +56,12 @@ class MailDetailActivity : ComponentActivity() {
                     onDownloadAttachment = { attachment ->
                         viewModel.downloadAttachment(attachment)
                     },
+                    onAnalyzeAttachment = { attachment ->
+                        viewModel.analyzeAttachment(attachment)
+                    },
+                    onDismissAnalysis = {
+                        viewModel.dismissAnalysisPopup()
+                    },
                     onClearDownloadResult = {
                         viewModel.clearDownloadResult()
                     }

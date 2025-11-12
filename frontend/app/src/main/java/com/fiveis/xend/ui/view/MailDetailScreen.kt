@@ -22,10 +22,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -56,7 +59,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,7 +69,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Attachment
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.AttachmentExcelBg
 import com.fiveis.xend.ui.theme.AttachmentHeaderText
@@ -88,10 +95,13 @@ fun MailDetailScreen(
     onBack: () -> Unit,
     onReply: () -> Unit = {},
     onDownloadAttachment: (Attachment) -> Unit = {},
+    onAnalyzeAttachment: (Attachment) -> Unit = {},
+    onDismissAnalysis: () -> Unit = {},
     onClearDownloadResult: () -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     var attachmentToDownload by remember { mutableStateOf<Attachment?>(null) }
 
     LaunchedEffect(uiState.downloadSuccessMessage) {
@@ -159,7 +169,8 @@ fun MailDetailScreen(
                         mail = uiState.mail,
                         onAttachmentClick = { selected ->
                             attachmentToDownload = selected
-                        }
+                        },
+                        onAnalyzeAttachment = onAnalyzeAttachment
                     )
                 }
             }
@@ -179,6 +190,20 @@ fun MailDetailScreen(
 
     if (uiState.isDownloadingAttachment) {
         DownloadingDialog()
+    }
+
+    if (uiState.showAnalysisPopup && uiState.analysisTarget != null) {
+        AttachmentAnalysisPopup(
+            attachment = uiState.analysisTarget,
+            isLoading = uiState.isAnalyzingAttachment,
+            result = uiState.analysisResult,
+            errorMessage = uiState.analysisErrorMessage,
+            onDismiss = onDismissAnalysis,
+            onCopyGuide = { text ->
+                clipboardManager.setText(AnnotatedString(text))
+                Toast.makeText(context, "답장 가이드가 복사되었습니다.", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 }
 
@@ -256,7 +281,11 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun MailDetailContent(mail: EmailItem, onAttachmentClick: (Attachment) -> Unit) {
+private fun MailDetailContent(
+    mail: EmailItem,
+    onAttachmentClick: (Attachment) -> Unit,
+    onAnalyzeAttachment: (Attachment) -> Unit
+) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -285,7 +314,8 @@ private fun MailDetailContent(mail: EmailItem, onAttachmentClick: (Attachment) -
         if (mail.attachments.isNotEmpty()) {
             AttachmentSection(
                 attachments = mail.attachments,
-                onAttachmentClick = onAttachmentClick
+                onAttachmentClick = onAttachmentClick,
+                onAnalyzeAttachment = onAnalyzeAttachment
             )
         }
     }
@@ -448,7 +478,11 @@ private fun BodySection(body: String) {
 }
 
 @Composable
-private fun AttachmentSection(attachments: List<Attachment>, onAttachmentClick: (Attachment) -> Unit) {
+private fun AttachmentSection(
+    attachments: List<Attachment>,
+    onAttachmentClick: (Attachment) -> Unit,
+    onAnalyzeAttachment: (Attachment) -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -472,7 +506,8 @@ private fun AttachmentSection(attachments: List<Attachment>, onAttachmentClick: 
             attachments.forEach { attachment ->
                 AttachmentItem(
                     attachment = attachment,
-                    onClick = { onAttachmentClick(attachment) }
+                    onClick = { onAttachmentClick(attachment) },
+                    onAnalyze = { onAnalyzeAttachment(attachment) }
                 )
             }
         }
@@ -480,7 +515,7 @@ private fun AttachmentSection(attachments: List<Attachment>, onAttachmentClick: 
 }
 
 @Composable
-private fun AttachmentItem(attachment: Attachment, onClick: () -> Unit) {
+private fun AttachmentItem(attachment: Attachment, onClick: () -> Unit, onAnalyze: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -525,8 +560,8 @@ private fun AttachmentItem(attachment: Attachment, onClick: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AiAnalysisBadge()
-                ViewButton()
+                AiAnalysisBadge(onClick = onAnalyze)
+                PreviewButton()
             }
         }
     }
@@ -551,10 +586,11 @@ private fun AttachmentFileIcon(filename: String) {
 }
 
 @Composable
-private fun AiAnalysisBadge() {
+private fun AiAnalysisBadge(onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFEFF6FF)
+        color = Color(0xFFEFF6FF),
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
         Text(
             text = "AI 분석",
@@ -567,7 +603,7 @@ private fun AiAnalysisBadge() {
 }
 
 @Composable
-private fun ViewButton() {
+private fun PreviewButton(onClick: () -> Unit = {}) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = Purple60
@@ -575,13 +611,14 @@ private fun ViewButton() {
         Row(
             modifier = Modifier
                 .height(24.dp)
+                .clickable(onClick = onClick)
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
                 imageVector = Icons.Filled.Visibility,
-                contentDescription = "보기",
+                contentDescription = "미리보기",
                 tint = Color.White,
                 modifier = Modifier.size(12.dp)
             )
@@ -639,6 +676,264 @@ private fun DownloadingDialog() {
                     fontSize = 14.sp,
                     color = TextPrimary
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentAnalysisPopup(
+    attachment: Attachment,
+    isLoading: Boolean,
+    result: AttachmentAnalysisResponse?,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onCopyGuide: (String) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x88000000)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .heightIn(min = 400.dp, max = 640.dp),
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 12.dp,
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    AnalysisHeader(attachment = attachment, onDismiss = onDismiss)
+                    AnalysisContent(
+                        isLoading = isLoading,
+                        result = result,
+                        errorMessage = errorMessage,
+                        onCopyGuide = onCopyGuide
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisHeader(attachment: Attachment, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AttachmentFileIcon(filename = attachment.filename)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = attachment.filename,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Text(
+                    text = "파일 분석 결과",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFFF1F5F9),
+            modifier = Modifier.clickable(onClick = onDismiss)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "닫기",
+                tint = TextSecondary,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnalysisContent(
+    isLoading: Boolean,
+    result: AttachmentAnalysisResponse?,
+    errorMessage: String?,
+    onCopyGuide: (String) -> Unit
+) {
+    when {
+        isLoading -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator()
+                Text(
+                    text = "AI가 파일을 분석 중입니다...",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        errorMessage != null -> {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = errorMessage,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "잠시 후 다시 시도해주세요.",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        result == null -> {
+            Text(
+                text = "분석 결과를 불러올 수 없습니다.",
+                fontSize = 14.sp,
+                color = TextSecondary
+            )
+        }
+        else -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                AnalysisSection(
+                    title = "주요 내용 요약",
+                    backgroundColor = Color(0xFFF8FAFC),
+                    borderColor = Color(0xFFE2E8F0),
+                    contentLines = result.summary.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                )
+                AnalysisSection(
+                    title = "핵심 시사점",
+                    backgroundColor = Color(0xFFFFF7ED),
+                    borderColor = Color(0xFFFED7AA),
+                    contentLines = result.insights.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                )
+                AnalysisSection(
+                    title = "답장 작성 가이드",
+                    backgroundColor = Color(0xFFFAF5FF),
+                    borderColor = Color(0xFFDDD6FE),
+                    contentLines = result.mailGuide.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val guideText = result.mailGuide
+                    val copyEnabled = guideText.isNotBlank()
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        color = Color(0xFFF1F5F9),
+                        modifier = Modifier.clickable(
+                            enabled = copyEnabled,
+                            onClick = { if (copyEnabled) onCopyGuide(guideText) }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "답장 가이드 복사",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "답장 가이드 복사",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisSection(title: String, backgroundColor: Color, borderColor: Color, contentLines: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextPrimary
+        )
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = backgroundColor,
+            border = BorderStroke(1.dp, borderColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (contentLines.isEmpty()) {
+                    Text(
+                        text = "표시할 내용이 없습니다.",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                } else {
+                    contentLines.forEach { line ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 9.dp)
+                                    .size(6.dp)
+                                    .background(color = Purple60, shape = CircleShape)
+                            )
+                            Text(
+                                text = line,
+                                fontSize = 13.sp,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -769,6 +1064,8 @@ private fun MailDetailScreenPreview() {
             onBack = {},
             onReply = {},
             onDownloadAttachment = {},
+            onAnalyzeAttachment = {},
+            onDismissAnalysis = {},
             onClearDownloadResult = {}
         )
     }

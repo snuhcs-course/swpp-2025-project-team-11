@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.Attachment
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.repository.InboxRepository
 import java.io.File
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
 
 data class MailDetailUiState(
@@ -28,7 +30,12 @@ data class MailDetailUiState(
     val error: String? = null,
     val isDownloadingAttachment: Boolean = false,
     val downloadSuccessMessage: String? = null,
-    val downloadErrorMessage: String? = null
+    val downloadErrorMessage: String? = null,
+    val showAnalysisPopup: Boolean = false,
+    val isAnalyzingAttachment: Boolean = false,
+    val analysisResult: AttachmentAnalysisResponse? = null,
+    val analysisErrorMessage: String? = null,
+    val analysisTarget: Attachment? = null
 )
 
 class MailDetailViewModel(
@@ -154,12 +161,92 @@ class MailDetailViewModel(
         }
     }
 
+    fun analyzeAttachment(attachment: Attachment) {
+        val mailId = _uiState.value.mail?.id ?: return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    analysisTarget = attachment,
+                    showAnalysisPopup = true,
+                    isAnalyzingAttachment = true,
+                    analysisResult = null,
+                    analysisErrorMessage = null
+                )
+            }
+            try {
+                val safeFilename = attachment.filename.ifBlank { "attachment" }
+                val safeMimeType = attachment.mimeType.ifBlank { "application/octet-stream" }
+                val response = withContext(Dispatchers.IO) {
+                    inboxRepository.analyzeAttachment(
+                        messageId = mailId,
+                        attachmentId = attachment.attachmentId,
+                        filename = safeFilename,
+                        mimeType = safeMimeType
+                    )
+                }
+                if (!response.isSuccessful) {
+                    Log.e(
+                        "MailDetailViewModel",
+                        "Attachment analysis failed with code: ${response.code()}"
+                    )
+                    _uiState.update {
+                        it.copy(
+                            isAnalyzingAttachment = false,
+                            analysisErrorMessage = "AI 분석에 실패했습니다. (${response.code()})"
+                        )
+                    }
+                    return@launch
+                }
+
+                val body = response.body()
+                if (body == null) {
+                    _uiState.update {
+                        it.copy(
+                            isAnalyzingAttachment = false,
+                            analysisErrorMessage = "AI 분석 결과가 비어 있습니다."
+                        )
+                    }
+                    return@launch
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isAnalyzingAttachment = false,
+                        analysisResult = body,
+                        analysisErrorMessage = null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("MailDetailViewModel", "Error analyzing attachment", e)
+                _uiState.update {
+                    it.copy(
+                        isAnalyzingAttachment = false,
+                        analysisErrorMessage = e.message ?: "AI 분석 중 오류가 발생했습니다."
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissAnalysisPopup() {
+        _uiState.update {
+            it.copy(
+                showAnalysisPopup = false,
+                isAnalyzingAttachment = false,
+                analysisResult = null,
+                analysisErrorMessage = null,
+                analysisTarget = null
+            )
+        }
+    }
+
     private fun saveAttachmentToDownloads(attachment: Attachment, responseBody: ResponseBody): String? {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val resolver = appContext.contentResolver
-//                val displayName = generateUniqueFileName(attachment.filename)
-                val displayName = attachment.filename
+                val displayName = generateUniqueFileName(
+                    attachment.filename.ifBlank { "attachment" }
+                )
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, displayName)
                     put(

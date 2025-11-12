@@ -2,6 +2,8 @@ package com.fiveis.xend.data.repository
 
 import android.util.Log
 import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.model.AttachmentAnalysisRequest
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
@@ -129,6 +131,21 @@ class InboxRepository(
         mimeType: String
     ): Response<ResponseBody> {
         return mailApiService.downloadAttachment(messageId, attachmentId, filename, mimeType)
+    }
+
+    suspend fun analyzeAttachment(
+        messageId: String,
+        attachmentId: String,
+        filename: String,
+        mimeType: String
+    ): Response<AttachmentAnalysisResponse> {
+        val request = AttachmentAnalysisRequest(
+            messageId = messageId,
+            attachmentId = attachmentId,
+            filename = filename,
+            mimeType = mimeType
+        )
+        return mailApiService.analyzeAttachment(request)
     }
 
     suspend fun updateReadStatus(emailId: String, isUnread: Boolean) {
