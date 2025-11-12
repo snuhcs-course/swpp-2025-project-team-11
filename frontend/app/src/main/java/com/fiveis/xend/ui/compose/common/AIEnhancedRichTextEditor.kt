@@ -197,7 +197,8 @@ private fun SwipeBar(onSwipe: () -> Unit, modifier: Modifier = Modifier) {
                 text = "→ Swipe to apply →",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     color = Blue60,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    fontStyle = FontStyle.Italic
                 )
             )
         }

@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,6 +23,7 @@ import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.ui.compose.MailComposeViewModel
 import com.fiveis.xend.ui.compose.SendMailViewModel
 import com.fiveis.xend.ui.compose.TemplateSelectionScreen
+import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.XendTheme
@@ -142,6 +145,13 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     }
                 }
 
+                val acceptSuggestion: () -> Unit = {
+                    editorState.acceptSuggestion()
+                    editorState.requestFocusAndShowKeyboard()
+                    composeVm.acceptSuggestion()
+                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                }
+
                 if (showTemplateScreen) {
                     // 템플릿 선택 화면
                     TemplateSelectionScreen(
@@ -153,67 +163,69 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    // 답장 작성 화면
-                    ReplyDirectComposeScreen(
-                        recipientEmail = recipientEmail,
-                        recipientName = recipientName,
-                        subject = currentSubject,
-                        groups = groups,
-                        onBack = { finish() },
-                        onSend = { bodyText ->
-                            // 이메일 전송
-                            sendVm.sendEmail(
-                                to = listOf(recipientEmail),
-                                subject = currentSubject,
-                                body = bodyText
-                            )
-                        },
-                        onTemplateClick = { showTemplateScreen = true },
-                        onSubjectChange = { currentSubject = it },
-                        editorState = editorState,
-                        senderEmail = senderEmail,
-                        date = date,
-                        originalBody = originalBody,
-                        sendUiState = sendUiState,
-                        // AI 관련 파라미터
-                        isStreaming = composeUi.isStreaming,
-                        suggestionText = composeUi.suggestionText,
-                        aiRealtime = aiRealtime,
-                        onUndo = {
-                            composeVm.undo()?.let { snapshot ->
-                                currentSubject = snapshot.subject
-                                editorState.setHtml(snapshot.bodyHtml)
-                            }
-                        },
-                        onAiComplete = {
-                            // Save current state before AI generation
-                            composeVm.saveUndoSnapshot(
-                                subject = currentSubject,
-                                bodyHtml = editorState.getHtml()
-                            )
-
-                            val payload = JSONObject().apply {
-                                put("subject", currentSubject.ifBlank { "제목 생성" })
-                                put("body", editorState.getHtml().ifBlank { "간단한 답장 내용" })
-                                put("to_emails", JSONArray(listOf(recipientEmail)))
-                                // 답장이므로 원본 메일 정보 포함
-                                if (originalBody.isNotEmpty()) {
-                                    put("reply_body", originalBody)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        ReplyDirectComposeScreen(
+                            recipientEmail = recipientEmail,
+                            recipientName = recipientName,
+                            subject = currentSubject,
+                            groups = groups,
+                            onBack = { finish() },
+                            onSend = { bodyText ->
+                                // 이메일 전송
+                                sendVm.sendEmail(
+                                    to = listOf(recipientEmail),
+                                    subject = currentSubject,
+                                    body = bodyText
+                                )
+                            },
+                            onTemplateClick = { showTemplateScreen = true },
+                            onSubjectChange = { currentSubject = it },
+                            editorState = editorState,
+                            senderEmail = senderEmail,
+                            date = date,
+                            originalBody = originalBody,
+                            sendUiState = sendUiState,
+                            // AI 관련 파라미터
+                            isStreaming = composeUi.isStreaming,
+                            suggestionText = composeUi.suggestionText,
+                            aiRealtime = aiRealtime,
+                            onUndo = {
+                                composeVm.undo()?.let { snapshot ->
+                                    currentSubject = snapshot.subject
+                                    editorState.setHtml(snapshot.bodyHtml)
                                 }
-                            }
-                            composeVm.startStreaming(payload)
-                        },
-                        onStopStreaming = { composeVm.stopStreaming() },
-                        onAcceptSuggestion = {
-                            // AI suggestion accepted - clear and request new one
-                            composeVm.acceptSuggestion()
-                            // Request new suggestion immediately
-                            composeVm.requestImmediateSuggestion(editorState.getHtml())
-                        },
-                        onAiRealtimeToggle = { aiRealtime = it },
-                        bannerState = bannerState,
-                        onDismissBanner = { bannerState = null }
-                    )
+                            },
+                            onAiComplete = {
+                                // Save current state before AI generation
+                                composeVm.saveUndoSnapshot(
+                                    subject = currentSubject,
+                                    bodyHtml = editorState.getHtml()
+                                )
+
+                                val payload = JSONObject().apply {
+                                    put("subject", currentSubject.ifBlank { "제목 생성" })
+                                    put("body", editorState.getHtml().ifBlank { "간단한 답장 내용" })
+                                    put("to_emails", JSONArray(listOf(recipientEmail)))
+                                    // 답장이므로 원본 메일 정보 포함
+                                    if (originalBody.isNotEmpty()) {
+                                        put("reply_body", originalBody)
+                                    }
+                                }
+                                composeVm.startStreaming(payload)
+                            },
+                            onStopStreaming = { composeVm.stopStreaming() },
+                            onAcceptSuggestion = acceptSuggestion,
+                            onAiRealtimeToggle = { aiRealtime = it },
+                            bannerState = bannerState,
+                            onDismissBanner = { bannerState = null },
+                            showInlineSwipeBar = false
+                        )
+
+                        SwipeSuggestionOverlay(
+                            visible = composeUi.suggestionText.isNotEmpty(),
+                            onSwipe = acceptSuggestion
+                        )
+                    }
                 }
             }
         }

@@ -111,7 +111,8 @@ fun ReplyDirectComposeScreen(
     onAcceptSuggestion: () -> Unit = {},
     onAiRealtimeToggle: (Boolean) -> Unit = {},
     bannerState: com.fiveis.xend.ui.compose.BannerState? = null,
-    onDismissBanner: () -> Unit = {}
+    onDismissBanner: () -> Unit = {},
+    showInlineSwipeBar: Boolean = true
 ) {
     var isMailContentExpanded by remember { mutableStateOf(false) }
 
@@ -281,7 +282,8 @@ fun ReplyDirectComposeScreen(
                 editorState = editorState,
                 isStreaming = isStreaming,
                 suggestionText = suggestionText,
-                onAcceptSuggestion = onAcceptSuggestion
+                onAcceptSuggestion = onAcceptSuggestion,
+                showInlineSwipeBar = showInlineSwipeBar
             )
         }
     }
