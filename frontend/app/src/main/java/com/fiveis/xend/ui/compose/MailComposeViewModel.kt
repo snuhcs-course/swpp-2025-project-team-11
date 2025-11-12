@@ -33,8 +33,9 @@ class MailComposeViewModel(
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
 
-    // Undo snapshot
+    // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
+    private var redoSnapshot: UndoSnapshot? = null
 
     data class UndoSnapshot(
         val subject: String,
@@ -43,11 +44,24 @@ class MailComposeViewModel(
 
     fun saveUndoSnapshot(subject: String, bodyHtml: String) {
         undoSnapshot = UndoSnapshot(subject, bodyHtml)
+        redoSnapshot = null
     }
 
-    fun undo(): UndoSnapshot? {
-        val snapshot = undoSnapshot
+    fun undo(currentSubject: String? = null, currentBodyHtml: String? = null): UndoSnapshot? {
+        val snapshot = undoSnapshot ?: return null
+        if (currentSubject != null && currentBodyHtml != null) {
+            redoSnapshot = UndoSnapshot(currentSubject, currentBodyHtml)
+        }
         undoSnapshot = null
+        return snapshot
+    }
+
+    fun redo(currentSubject: String? = null, currentBodyHtml: String? = null): UndoSnapshot? {
+        val snapshot = redoSnapshot ?: return null
+        if (currentSubject != null && currentBodyHtml != null) {
+            undoSnapshot = UndoSnapshot(currentSubject, currentBodyHtml)
+        }
+        redoSnapshot = null
         return snapshot
     }
 

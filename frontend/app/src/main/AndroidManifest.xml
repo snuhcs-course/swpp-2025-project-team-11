@@ -38,10 +38,14 @@
         <activity android:name=".ui.inbox.InboxActivity" />
         <activity android:name=".ui.sent.SentActivity" />
         <activity android:name=".ui.mail.MailActivity" />
-        <activity android:name=".ui.compose.MailComposeActivity" />
+        <activity
+            android:name=".ui.compose.MailComposeActivity"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.view.MailDetailActivity" />
         <activity android:name=".ui.view.ReplyComposeActivity" />
-        <activity android:name=".ui.view.ReplyDirectComposeActivity" />
+        <activity
+            android:name=".ui.view.ReplyDirectComposeActivity"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.contactbook.ContactBookActivity" />
         <activity android:name=".ui.search.SearchActivity" />
         <activity android:name=".ui.contactbook.AddContactActivity" />

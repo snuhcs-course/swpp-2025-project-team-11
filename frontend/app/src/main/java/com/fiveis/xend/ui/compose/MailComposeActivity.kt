@@ -16,6 +16,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,18 +38,24 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -77,6 +84,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -99,7 +107,6 @@ import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
-import com.fiveis.xend.ui.compose.common.AIActionRow
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
@@ -117,6 +124,8 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -160,10 +169,17 @@ fun EmailComposeScreen(
     onAddContactClick: ((Contact) -> Unit)? = null,
     bannerState: BannerState?,
     onDismissBanner: () -> Unit,
-    showInlineSwipeBar: Boolean = true
+    showInlineSwipeBar: Boolean = true,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onRedo: () -> Unit,
+    contactSuggestions: List<Contact>,
+    onSuggestionClick: (Contact) -> Unit,
+    onShowPrompt: () -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         modifier = modifier
@@ -210,27 +226,38 @@ fun EmailComposeScreen(
                 }
             }
 
-            AIActionRow(
-                isStreaming = isStreaming,
-                onUndo = onUndo,
-                onAiComplete = onAiComplete,
-                onStopStreaming = onStopStreaming,
-                aiCompleteEnabled = contacts.isNotEmpty()
+            SectionHeaderWithAction(
+                title = "받는 사람",
+                actionLabel = "프롬프트",
+                actionEnabled = contacts.isNotEmpty(),
+                onActionClick = onShowPrompt
             )
-
-            SectionHeader("받는 사람")
             RecipientSection(
                 contacts = contacts,
                 onContactsChange = onContactsChange,
                 newContact = newContact,
                 onNewContactChange = onNewContactChange,
                 knownContactsByEmail = knownContactsByEmail,
-                onAddContactClick = onAddContactClick
+                onAddContactClick = onAddContactClick,
+                contactSuggestions = contactSuggestions,
+                onSuggestionClick = onSuggestionClick
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            SectionHeader("제목")
+            SubjectControlRow(
+                label = "제목",
+                canUndo = canUndo,
+                canRedo = canRedo,
+                onUndo = onUndo,
+                onRedo = onRedo,
+                undoRedoVisible = !isStreaming && (canUndo || canRedo),
+                isStreaming = isStreaming,
+                aiCompleteEnabled = contacts.isNotEmpty(),
+                onAiComplete = onAiComplete,
+                onStopStreaming = onStopStreaming
+            )
+
             SubjectField(
                 value = subject,
                 enabled = !isStreaming,
@@ -248,8 +275,15 @@ fun EmailComposeScreen(
                 isStreaming = isStreaming,
                 suggestionText = suggestionText,
                 onAcceptSuggestion = onAcceptSuggestion,
-                showInlineSwipeBar = showInlineSwipeBar
+                showInlineSwipeBar = showInlineSwipeBar,
+                onEditorFocused = {
+                    coroutineScope.launch {
+                        scrollState.animateScrollTo(scrollState.maxValue)
+                    }
+                }
             )
+
+            Spacer(modifier = Modifier.height(240.dp))
 
             error?.let { ErrorMessage(it) }
         }
@@ -372,16 +406,185 @@ private fun ToolbarIconButton(
 
 @Composable
 private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall.copy(
-            color = ToolbarIconTint,
-            fontWeight = FontWeight.SemiBold
-        ),
+    SectionHeaderWithAction(title = text, actionLabel = null, actionEnabled = true, onActionClick = null)
+}
+
+@Composable
+private fun SectionHeaderWithAction(
+    title: String,
+    actionLabel: String?,
+    actionEnabled: Boolean,
+    onActionClick: (() -> Unit)?
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    )
+            .padding(horizontal = 20.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = ToolbarIconTint,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+
+        if (!actionLabel.isNullOrEmpty() && onActionClick != null) {
+            TextButton(
+                onClick = onActionClick,
+                enabled = actionEnabled,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = actionLabel,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = if (actionEnabled) Blue60 else Blue60.copy(alpha = 0.4f),
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UndoRedoButton(icon: ImageVector, contentDescription: String, enabled: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, ComposeOutline),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier.height(32.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) ToolbarIconTint else ToolbarIconTint.copy(alpha = 0.3f),
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun SubjectControlRow(
+    label: String,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    undoRedoVisible: Boolean,
+    isStreaming: Boolean,
+    onAiComplete: () -> Unit,
+    onStopStreaming: () -> Unit,
+    aiCompleteEnabled: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = ToolbarIconTint,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedVisibility(visible = undoRedoVisible) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UndoRedoButton(
+                        icon = Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "실행취소",
+                        enabled = canUndo,
+                        onClick = onUndo
+                    )
+                    UndoRedoButton(
+                        icon = Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "다시 실행",
+                        enabled = canRedo,
+                        onClick = onRedo
+                    )
+                }
+            }
+            if (isStreaming) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onStopStreaming,
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Stop,
+                            contentDescription = "AI 중지",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "중지",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFEF4444)
+                            )
+                        )
+                    }
+                    Text(
+                        text = "AI 플래너가 메일 구조를 설계 중입니다",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = Blue60
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onAiComplete,
+                    enabled = aiCompleteEnabled,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (aiCompleteEnabled) Blue60 else Blue60.copy(alpha = 0.3f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Blue60,
+                        disabledContentColor = Blue60.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = "AI 완성",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "AI 완성",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -391,7 +594,9 @@ private fun RecipientSection(
     newContact: TextFieldValue,
     onNewContactChange: (TextFieldValue) -> Unit,
     knownContactsByEmail: Map<String, Contact>,
-    onAddContactClick: ((Contact) -> Unit)? = null
+    onAddContactClick: ((Contact) -> Unit)? = null,
+    contactSuggestions: List<Contact> = emptyList(),
+    onSuggestionClick: (Contact) -> Unit = {}
 ) {
     fun normalizeEmail(s: String) = s.trim().lowercase()
 
@@ -417,47 +622,120 @@ private fun RecipientSection(
     }
 
     val scrollState = rememberScrollState()
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeSurface
-    ) {
-        Row(
+    Column {
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
-                .padding(horizontal = 12.dp)
-                .horizontalScroll(scrollState),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, ComposeOutline),
+            color = ComposeSurface
         ) {
-            contacts.forEachIndexed { index, contact ->
-                ContactChip(
-                    contact = contact,
-                    onRemove = {
-                        onContactsChange(contacts.filterNot { it.email == contact.email })
-                    },
-                    onAddToContacts = if (contact.id < 0L && onAddContactClick != null) {
-                        { onAddContactClick(contact) }
-                    } else {
-                        null
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 36.dp)
+                    .padding(horizontal = 12.dp)
+                    .horizontalScroll(scrollState),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                contacts.forEachIndexed { index, contact ->
+                    ContactChip(
+                        contact = contact,
+                        onRemove = {
+                            onContactsChange(contacts.filterNot { it.email == contact.email })
+                        },
+                        onEdit = {
+                            onNewContactChange(TextFieldValue(contact.email))
+                            onContactsChange(contacts.filterNot { it.email == contact.email })
+                        },
+                        onAddToContacts = if (contact.id < 0L && onAddContactClick != null) {
+                            { onAddContactClick(contact) }
+                        } else {
+                            null
+                        }
+                    )
+                    if (index != contacts.lastIndex) {
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                )
-                if (index != contacts.lastIndex) {
+                }
+                if (contacts.isNotEmpty()) {
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-            }
-            if (contacts.isNotEmpty()) {
+                RecipientInputField(
+                    value = newContact,
+                    onValueChange = onNewContactChange,
+                    onAdd = addContact
+                )
                 Spacer(modifier = Modifier.width(8.dp))
             }
-            RecipientInputField(
-                value = newContact,
-                onValueChange = onNewContactChange,
-                onAdd = addContact
+        }
+
+        AnimatedVisibility(visible = contactSuggestions.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "연락처 추천",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = ToolbarIconTint,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                contactSuggestions.forEach { suggestion ->
+                    RecipientSuggestionRow(
+                        contact = suggestion,
+                        onClick = { onSuggestionClick(suggestion) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecipientSuggestionRow(contact: Contact, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(ComposeSurface)
+            .border(BorderStroke(1.dp, ComposeOutline), RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val displayName = contact.name?.takeIf { it.isNotBlank() } ?: contact.email
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Blue80.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                style = MaterialTheme.typography.labelLarge.copy(color = Blue80)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = contact.email,
+                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -515,7 +793,13 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("제목을 입력하세요", color = TextSecondary) },
+        placeholder = {
+            Text(
+                "제목을 입력하세요",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
         singleLine = true,
         enabled = enabled,
         shape = RoundedCornerShape(18.dp),
@@ -523,6 +807,8 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            .height(48.dp),
+        textStyle = MaterialTheme.typography.bodySmall
     )
 }
 
@@ -600,13 +886,20 @@ private fun ErrorMessage(message: String) {
 }
 
 @Composable
-fun ContactChip(contact: Contact, onRemove: () -> Unit, onAddToContacts: (() -> Unit)? = null) {
+fun ContactChip(
+    contact: Contact,
+    onRemove: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onAddToContacts: (() -> Unit)? = null
+) {
     val isKnown = contact.id >= 0L
     val borderColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
     val dotColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
 
     Surface(
-        modifier = Modifier.height(24.dp),
+        modifier = Modifier
+            .height(24.dp)
+            .clickable(enabled = onEdit != null) { onEdit?.invoke() },
         shape = RoundedCornerShape(12.dp),
         color = ComposeSurface,
         border = BorderStroke(1.dp, borderColor)
@@ -760,25 +1053,35 @@ class MailComposeActivity : ComponentActivity() {
 
                 var contacts by remember { mutableStateOf(prefilledContact?.let(::listOf) ?: emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
+                var contactSuggestions by remember { mutableStateOf<List<Contact>>(emptyList()) }
 
                 var showTemplateScreen by remember { mutableStateOf(false) }
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
+                var canUndo by rememberSaveable { mutableStateOf(false) }
+                var canRedo by rememberSaveable { mutableStateOf(false) }
 
                 // Banner state
-                var bannerState by remember {
-                    mutableStateOf<BannerState?>(
-                        BannerState(
-                            message = "연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.",
-                            type = BannerType.INFO,
-                            autoDismiss = false
-                        )
-                    )
-                }
+                var bannerState by remember { mutableStateOf<BannerState?>(null) }
                 // Auto-dismiss logic for banners
                 LaunchedEffect(bannerState) {
                     if (bannerState?.autoDismiss == true) {
                         kotlinx.coroutines.delay(3000)
                         bannerState = null
+                    }
+                }
+
+                // Show info banner when unregistered contacts exist
+                LaunchedEffect(contacts, knownByEmail) {
+                    val hasUnknown = contacts.any { contact ->
+                        contact.id < 0L && contact.email.lowercase() !in knownByEmail
+                    }
+                    bannerState = if (hasUnknown) {
+                        BannerState(
+                            message = "저장되지 않은 연락처가 있습니다. 저장하면 더 향상된 AI 메일 작성이 가능해요.",
+                            type = BannerType.INFO
+                        )
+                    } else {
+                        null
                     }
                 }
 
@@ -819,6 +1122,23 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(newContact.text) {
+                    val query = newContact.text.trim()
+                    if (query.length < 2) {
+                        contactSuggestions = emptyList()
+                    } else {
+                        delay(250)
+                        val results = runCatching {
+                            contactRepository.searchContacts(query).first()
+                        }.getOrDefault(emptyList())
+                        contactSuggestions = results
+                            .filterNot { candidate ->
+                                contacts.any { it.email.equals(candidate.email, ignoreCase = true) }
+                            }
+                            .take(5)
+                    }
+                }
+
                 // Handle back press to show save draft dialog
                 val onBackPressedCallback = remember {
                     object : OnBackPressedCallback(true) {
@@ -850,6 +1170,24 @@ class MailComposeActivity : ComponentActivity() {
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
+
+                val undoAction: () -> Unit = {
+                    composeVm.undo(subject, editorState.getHtml())?.let { snapshot ->
+                        subject = snapshot.subject
+                        editorState.setHtml(snapshot.bodyHtml)
+                        canUndo = false
+                        canRedo = true
+                    }
+                }
+
+                val redoAction: () -> Unit = {
+                    composeVm.redo(subject, editorState.getHtml())?.let { snapshot ->
+                        subject = snapshot.subject
+                        editorState.setHtml(snapshot.bodyHtml)
+                        canUndo = true
+                        canRedo = false
+                    }
+                }
 
                 // Enable/disable realtime mode when toggle changes
                 LaunchedEffect(aiRealtime) {
@@ -938,12 +1276,7 @@ class MailComposeActivity : ComponentActivity() {
                                 // Trigger our custom back press handling
                                 onBack = { onBackPressedDispatcher.onBackPressed() },
                                 onTemplateClick = { showTemplateScreen = true },
-                                onUndo = {
-                                    composeVm.undo()?.let { snapshot ->
-                                        subject = snapshot.subject
-                                        editorState.setHtml(snapshot.bodyHtml)
-                                    }
-                                },
+                                onUndo = undoAction,
                                 suggestionText = composeUi.suggestionText,
                                 onAcceptSuggestion = acceptSuggestion,
                                 aiRealtime = aiRealtime,
@@ -954,6 +1287,8 @@ class MailComposeActivity : ComponentActivity() {
                                         subject = subject,
                                         bodyHtml = editorState.getHtml()
                                     )
+                                    canUndo = true
+                                    canRedo = false
 
                                     val payload = JSONObject().apply {
                                         put("subject", subject.ifBlank { "제목 생성" })
@@ -988,7 +1323,21 @@ class MailComposeActivity : ComponentActivity() {
                                 },
                                 bannerState = bannerState,
                                 onDismissBanner = { bannerState = null },
-                                showInlineSwipeBar = false
+                                showInlineSwipeBar = false,
+                                canUndo = canUndo,
+                                canRedo = canRedo,
+                                onRedo = redoAction,
+                                contactSuggestions = contactSuggestions,
+                                onSuggestionClick = { suggestion ->
+                                    if (contacts.none { it.email.equals(suggestion.email, ignoreCase = true) }) {
+                                        contacts = contacts + suggestion
+                                    }
+                                    newContact = TextFieldValue("")
+                                    contactSuggestions = emptyList()
+                                },
+                                onShowPrompt = {
+                                    // TODO: Hook up prompt viewer once backend API is ready
+                                }
                             )
 
                             // Show Add Contact Dialog
@@ -1136,7 +1485,13 @@ private fun EmailComposePreview() {
             aiRealtime = true,
             onAiRealtimeToggle = {},
             bannerState = null,
-            onDismissBanner = {}
+            onDismissBanner = {},
+            canUndo = false,
+            canRedo = false,
+            onRedo = {},
+            contactSuggestions = emptyList(),
+            onSuggestionClick = {},
+            onShowPrompt = {}
         )
     }
 }
