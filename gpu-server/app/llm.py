@@ -31,7 +31,7 @@ async def stream_generate_reply(system_prompt: str, user_input: str, max_tokens:
 
     input_length = input_ids.shape[1]
 
-    for attempt in range(1, 4):
+    for attempt in range(1, retry+1):
         try:
             output = model.generate(
                 input_ids,
