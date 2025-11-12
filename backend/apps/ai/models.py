@@ -21,12 +21,9 @@ class MailAnalysisResult(TimeStampedModel):
         db_index=True,
     )
 
-    # 프롬프트에서 분석하는 항목에 따라 필드 수정 필요함
-    lexical_style = models.TextField()
-    grammar_patterns = models.TextField()
-    emotional_tone = models.TextField()
-    figurative_usage = models.TextField()
-    long_sentence_ratio = models.TextField()
+    lexical_style = models.JSONField()
+    grammar_patterns = models.JSONField()
+    emotional_tone = models.JSONField()
     representative_sentences = ArrayField(base_field=models.TextField(), default=list)
 
 
@@ -47,12 +44,9 @@ class ContactAnalysisResult(TimeStampedModel):
     last_analysis_id = models.IntegerField(null=True, blank=True)
     # 마지막으로 통합에 사용된 MailAnalysisResult 모델의 id를 저장함
 
-    # 프롬프트에서 분석하는 항목에 따라 필드 수정 필요함
-    lexical_style = models.TextField()
-    grammar_patterns = models.TextField()
-    emotional_tone = models.TextField()
-    figurative_usage = models.TextField()
-    long_sentence_ratio = models.TextField()
+    lexical_style = models.JSONField()
+    grammar_patterns = models.JSONField()
+    emotional_tone = models.JSONField()
     representative_sentences = ArrayField(base_field=models.TextField(), default=list)
 
 
@@ -73,10 +67,7 @@ class GroupAnalysisResult(TimeStampedModel):
     last_analysis_id = models.IntegerField(null=True, blank=True)
     # 마지막으로 통합에 사용된 MailAnalysisResult 모델의 id를 저장함
 
-    # 프롬프트에서 분석하는 항목에 따라 필드 수정 필요함
-    lexical_style = models.TextField()
-    grammar_patterns = models.TextField()
-    emotional_tone = models.TextField()
-    figurative_usage = models.TextField()
-    long_sentence_ratio = models.TextField()
+    lexical_style = models.JSONField()
+    grammar_patterns = models.JSONField()
+    emotional_tone = models.JSONField()
     representative_sentences = ArrayField(base_field=models.TextField(), default=list)

@@ -82,6 +82,9 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         if raw_inputs["body"]:
             system_prompt += f"\n사용자는 다음 내용의 메일에 답장하고 있습니다:\n{raw_inputs["body"]}"
 
+        if raw_inputs["analysis"]:
+            system_prompt += f"\n사용자가 수신자들에게 작성한 메일을 분석한 내용은 다음과 같습니다:\n{raw_inputs["analysis"]}"
+
         system_prompt += """\n\n
         user: 안녕하세요 오늘 회의 진행을 맡은 홍길동 대리입니다.
         output: {"output": "오늘 회의 자료를 준비하면서"}

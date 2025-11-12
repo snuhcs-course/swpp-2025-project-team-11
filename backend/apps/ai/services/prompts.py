@@ -418,17 +418,38 @@ Body:
 "{{ incoming_body }}"
 
 Extract the following as JSON:
-- lexical_style: summary of vocabulary and word choice habits
-- grammar_patterns: notable grammar structures or sentence organization patterns
-- emotional_tone: emotional tone category
-- figurative_usage: summary of figurative language usage and effect
-- long_sentence_ratio: ratio of sentences with >30 words
-- representative_sentences: list of 3-5 sentences that most strongly reflect the user's writing style
+{
+  "lexical_style": {
+    "summary": "Analysis of vocabulary and word choice habits — the summary must integrate evidence from top_connectives, frequent_phrases, slang_or_chat_markers, and politeness_lexemes to describe the writer’s lexical tone, formality, and characteristic expressions.",
+    "top_connectives": "Describe notable discourse connectives or linking expressions that frequently appear in the email and how they shape cohesion or tone.",
+    "frequent_phrases": "Identify and explain any recurring idioms, set phrases, or formulaic expressions characteristic of the writer’s communication style.",
+    "slang_or_chat_markers": "Describe the presence or absence of casual elements such as emojis, laughter markers, or colloquial sentence endings, and their effect on tone.",
+    "politeness_lexemes": "Explain how the writer uses polite or mitigated vocabulary such as thank, sorry, or hedge expressions to adjust formality or soften statements."
+  },
 
-Sentence selection rules for representative_sentences:
-- preserve the exact style without modification
-- include idioms, emotional markers, or unique grammar constructions
-- each sentence should stand alone meaningfully
+  "grammar_patterns": {
+    "summary": "Analysis of sentence structure and grammatical patterns — reflect evidence from ender_distribution, sentence_length, sentence_type_ratio, structure_pattern, and paragraph_stats to describe how the writer organizes sentences, uses endings, and structures the email’s overall flow.",
+    "ender_distribution": "Describe the dominant sentence endings (e.g., formal declarative, polite imperative) and what they reveal about the tone and register.",
+    "sentence_length": "Summarize the general tendency in sentence length, noting whether the writer favors short, concise sentences or longer, complex structures.",
+    "sentence_type_ratio": "Explain the balance among declarative, interrogative, imperative, and exclamatory sentences, and how this affects the communicative style.",
+    "structure_pattern": "Outline the logical or rhetorical structure of the email, describing the sequence of sections such as greeting, purpose, request, or closing.",
+    "paragraph_stats": "Comment on the paragraph organization, such as the number and relative length of sections, and how this contributes to clarity or flow."
+  },
+
+  "emotional_tone": {
+    "summary": "Analysis of the writer’s emotional and pragmatic tone — integrate findings across lexical and grammatical dimensions to describe overall tone, formality_level, politeness_level, directness_score, warmth_score, speech_act_distribution, and request_style in descriptive prose.",
+    "overall": "Describe the dominant emotional tone category (e.g., calm_polite, neutral_direct, friendly_formal).",
+    "formality_level": "Explain the perceived level of formality based on sentence endings, lexical choice, and tone.",
+    "politeness_level": "Describe how polite or considerate the writing appears, referencing indirect or softened expressions.",
+    "directness_score": "Discuss how directly or indirectly the writer conveys requests or opinions.",
+    "warmth_score": "Describe the warmth or emotional temperature of the writing, noting whether it feels distant, neutral, or friendly.",
+    "speech_act_distribution": "Summarize the range of communicative functions present, such as requests, information, thanks, apologies, or small talk, and how they shape interpersonal stance.",
+    "request_style": "Characterize the request style as direct, indirect, or neutral, based on the phrasing and level of mitigation.",
+    "notes": "Provide a concise integrative explanation combining all observed emotional and pragmatic features."
+  },
+
+  "representative_sentences": "List 3–5 sentences that best represent the writer’s style. Select sentences that include idiomatic expressions, distinctive grammar, or tone markers, preserving their original wording."
+}
 
 Return ONLY the JSON object. Do not include commentary or extra text.
 """.strip()
@@ -457,12 +478,38 @@ Analysis results list (JSON array):
 
 Your task:
 Integrate them into a single unified result with the SAME fields as an individual analysis:
-- lexical_style
-- grammar_patterns
-- emotional_tone
-- figurative_usage
-- long_sentence_ratio
-- representative_sentences
+{
+  "lexical_style": {
+    "summary": "Analysis of vocabulary and word choice habits — the summary must integrate evidence from top_connectives, frequent_phrases, slang_or_chat_markers, and politeness_lexemes to describe the writer’s lexical tone, formality, and characteristic expressions.",
+    "top_connectives": "Describe notable discourse connectives or linking expressions that frequently appear in the email and how they shape cohesion or tone.",
+    "frequent_phrases": "Identify and explain any recurring idioms, set phrases, or formulaic expressions characteristic of the writer’s communication style.",
+    "slang_or_chat_markers": "Describe the presence or absence of casual elements such as emojis, laughter markers, or colloquial sentence endings, and their effect on tone.",
+    "politeness_lexemes": "Explain how the writer uses polite or mitigated vocabulary such as thank, sorry, or hedge expressions to adjust formality or soften statements."
+  },
+
+  "grammar_patterns": {
+    "summary": "Analysis of sentence structure and grammatical patterns — reflect evidence from ender_distribution, sentence_length, sentence_type_ratio, structure_pattern, and paragraph_stats to describe how the writer organizes sentences, uses endings, and structures the email’s overall flow.",
+    "ender_distribution": "Describe the dominant sentence endings (e.g., formal declarative, polite imperative) and what they reveal about the tone and register.",
+    "sentence_length": "Summarize the general tendency in sentence length, noting whether the writer favors short, concise sentences or longer, complex structures.",
+    "sentence_type_ratio": "Explain the balance among declarative, interrogative, imperative, and exclamatory sentences, and how this affects the communicative style.",
+    "structure_pattern": "Outline the logical or rhetorical structure of the email, describing the sequence of sections such as greeting, purpose, request, or closing.",
+    "paragraph_stats": "Comment on the paragraph organization, such as the number and relative length of sections, and how this contributes to clarity or flow."
+  },
+
+  "emotional_tone": {
+    "summary": "Analysis of the writer’s emotional and pragmatic tone — integrate findings across lexical and grammatical dimensions to describe overall tone, formality_level, politeness_level, directness_score, warmth_score, speech_act_distribution, and request_style in descriptive prose.",
+    "overall": "Describe the dominant emotional tone category (e.g., calm_polite, neutral_direct, friendly_formal).",
+    "formality_level": "Explain the perceived level of formality based on sentence endings, lexical choice, and tone.",
+    "politeness_level": "Describe how polite or considerate the writing appears, referencing indirect or softened expressions.",
+    "directness_score": "Discuss how directly or indirectly the writer conveys requests or opinions.",
+    "warmth_score": "Describe the warmth or emotional temperature of the writing, noting whether it feels distant, neutral, or friendly.",
+    "speech_act_distribution": "Summarize the range of communicative functions present, such as requests, information, thanks, apologies, or small talk, and how they shape interpersonal stance.",
+    "request_style": "Characterize the request style as direct, indirect, or neutral, based on the phrasing and level of mitigation.",
+    "notes": "Provide a concise integrative explanation combining all observed emotional and pragmatic features."
+  },
+
+  "representative_sentences": "List 3–5 sentences that best represent the writer’s style. Select sentences that include idiomatic expressions, distinctive grammar, or tone markers, preserving their original wording."
+}
 
 Rules for integration:
 - Combine overlapping findings into a concise unified description
