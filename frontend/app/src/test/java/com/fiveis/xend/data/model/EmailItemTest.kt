@@ -144,4 +144,32 @@ class EmailItemTest {
         assertTrue(item.cachedAt >= beforeCreation)
         assertTrue(item.cachedAt <= afterCreation)
     }
+
+    @Test
+    fun email_item_stores_attachment_metadata() {
+        val attachments = listOf(
+            Attachment(
+                attachmentId = "att-1",
+                filename = "report.pdf",
+                mimeType = "application/pdf",
+                size = 2048
+            )
+        )
+
+        val item = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Subject",
+            fromEmail = "sender@test.com",
+            toEmail = "recipient@test.com",
+            snippet = "snippet",
+            date = "2024-10-30",
+            dateRaw = "1698624000",
+            isUnread = true,
+            labelIds = listOf("INBOX"),
+            attachments = attachments
+        )
+
+        assertEquals(attachments, item.attachments)
+    }
 }

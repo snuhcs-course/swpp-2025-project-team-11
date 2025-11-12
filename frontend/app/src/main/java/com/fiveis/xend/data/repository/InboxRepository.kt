@@ -8,6 +8,7 @@ import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.network.MailApiService
 import kotlinx.coroutines.flow.Flow
+import okhttp3.ResponseBody
 import retrofit2.Response
 
 class InboxRepository(
@@ -119,6 +120,10 @@ class InboxRepository(
 
     suspend fun getMail(messageId: String): Response<MailDetailResponse> {
         return mailApiService.getMail(messageId)
+    }
+
+    suspend fun downloadAttachment(messageId: String, attachmentId: String): Response<ResponseBody> {
+        return mailApiService.downloadAttachment(messageId, attachmentId)
     }
 
     suspend fun updateReadStatus(emailId: String, isUnread: Boolean) {

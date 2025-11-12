@@ -4,6 +4,7 @@ import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.data.model.SendResponse
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Multipart
@@ -27,4 +28,10 @@ interface MailApiService {
 
     @GET("api/mail/emails/{message_id}/")
     suspend fun getMail(@Path("message_id") messageId: String): Response<MailDetailResponse>
+
+    @GET("api/mail/emails/{message_id}/attachments/{attachment_id}/")
+    suspend fun downloadAttachment(
+        @Path("message_id") messageId: String,
+        @Path("attachment_id") attachmentId: String
+    ): Response<ResponseBody>
 }
