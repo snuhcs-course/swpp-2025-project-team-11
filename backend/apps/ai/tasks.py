@@ -35,8 +35,6 @@ def analyze_speech(self, user_id, subject, body, to_emails):
                     lexical_style=analysis_result["lexical_style"],
                     grammar_patterns=analysis_result["grammar_patterns"],
                     emotional_tone=analysis_result["emotional_tone"],
-                    figurative_usage=analysis_result["figurative_usage"],
-                    long_sentence_ratio=analysis_result["long_sentence_ratio"],
                     representative_sentences=analysis_result["representative_sentences"],
                 )
 
@@ -49,8 +47,6 @@ def analyze_speech(self, user_id, subject, body, to_emails):
                         lexical_style=result.lexical_style,
                         grammar_patterns=result.grammar_patterns,
                         emotional_tone=result.emotional_tone,
-                        figurative_usage=result.figurative_usage,
-                        long_sentence_ratio=result.long_sentence_ratio,
                         representative_sentences=result.representative_sentences,
                     )
 
@@ -63,8 +59,6 @@ def analyze_speech(self, user_id, subject, body, to_emails):
                         lexical_style=result.lexical_style,
                         grammar_patterns=result.grammar_patterns,
                         emotional_tone=result.emotional_tone,
-                        figurative_usage=result.figurative_usage,
-                        long_sentence_ratio=result.long_sentence_ratio,
                         representative_sentences=result.representative_sentences,
                     )
 
@@ -111,8 +105,6 @@ def unified_analysis(self, n=10):
                     "lexical_style": r.lexical_style,
                     "grammar_patterns": r.grammar_patterns,
                     "emotional_tone": r.emotional_tone,
-                    "figurative_usage": r.figurative_usage,
-                    "long_sentence_ratio": r.long_sentence_ratio,
                     "representative_sentences": r.representative_sentences,
                 }
                 for r in latest_n_results
@@ -125,8 +117,6 @@ def unified_analysis(self, n=10):
             contact_result.lexical_style = unified["lexical_style"]
             contact_result.grammar_patterns = unified["grammar_patterns"]
             contact_result.emotional_tone = unified["emotional_tone"]
-            contact_result.figurative_usage = unified["figurative_usage"]
-            contact_result.long_sentence_ratio = unified["long_sentence_ratio"]
             contact_result.representative_sentences = unified["representative_sentences"]
             contact_result.last_analysis_id = latest_mail_id
 
@@ -160,8 +150,6 @@ def unified_analysis(self, n=10):
                     "lexical_style": r.lexical_style,
                     "grammar_patterns": r.grammar_patterns,
                     "emotional_tone": r.emotional_tone,
-                    "figurative_usage": r.figurative_usage,
-                    "long_sentence_ratio": r.long_sentence_ratio,
                     "representative_sentences": r.representative_sentences,
                 }
                 for r in latest_n_results
@@ -173,8 +161,6 @@ def unified_analysis(self, n=10):
             group_result.lexical_style = unified["lexical_style"]
             group_result.grammar_patterns = unified["grammar_patterns"]
             group_result.emotional_tone = unified["emotional_tone"]
-            group_result.figurative_usage = unified["figurative_usage"]
-            group_result.long_sentence_ratio = unified["long_sentence_ratio"]
             group_result.representative_sentences = unified["representative_sentences"]
             group_result.last_analysis_id = latest_mail_id
 
