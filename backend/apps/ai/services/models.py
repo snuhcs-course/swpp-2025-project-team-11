@@ -22,12 +22,39 @@ class ValidationResult(BaseModel):
     rewrite_instructions: str = Field("", description="Short instructions to fix issues if validation failed")
 
 
+class LexicalStyle(BaseModel):
+    summary: str | None
+    top_connectives: str | None
+    frequent_phrases: str | None
+    slang_or_chat_markers: str | None
+    politeness_lexemes: str | None
+
+
+class GrammarPatterns(BaseModel):
+    summary: str | None
+    ender_distribution: str | None
+    sentence_length: str | None
+    sentence_type_ratio: str | None
+    structure_pattern: str | None
+    paragraph_stats: str | None
+
+
+class EmotionalTone(BaseModel):
+    summary: str | None
+    overall: str | None
+    formality_level: str | None
+    politeness_level: str | None
+    directness_score: str | None
+    warmth_score: str | None
+    speech_act_distribution: str | None
+    request_style: str | None
+    notes: str | None
+
+
 class SpeechAnalysis(BaseModel):
-    lexical_style: str
-    grammar_patterns: str
-    emotional_tone: str
-    figurative_usage: str
-    long_sentence_ratio: str
+    lexical_style: LexicalStyle | None
+    grammar_patterns: GrammarPatterns | None
+    emotional_tone: EmotionalTone | None
     representative_sentences: list[str] = Field(default_factory=list)
 
 
