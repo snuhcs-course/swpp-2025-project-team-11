@@ -179,14 +179,20 @@ def delete_up_n(n=10):
 
     for entry in contacts:
         extra_count = entry["count"] - n
-        MailAnalysisResult.objects.filter(contact=entry["contact"]).order_by("created_at")[:extra_count].delete()
+        old_ids = MailAnalysisResult.objects.filter(contact=entry["contact"]).order_by("created_at").values_list("id", flat=True)[:extra_count]
+        MailAnalysisResult.objects.filter(id__in=list(old_ids)).delete()
 
     # Group 별 정리
     groups = MailAnalysisResult.objects.values("contact__group").annotate(count=Count("id")).filter(count__gt=n)
 
     for entry in groups:
         extra_count = entry["count"] - n
-        MailAnalysisResult.objects.filter(contact__group=entry["contact__group"]).order_by("created_at")[:extra_count].delete()
+        old_ids = (
+            MailAnalysisResult.objects.filter(contact__group=entry["contact__group"])
+            .order_by("created_at")
+            .values_list("id", flat=True)[:extra_count]
+        )
+        MailAnalysisResult.objects.filter(id__in=list(old_ids)).delete()
 
 
 @shared_task
