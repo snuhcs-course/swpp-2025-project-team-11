@@ -239,11 +239,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material:material:1.7.7")
 
-    // Compose Rich Editor
-    implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")
-
     // WebView-based Rich Editor (wasabeef)
-    implementation("jp.wasabeef:richeditor-android:2.0.0")
+    implementation(libs.wasabeef.richeditor)
 
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
