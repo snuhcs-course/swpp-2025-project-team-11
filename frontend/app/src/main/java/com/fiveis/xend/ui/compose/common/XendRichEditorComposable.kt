@@ -164,7 +164,7 @@ fun XendRichEditorView(
             XendRichEditor(context).apply {
                 // Set placeholder
                 setPlaceholder(placeholder)
-                setEditorHeight(320)
+                // setEditorHeight(320)
 
                 // Enable focus
                 isFocusable = true

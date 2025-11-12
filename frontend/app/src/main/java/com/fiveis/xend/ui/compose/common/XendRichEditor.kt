@@ -17,6 +17,7 @@ class XendRichEditor @JvmOverloads constructor(
 
     private val textChangeListeners = mutableListOf<(String) -> Unit>()
     private var cursorPosition: Int = 0
+    private var baseStylesInjected: Boolean = false
 
     init {
         // Enable JavaScript
@@ -30,7 +31,24 @@ class XendRichEditor @JvmOverloads constructor(
         setOnInitialLoadListener {
             setEditorFontSize(15)
             setPadding(16, 16, 16, 16)
+            injectBaseStyles()
         }
+    }
+
+    private fun injectBaseStyles() {
+        if (baseStylesInjected) return
+        val js = """
+            (function() {
+                var style = document.getElementById('xend-editor-base-style');
+                if (style) return;
+                style = document.createElement('style');
+                style.id = 'xend-editor-base-style';
+                style.innerHTML = "i, em, #ai-suggestion { font-style: normal !important; transform: skewX(-15deg); }";
+                document.head.appendChild(style);
+            })();
+        """.trimIndent()
+        evaluateJavascript(js, null)
+        baseStylesInjected = true
     }
 
     /**
@@ -213,7 +231,6 @@ class XendRichEditor @JvmOverloads constructor(
                 textSpan.id = 'ai-suggestion';
                 textSpan.contentEditable = 'false';
                 textSpan.style.color = '#9CA3AF';
-                textSpan.style.fontStyle = 'italic';
                 textSpan.style.fontSize = '14px';
                 textSpan.style.userSelect = 'none';
                 textSpan.textContent = ' ' + '$escapedText';
