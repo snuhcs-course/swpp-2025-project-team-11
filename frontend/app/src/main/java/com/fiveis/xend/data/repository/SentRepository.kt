@@ -121,8 +121,13 @@ class SentRepository(
         return mailApiService.getMail(messageId)
     }
 
-    suspend fun downloadAttachment(messageId: String, attachmentId: String): Response<ResponseBody> {
-        return mailApiService.downloadAttachment(messageId, attachmentId)
+    suspend fun downloadAttachment(
+        messageId: String,
+        attachmentId: String,
+        filename: String,
+        mimeType: String
+    ): Response<ResponseBody> {
+        return mailApiService.downloadAttachment(messageId, attachmentId, filename, mimeType)
     }
 
     suspend fun updateReadStatus(emailId: String, isUnread: Boolean) {

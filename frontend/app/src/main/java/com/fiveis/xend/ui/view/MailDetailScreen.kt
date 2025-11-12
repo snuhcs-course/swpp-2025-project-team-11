@@ -1,10 +1,14 @@
 package com.fiveis.xend.ui.view
 
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -16,11 +20,15 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,24 +41,36 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import com.fiveis.xend.data.model.Attachment
+import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.theme.AttachmentExcelBg
+import com.fiveis.xend.ui.theme.AttachmentHeaderText
+import com.fiveis.xend.ui.theme.AttachmentImageBg
 import com.fiveis.xend.ui.theme.BackgroundWhite
+import com.fiveis.xend.ui.theme.Blue40
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
@@ -59,11 +79,34 @@ import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: () -> Unit = {}) {
+fun MailDetailScreen(
+    uiState: MailDetailUiState,
+    onBack: () -> Unit,
+    onReply: () -> Unit = {},
+    onDownloadAttachment: (Attachment) -> Unit = {},
+    onClearDownloadResult: () -> Unit = {}
+) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val context = LocalContext.current
+    var attachmentToDownload by remember { mutableStateOf<Attachment?>(null) }
+
+    LaunchedEffect(uiState.downloadSuccessMessage) {
+        uiState.downloadSuccessMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            onClearDownloadResult()
+        }
+    }
+
+    LaunchedEffect(uiState.downloadErrorMessage) {
+        uiState.downloadErrorMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            onClearDownloadResult()
+        }
+    }
 
     Scaffold(
         modifier = Modifier
@@ -113,11 +156,29 @@ fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: ()
                 }
                 uiState.mail != null -> {
                     MailDetailContent(
-                        mail = uiState.mail
+                        mail = uiState.mail,
+                        onAttachmentClick = { selected ->
+                            attachmentToDownload = selected
+                        }
                     )
                 }
             }
         }
+    }
+
+    attachmentToDownload?.let { attachment ->
+        AttachmentDownloadDialog(
+            attachment = attachment,
+            onDismiss = { attachmentToDownload = null },
+            onConfirm = {
+                onDownloadAttachment(attachment)
+                attachmentToDownload = null
+            }
+        )
+    }
+
+    if (uiState.isDownloadingAttachment) {
+        DownloadingDialog()
     }
 }
 
@@ -195,7 +256,7 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem) {
+private fun MailDetailContent(mail: EmailItem, onAttachmentClick: (Attachment) -> Unit) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -220,8 +281,13 @@ private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem) {
         // C. 메일 본문
         BodySection(body = mail.body)
 
-        // D. 첨부파일 섹션 (API에 데이터 없으므로 주석 처리)
-        // AttachmentSection()
+        // D. 첨부파일 섹션
+        if (mail.attachments.isNotEmpty()) {
+            AttachmentSection(
+                attachments = mail.attachments,
+                onAttachmentClick = onAttachmentClick
+            )
+        }
     }
 }
 
@@ -382,6 +448,203 @@ private fun BodySection(body: String) {
 }
 
 @Composable
+private fun AttachmentSection(attachments: List<Attachment>, onAttachmentClick: (Attachment) -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFF8FAFC),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "첨부파일 (${attachments.size}개)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = AttachmentHeaderText
+            )
+            attachments.forEach { attachment ->
+                AttachmentItem(
+                    attachment = attachment,
+                    onClick = { onAttachmentClick(attachment) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentItem(attachment: Attachment, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = BackgroundWhite,
+        border = BorderStroke(1.dp, ComposeOutline)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AttachmentFileIcon(filename = attachment.filename)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = attachment.filename,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = formatFileSize(attachment.size),
+                        fontSize = 10.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AiAnalysisBadge()
+                ViewButton()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentFileIcon(filename: String) {
+    Surface(
+        modifier = Modifier.size(32.dp),
+        shape = RoundedCornerShape(6.dp),
+        color = attachmentBadgeColor(filename)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Filled.InsertDriveFile,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AiAnalysisBadge() {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFEFF6FF)
+    ) {
+        Text(
+            text = "AI 분석",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = Purple60,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun ViewButton() {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Purple60
+    ) {
+        Row(
+            modifier = Modifier
+                .height(24.dp)
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Visibility,
+                contentDescription = "보기",
+                tint = Color.White,
+                modifier = Modifier.size(12.dp)
+            )
+            Text(
+                text = "보기",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun AttachmentDownloadDialog(attachment: Attachment, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "첨부파일 다운로드") },
+        text = {
+            Text(
+                text = "'${attachment.filename}' 파일을 저장할까요?",
+                fontSize = 14.sp
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(text = "파일 저장")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "취소")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DownloadingDialog() {
+    Dialog(onDismissRequest = { }) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = BackgroundWhite,
+            tonalElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Text(
+                    text = "파일 저장 중입니다...",
+                    fontSize = 14.sp,
+                    color = TextPrimary
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ReplyButton(onClick: () -> Unit) {
     Box(
         modifier = Modifier
@@ -409,6 +672,31 @@ private fun ReplyButton(onClick: () -> Unit) {
     }
 }
 
+private fun attachmentBadgeColor(filename: String): Color {
+    val extension = filename.substringAfterLast('.', "").lowercase(Locale.getDefault())
+    return when (extension) {
+        "xls", "xlsx", "csv" -> AttachmentExcelBg
+        "png", "jpg", "jpeg", "gif", "bmp", "webp" -> AttachmentImageBg
+        else -> Blue40
+    }
+}
+
+private fun formatFileSize(size: Long): String {
+    if (size <= 0) return "0B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    var value = size.toDouble()
+    var index = 0
+    while (value >= 1024 && index < units.lastIndex) {
+        value /= 1024
+        index++
+    }
+    return if (index == 0) {
+        "${size}B"
+    } else {
+        String.format(Locale.getDefault(), "%.1f%s", value, units[index])
+    }
+}
+
 /**
  * 발신자 이메일을 파싱하는 함수
  * 입력: "김대표 <kim@company.com>" 또는 "kim@company.com"
@@ -433,7 +721,7 @@ private fun parseSenderEmail(senderEmail: String): Pair<String, String> {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun MailDetailScreenPreview() {
-    val sampleMail = com.fiveis.xend.data.model.EmailItem(
+    val sampleMail = EmailItem(
         id = "1",
         threadId = "thread_1",
         subject = "Re: Q4 실적 보고서 검토 부탁드립니다",
@@ -452,7 +740,21 @@ private fun MailDetailScreenPreview() {
             • 내년도 목표 설정
 
             감사합니다.
-        """.trimIndent()
+        """.trimIndent(),
+        attachments = listOf(
+            Attachment(
+                attachmentId = "att1",
+                filename = "Q4_실적보고서_최종.xlsx",
+                mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                size = 2_400_000
+            ),
+            Attachment(
+                attachmentId = "att2",
+                filename = "매출_그래프_비교분석.png",
+                mimeType = "image/png",
+                size = 856_000
+            )
+        )
     )
 
     val uiState = MailDetailUiState(
@@ -465,7 +767,9 @@ private fun MailDetailScreenPreview() {
         MailDetailScreen(
             uiState = uiState,
             onBack = {},
-            onReply = {}
+            onReply = {},
+            onDownloadAttachment = {},
+            onClearDownloadResult = {}
         )
     }
 }

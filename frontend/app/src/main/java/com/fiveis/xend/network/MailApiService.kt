@@ -32,6 +32,8 @@ interface MailApiService {
     @GET("api/mail/emails/{message_id}/attachments/{attachment_id}/")
     suspend fun downloadAttachment(
         @Path("message_id") messageId: String,
-        @Path("attachment_id") attachmentId: String
+        @Path("attachment_id") attachmentId: String,
+        @Query("filename") filename: String,
+        @Query("mime_type") mimeType: String
     ): Response<ResponseBody>
 }
