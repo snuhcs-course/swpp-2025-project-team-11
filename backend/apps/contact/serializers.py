@@ -73,9 +73,12 @@ class GroupSerializer(serializers.ModelSerializer):
 
     contacts = ContactInGroupSerializer(many=True, read_only=True)
 
+    background_color = serializers.CharField(required=False, allow_blank=False, default="#FFFFFF")
+    emoji = serializers.CharField(required=False, allow_blank=True, max_length=16)
+
     class Meta:
         model = Group
-        fields = ("id", "name", "description", "options", "option_ids", "contacts", "created_at", "updated_at")
+        fields = ("id", "name", "description", "background_color", "emoji", "options", "option_ids", "contacts", "created_at", "updated_at")
         read_only_fields = ("id", "contacts", "created_at", "updated_at")
 
     def _resolve_options_for_user(self, option_ids):
@@ -138,7 +141,7 @@ class GroupInContactSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Group
-        fields = ("id", "name", "description", "options", "created_at", "updated_at")
+        fields = ("id", "name", "description", "background_color", "emoji", "options", "created_at", "updated_at")
         read_only_fields = ("id", "name", "description", "options", "created_at", "updated_at")
 
 

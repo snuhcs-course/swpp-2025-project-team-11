@@ -1,6 +1,7 @@
 from django.http import StreamingHttpResponse
 from drf_spectacular.utils import (
     OpenApiExample,
+    OpenApiResponse,
     OpenApiTypes,
     extend_schema,
 )
@@ -11,6 +12,7 @@ from rest_framework.response import Response
 from ..core.mixins import AuthRequiredMixin
 from ..core.utils.docs import extend_schema_with_common_errors
 from .serializers import (
+    AttachmentAnalysisResponseSerializer,
     AttachmentAnalyzeFromMailSerializer,
     AttachmentAnalyzeUploadSerializer,
     MailGenerateRequest,
@@ -343,6 +345,33 @@ class EmailPromptPreviewView(AuthRequiredMixin, generics.GenericAPIView):
 class AttachmentAnalyzeFromMailView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = AttachmentAnalyzeFromMailSerializer
 
+    @extend_schema(
+        summary="Analyze a Gmail attachment (by message/attachment id)",
+        request=AttachmentAnalyzeFromMailSerializer,
+        responses={
+            200: OpenApiResponse(
+                response=AttachmentAnalysisResponseSerializer,
+                description="분석 성공",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "summary": "프로젝트 일정 및 요구사항이 요약된 문서입니다. 마감은 2025-11-20로 명시되어 있습니다.",
+                            "insights": "- 핵심 마일스톤은 3단계로 구분됨\n- 위험요인은 데이터 마이그레이션 지연",
+                            "mail_guide": "담당자에게 마감 준수 가능 여부와 리소스 보강 필요성 문의 메일을 제안하세요.",
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description="검증 실패 / 지원되지 않는 파일 형식 / 파일 사이즈 초과 등",
+                examples=[
+                    OpenApiExample("Unsupported type", value={"error": "Unsupported file type '.exe'. Supported types are: pdf, docx, txt"}),
+                    OpenApiExample("Too large", value={"error": "File size exceeds 20MB limit."}),
+                ],
+            ),
+        },
+    )
     def post(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -366,6 +395,33 @@ class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = AttachmentAnalyzeUploadSerializer
     parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(
+        summary="Analyze an uploaded file",
+        request={"multipart/form-data": AttachmentAnalyzeUploadSerializer},
+        responses={
+            200: OpenApiResponse(
+                response=AttachmentAnalysisResponseSerializer,
+                description="분석 성공",
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "summary": "회의록 요약: 주요 의사결정은 API 런칭 일정 연기.",
+                            "insights": "성능 이슈로 캐시 도입 필요. QA 일정 재조정.",
+                            "mail_guide": "PM에게 일정 변경 공지 및 대안(캐시 전략) 제안 메일.",
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description="검증 실패 / 지원되지 않는 파일 형식 / 파일 사이즈 초과 등",
+                examples=[
+                    OpenApiExample("Unsupported type", value={"error": "Unsupported file type '.zip'. Supported types are: pdf, docx, txt"}),
+                    OpenApiExample("Too large", value={"error": "File size exceeds 20MB limit."}),
+                ],
+            ),
+        },
+    )
     def post(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)

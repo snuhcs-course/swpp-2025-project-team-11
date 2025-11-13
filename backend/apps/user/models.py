@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
+from apps.core.models import TimeStampedModel
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, name, password=None):
@@ -47,3 +49,17 @@ class GoogleAccount(models.Model):  # 구글 API 접근을 위한 모델
 
     def __str__(self):
         return f"GoogleAccount for {self.user.email}"
+
+
+class UserProfile(TimeStampedModel):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+    display_name = models.CharField(max_length=60, blank=True)
+
+    info = models.TextField(blank=True, help_text="메일 작성 시 프롬프트에 포함될 사용자 정보 (소속, 직책, 연락처 등 자유 입력)")
+
+    def __str__(self):
+        return f"Profile of {self.user.email}"

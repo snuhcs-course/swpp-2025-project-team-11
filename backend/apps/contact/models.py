@@ -1,3 +1,4 @@
+from django.core.validators import RegexValidator
 from django.db import models
 
 from apps.core.models import TimeStampedModel
@@ -16,6 +17,23 @@ class Group(TimeStampedModel):
     options = models.ManyToManyField(
         "PromptOption",
         related_name="groups",
+    )
+
+    background_color = models.CharField(
+        max_length=7,
+        default="#FFFFFF",
+        validators=[
+            RegexValidator(
+                regex=r"^#([0-9A-Fa-f]{6})$",
+                message="색상은 #RRGGBB 형태의 16진수여야 합니다.",
+            )
+        ],
+        help_text="앱에서 표시할 배경색 (#RRGGBB 형식)",
+    )
+    emoji = models.CharField(
+        max_length=16,  # 복합 이모지(피부톤/ZWJ 등) 대비
+        blank=True,
+        help_text="그룹 이모지 (예: 🔥, 💬, 👩🏽‍❤️‍👨🏿 등)",
     )
 
     class Meta:

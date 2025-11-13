@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import User
+from .models import User, UserProfile
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -25,3 +25,19 @@ class GoogleCallbackResponseSerializer(serializers.Serializer):
 
 class LogoutRequestSerializer(serializers.Serializer):
     refresh_token = serializers.CharField(required=False, allow_blank=True)
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(required=False, allow_blank=True, max_length=60)
+    info = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        help_text="메일 프롬프트에 포함될 자유 텍스트 (소속, 직책, 연락처 등 최대 1000자)",
+        max_length=1000,
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ("display_name", "info", "created_at", "updated_at")
+        read_only_fields = ("created_at", "updated_at")

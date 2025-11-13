@@ -47,3 +47,9 @@ class AttachmentAnalyzeUploadSerializer(serializers.Serializer):
         if ext not in SUPPORTED_FILE_TYPES:
             raise serializers.ValidationError(f"Unsupported file type '.{ext}'. " f"Supported types are: {', '.join(SUPPORTED_FILE_TYPES)}")
         return file
+
+
+class AttachmentAnalysisResponseSerializer(serializers.Serializer):
+    summary = serializers.CharField(help_text="첨부파일 요약")
+    insights = serializers.CharField(help_text="핵심 인사이트")
+    mail_guide = serializers.CharField(help_text="이메일 작성 가이드")
