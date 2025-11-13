@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -260,27 +261,95 @@ fun ContactDetailScreen(
                     }
                     HorizontalDivider()
                     InfoRow("개인 프롬프트", contact.context?.personalPrompt.orEmpty())
+
+                    HorizontalDivider()
+                    Text("소속 그룹", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+                    uiState.contact.group?.let { group ->
+                        val groupColor = StableColor.forId(group.id)
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = { onOpenGroup(group.id) }),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = groupColor.copy(alpha = 0.08f)),
+                            border = BorderStroke(2.dp, groupColor)
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(CircleShape)
+                                        .background(groupColor)
+                                )
+                                Spacer(Modifier.size(16.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        group.name,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = groupColor
+                                    )
+                                    if (group.description?.isNotBlank() ?: false) {
+                                        Text(
+                                            group.description,
+                                            color = Color.DarkGray,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (uiState.contact.group == null) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Gray600.copy(alpha = 0.08f)),
+                            border = BorderStroke(2.dp, Gray600)
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("소속된 그룹이 없습니다.", color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                 }
             }
-
-            uiState.contact.group?.let { g ->
-                GroupBriefCard(
-                    group = g,
-                    onClick = { onOpenGroup(g.id) }
-                )
-            }
+//            uiState.contact.group?.let { g ->
+//                GroupBriefCard(
+//                    group = g,
+//                    onClick = { onOpenGroup(g.id) }
+//                )
+//            }
 //
-//            Spacer(modifier = Modifier.height(16.dp))
+//            if (uiState.contact.group == null) {
+//                Card(
+//                    modifier = Modifier
+//                        .padding(horizontal = 16.dp)
+//                        .fillMaxWidth(),
+//                    shape = RoundedCornerShape(16.dp),
+//                    colors = CardDefaults.cardColors(containerColor = Gray600.copy(alpha = 0.08f))
+//                ) {
+//                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+//                        Text("소속 그룹", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+//                        Spacer(Modifier.height(4.dp))
 //
-//            // 세부 정보
-//            Surface(
-//                modifier = Modifier
-//                    .padding(horizontal = 16.dp)
-//                    .fillMaxWidth(),
-//                shape = RoundedCornerShape(16.dp),
-//                tonalElevation = 1.dp
-//            ) {
-//                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+//                        Card(
+//                            modifier = Modifier
+//                                .fillMaxWidth(),
+//                            shape = RoundedCornerShape(16.dp),
+//                            colors = CardDefaults.cardColors(containerColor = Gray600.copy(alpha = 0.08f)),
+//                            border = BorderStroke(2.dp, Gray600)
+//                        ) {
+//                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+//                                Text("소속된 그룹이 없습니다.", color = Color.Gray, fontWeight = FontWeight.SemiBold)
+//                            }
+//                        }
+//                    }
 //                }
 //            }
         }
@@ -372,18 +441,53 @@ fun ContactDetailScreen(
 
 @Composable
 private fun GroupBriefCard(group: Group, onClick: () -> Unit) {
+    val themeColor = StableColor.forId(group.id)
+
     Card(
         modifier = Modifier
             .padding(horizontal = 16.dp)
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = StableColor.forId(group.id).copy(alpha = 0.08f))
+        colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f))
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("소속 그룹", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(group.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            if (group.description?.isNotBlank() == true) Text(group.description, color = Color.DarkGray)
+            Spacer(Modifier.height(4.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f)),
+                border = BorderStroke(2.dp, themeColor)
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(themeColor)
+                    )
+                    Spacer(Modifier.size(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            group.name,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColor
+                        )
+                        if (group.description?.isNotBlank() ?: false) {
+                            Text(
+                                group.description,
+                                color = Color.DarkGray,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
 
             if (group.options.isNotEmpty()) {
                 Divider(Modifier.padding(vertical = 4.dp))
@@ -434,7 +538,7 @@ private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier)
     Column(modifier.fillMaxWidth()) {
         Text(label, color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(2.dp))
-        Text(value, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(value, maxLines = 3, overflow = TextOverflow.Ellipsis, fontSize = 16.sp)
     }
 }
 

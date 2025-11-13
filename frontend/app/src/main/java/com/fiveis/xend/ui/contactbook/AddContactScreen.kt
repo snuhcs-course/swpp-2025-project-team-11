@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Group
@@ -109,7 +110,8 @@ fun AddContactScreen(
     onAdd: () -> Unit,
     onGmailContactsSync: () -> Unit,
     onBottomNavChange: (String) -> Unit = {},
-    onGroupChange: (Group?) -> Unit = {}
+    onGroupChange: (Group?) -> Unit = {},
+    onAddGroupClick: () -> Unit = {}
 ) {
     val directInputLabel = "직접 입력"
 
@@ -136,6 +138,7 @@ fun AddContactScreen(
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
     val savable = name.isNotBlank() && email.contains("@")
+    val sortedGroups = remember(groups) { groups.sortedBy { it.name } }
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -553,7 +556,7 @@ fun AddContactScreen(
                             expanded = isGroupExpanded,
                             onDismissRequest = { isGroupExpanded = false }
                         ) {
-                            groups.forEach { g ->
+                            sortedGroups.forEach { g ->
                                 DropdownMenuItem(
                                     text = {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -578,6 +581,23 @@ fun AddContactScreen(
                                     }
                                 )
                             }
+
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Add,
+                                            contentDescription = "새 그룹 추가"
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("새 그룹 추가")
+                                    }
+                                },
+                                onClick = {
+                                    isGroupExpanded = false
+                                    onAddGroupClick()
+                                }
+                            )
                         }
                     }
                 }

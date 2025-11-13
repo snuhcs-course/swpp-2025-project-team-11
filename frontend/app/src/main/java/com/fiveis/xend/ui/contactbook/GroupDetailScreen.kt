@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -16,12 +17,15 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,13 +34,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -71,7 +80,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Red60
 import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextSecondary
 import kotlinx.coroutines.flow.collectLatest
@@ -84,6 +95,8 @@ fun GroupDetailScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onMemberClick: (Contact) -> Unit,
+    onRemoveMember: (Contact) -> Unit,
+    onAddMembers: (List<Long>) -> Unit,
     onRenameGroup: (String, String) -> Unit,
     onClearRenameError: () -> Unit,
     onRefreshPromptOptions: () -> Unit,
@@ -96,6 +109,14 @@ fun GroupDetailScreen(
     var renameField by rememberSaveable { mutableStateOf("") }
     var renameDescriptionField by rememberSaveable { mutableStateOf("") }
     var renameSubmitted by rememberSaveable { mutableStateOf(false) }
+    val memberIds = remember(group?.members) { group?.members?.map { it.id }?.toSet() ?: emptySet() }
+    val availableContacts = remember(group?.id, uiState.contacts, memberIds) {
+        uiState.contacts
+            .filterNot { memberIds.contains(it.id) }
+            .sortedBy { it.name }
+    }
+    var showAddMembersDialog by rememberSaveable(group?.id) { mutableStateOf(false) }
+    var selectedContactIds by rememberSaveable(group?.id) { mutableStateOf<List<Long>>(emptyList()) }
 
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var selectedToneIds by rememberSaveable { mutableStateOf<List<Long>>(emptyList()) }
@@ -172,7 +193,8 @@ fun GroupDetailScreen(
         val screenWidth = configuration.screenWidthDp.dp
         val innerCardPadding = 32.dp // card content padding (16dp each side)
         val outerListPadding = 32.dp // LazyColumn horizontal padding (16dp each side)
-        val memberPages = remember(group.members) { group.members.chunked(4) }
+        val sortedMembers = remember(group.members) { group.members.sortedBy { it.name } }
+        val memberPages = remember(sortedMembers) { sortedMembers.chunked(4) }
         val pageWidth = remember(configuration.screenWidthDp) {
             (screenWidth - innerCardPadding - outerListPadding).coerceAtLeast(0.dp)
         }
@@ -197,6 +219,7 @@ fun GroupDetailScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.08f)),
+                    border = BorderStroke(2.dp, themeColor),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(Modifier.padding(16.dp)) {
@@ -263,7 +286,22 @@ fun GroupDetailScreen(
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
 
-                        Text("멤버 ${group.members.size}명", fontWeight = FontWeight.SemiBold)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("멤버 ${group.members.size}명", fontWeight = FontWeight.SemiBold)
+
+                            IconButton(
+                                onClick = {
+                                    selectedContactIds = emptyList()
+                                    showAddMembersDialog = true
+                                }
+                            ) {
+                                Icon(Icons.Outlined.PersonAdd, contentDescription = "그룹에 멤버 추가")
+                            }
+                        }
                         Spacer(Modifier.height(16.dp))
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -283,7 +321,8 @@ fun GroupDetailScreen(
                                         MemberRow(
                                             member = c,
                                             modifier = Modifier.fillMaxWidth(),
-                                            onClick = { onMemberClick(c) }
+                                            onClick = { onMemberClick(c) },
+                                            onDeleteMember = { onRemoveMember(c) }
                                         )
                                     }
                                 }
@@ -314,6 +353,23 @@ fun GroupDetailScreen(
                 )
             }
         }
+    }
+
+    if (showAddMembersDialog) {
+        AddMembersDialog(
+            contacts = availableContacts,
+            selectedIds = selectedContactIds,
+            onDismiss = {
+                showAddMembersDialog = false
+                selectedContactIds = emptyList()
+            },
+            onToggle = { id -> selectedContactIds = selectedContactIds.toggle(id) },
+            onConfirm = {
+                onAddMembers(selectedContactIds)
+                showAddMembersDialog = false
+                selectedContactIds = emptyList()
+            }
+        )
     }
 
     if (showRenameDialog) {
@@ -466,10 +522,13 @@ fun GroupDetailScreen(
 }
 
 @Composable
-private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: () -> Unit, onDeleteMember: () -> Unit) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Surface(
         shape = RoundedCornerShape(14.dp),
-        tonalElevation = 1.dp,
+        color = BackgroundLight,
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Row(
@@ -490,7 +549,51 @@ private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: (
                 Text(member.name, fontWeight = FontWeight.SemiBold)
                 if (member.email.isNotBlank()) Text(member.email, color = Color.Gray, fontSize = 12.sp)
             }
+
+            Box(
+                modifier = Modifier.wrapContentSize(Alignment.TopEnd)
+            ) {
+                // 우측 "..." 버튼
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "더보기(멤버 삭제)"
+                    )
+                }
+                // 오버플로우 메뉴
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                        text = { Text("멤버 삭제", color = Red60) },
+                        onClick = {
+                            menuExpanded = false
+                            showDeleteConfirm = true
+                        }
+                    )
+                }
+            }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("멤버 삭제") },
+            text = { Text("\"${member.name}\" 님을 현재 그룹에서 삭제하시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDeleteMember()
+                }) { Text("삭제", color = Red60) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("취소") }
+            },
+            containerColor = BackgroundLight
+        )
     }
 }
 
@@ -688,6 +791,106 @@ private fun PromptOptionsBottomSheet(
 
             // (선택) 네비게이션 바와 겹치지 않도록 아주 살짝 여백
             item { Spacer(Modifier.height(8.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun AddMembersDialog(
+    contacts: List<Contact>,
+    selectedIds: List<Long>,
+    onDismiss: () -> Unit,
+    onToggle: (Long) -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("멤버 추가", fontWeight = FontWeight.SemiBold) },
+        text = {
+            if (contacts.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("추가할 수 있는 연락처가 없습니다", color = TextSecondary)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp)
+                ) {
+                    items(contacts, key = { it.id }) { contact ->
+                        AddMemberSelectableRow(
+                            contact = contact,
+                            selected = selectedIds.contains(contact.id),
+                            onToggle = { onToggle(contact.id) }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = selectedIds.isNotEmpty()
+            ) { Text("추가 (${selectedIds.size})") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소") }
+        }
+    )
+}
+
+@Composable
+private fun AddMemberSelectableRow(contact: Contact, selected: Boolean, onToggle: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(StableColor.forId(contact.id)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = contact.name.firstOrNull()?.uppercase() ?: "?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(contact.name, fontWeight = FontWeight.Medium)
+                Text(
+                    contact.email,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Icon(
+                imageVector = if (selected) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                contentDescription = if (selected) "선택됨" else "선택 안 됨",
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+            )
         }
     }
 }

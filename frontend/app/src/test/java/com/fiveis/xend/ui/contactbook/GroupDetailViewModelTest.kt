@@ -136,4 +136,15 @@ class GroupDetailViewModelTest {
 
         coVerify(exactly = 2) { repository.refreshGroupAndMembers(groupId) }
     }
+
+    @Test
+    fun remove_member_from_group_invokes_repository() = runTest {
+        viewModel = GroupDetailViewModel(application, repository)
+        coEvery { repository.updateContactGroup(42L, null) } returns Unit
+
+        viewModel.removeMemberFromGroup(42L)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.updateContactGroup(42L, null) }
+    }
 }

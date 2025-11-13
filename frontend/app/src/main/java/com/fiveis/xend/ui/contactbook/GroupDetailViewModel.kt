@@ -3,6 +3,7 @@ package com.fiveis.xend.ui.contactbook
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.data.repository.ContactBookRepository
@@ -23,7 +24,8 @@ data class GroupDetailUiState(
     val tonePromptOptions: List<PromptOption> = emptyList(),
     val formatPromptOptions: List<PromptOption> = emptyList(),
     val isPromptSaving: Boolean = false,
-    val promptOptionsError: String? = null
+    val promptOptionsError: String? = null,
+    val contacts: List<Contact> = emptyList()
 )
 
 class GroupDetailViewModel(
@@ -37,6 +39,7 @@ class GroupDetailViewModel(
     private var observingId: Long? = null
     private var observeJob: Job? = null
     private var promptOptionsJob: Job? = null
+    private var contactsJob: Job? = null
 
     /**
      * - DB Flow로 즉시 캐시 표시
@@ -49,6 +52,7 @@ class GroupDetailViewModel(
         ui.update { it.copy(isLoading = true, error = null) }
 
         ensurePromptOptionsObservation()
+        ensureContactsObservation()
 
         // 1) DB Flow
         observeJob?.cancel()
@@ -79,6 +83,30 @@ class GroupDetailViewModel(
                 ui.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 ui.update { it.copy(isLoading = false, error = e.message ?: "동기화 실패") }
+            }
+        }
+    }
+
+    fun removeMemberFromGroup(contactId: Long) {
+        viewModelScope.launch {
+            try {
+                repo.updateContactGroup(contactId, null)
+            } catch (e: Exception) {
+                ui.update { it.copy(error = e.message ?: "멤버 삭제에 실패했습니다") }
+            }
+        }
+    }
+
+    fun addMembersToGroup(contactIds: List<Long>) {
+        val groupId = observingId ?: return
+        if (contactIds.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                contactIds.forEach { contactId ->
+                    repo.updateContactGroup(contactId, groupId)
+                }
+            } catch (e: Exception) {
+                ui.update { it.copy(error = e.message ?: "멤버 추가에 실패했습니다") }
             }
         }
     }
@@ -169,6 +197,7 @@ class GroupDetailViewModel(
     override fun onCleared() {
         observeJob?.cancel()
         promptOptionsJob?.cancel()
+        contactsJob?.cancel()
         super.onCleared()
     }
 
@@ -185,5 +214,14 @@ class GroupDetailViewModel(
             }
         }
         refreshPromptOptions()
+    }
+
+    private fun ensureContactsObservation() {
+        if (contactsJob != null) return
+        contactsJob = viewModelScope.launch {
+            repo.observeContacts().collectLatest { contacts ->
+                ui.update { it.copy(contacts = contacts) }
+            }
+        }
     }
 }
