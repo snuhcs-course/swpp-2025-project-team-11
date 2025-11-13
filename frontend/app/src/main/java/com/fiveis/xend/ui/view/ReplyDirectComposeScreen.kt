@@ -6,16 +6,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,22 +31,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
-import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatColorText
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.FormatStrikethrough
-import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -75,10 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -87,6 +72,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.fiveis.xend.ui.compose.common.AIActionRow
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.XendRichEditorState
+import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
@@ -97,8 +84,6 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.UndoBorder
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +96,7 @@ fun ReplyDirectComposeScreen(
     onSend: (String) -> Unit,
     onTemplateClick: () -> Unit = {},
     onSubjectChange: (String) -> Unit = {},
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState = rememberRichTextState(),
+    editorState: XendRichEditorState = rememberXendRichEditorState(),
     senderEmail: String = "",
     date: String = "",
     originalBody: String = "",
@@ -126,7 +111,8 @@ fun ReplyDirectComposeScreen(
     onAcceptSuggestion: () -> Unit = {},
     onAiRealtimeToggle: (Boolean) -> Unit = {},
     bannerState: com.fiveis.xend.ui.compose.BannerState? = null,
-    onDismissBanner: () -> Unit = {}
+    onDismissBanner: () -> Unit = {},
+    showInlineSwipeBar: Boolean = true
 ) {
     var isMailContentExpanded by remember { mutableStateOf(false) }
 
@@ -183,7 +169,7 @@ fun ReplyDirectComposeScreen(
                     DirectComposeToolbarIconButton(
                         onClick = {
                             // HTML body를 전달하여 전송
-                            onSend(richTextState.toHtml())
+                            onSend(editorState.getHtml())
                         },
                         border = null,
                         contentTint = Blue60,
@@ -293,10 +279,11 @@ fun ReplyDirectComposeScreen(
 
             // Rich Text Editor with AI
             AIEnhancedRichTextEditor(
-                richTextState = richTextState,
+                editorState = editorState,
                 isStreaming = isStreaming,
                 suggestionText = suggestionText,
-                onAcceptSuggestion = onAcceptSuggestion
+                onAcceptSuggestion = onAcceptSuggestion,
+                showInlineSwipeBar = showInlineSwipeBar
             )
         }
     }
@@ -600,146 +587,6 @@ private fun DirectComposeRealtimeToggleChip(isChecked: Boolean, onToggle: (Boole
                     uncheckedTrackColor = ComposeOutline
                 )
             )
-        }
-    }
-}
-
-@Composable
-private fun DirectComposeRichTextEditorCard(
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
-    isStreaming: Boolean,
-    onTapComplete: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeBackground
-    ) {
-        Column {
-            DirectComposeRichTextEditorControls(state = richTextState)
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                modifier = Modifier.background(Color.White)
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                placeholder = {
-                    Text(
-                        text = "내용을 입력하세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                    )
-                }
-            )
-
-            // 탭 완성 버튼
-            TapCompleteButton(onClick = onTapComplete)
-        }
-    }
-}
-
-@Composable
-private fun DirectComposeRichTextEditorControls(
-    state: com.mohamedrejeb.richeditor.model.RichTextState,
-    modifier: Modifier = Modifier
-) {
-    var showSizeDropdown by remember { mutableStateOf(false) }
-    val fontSizes = listOf(14.sp, 18.sp, 22.sp)
-
-    var showColorDropdown by remember { mutableStateOf(false) }
-    val colors = listOf(Color.Black, Color.Red, Color.Blue, Color.Green)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Bold button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatBold,
-                contentDescription = "Bold",
-                tint = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) Blue60 else TextSecondary
-            )
-        }
-        // Italic button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatItalic,
-                contentDescription = "Italic",
-                tint = if (state.currentSpanStyle.fontStyle == FontStyle.Italic) Blue60 else TextSecondary
-            )
-        }
-        // Underline button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatUnderlined,
-                contentDescription = "Underline",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.Underline) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-        // Strikethrough button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatStrikethrough,
-                contentDescription = "Strikethrough",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.LineThrough) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-
-        // Font size selector
-        Box {
-            IconButton(onClick = { showSizeDropdown = true }) {
-                Icon(Icons.Default.FormatSize, contentDescription = "Font Size")
-            }
-            DropdownMenu(expanded = showSizeDropdown, onDismissRequest = { showSizeDropdown = false }) {
-                fontSizes.forEach { size ->
-                    DropdownMenuItem(text = { Text("${size.value}") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(fontSize = size))
-                        showSizeDropdown = false
-                    })
-                }
-            }
-        }
-
-        // Font color selector
-        Box {
-            IconButton(onClick = { showColorDropdown = true }) {
-                Icon(
-                    imageVector = Icons.Default.FormatColorText,
-                    contentDescription = "Font Color",
-                    tint = state.currentSpanStyle.color
-                )
-            }
-            DropdownMenu(expanded = showColorDropdown, onDismissRequest = { showColorDropdown = false }) {
-                colors.forEach { color ->
-                    DropdownMenuItem(text = { Text("Color") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(color = color))
-                        showColorDropdown = false
-                    }, leadingIcon = {
-                        Icon(Icons.Default.Circle, contentDescription = null, tint = color)
-                    })
-                }
-            }
         }
     }
 }

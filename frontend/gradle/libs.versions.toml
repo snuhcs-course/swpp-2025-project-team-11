@@ -20,6 +20,8 @@ coroutines = "1.8.1"
 
 coil = "2.6.0"
 
+richeditor = "2.0.0"
+
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 okhttpBom = "4.12.0"
@@ -75,6 +77,9 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp" }
 okhttp-sse = { group = "com.squareup.okhttp3", name = "okhttp-sse", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+
+# Rich editor (WebView based)
+wasabeef-richeditor = { group = "jp.wasabeef", name = "richeditor-android", version.ref = "richeditor" }
 
 # Paging3
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }

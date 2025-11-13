@@ -102,17 +102,13 @@ class MailComposeViewModel(
                                 suggestionBuffer.append(" ")
                             }
                             suggestionBuffer.append(rawText)
-                        }
-                        "gpu.done" -> {
+
                             val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
                             val singleSentence = extractFirstSentence(parsed)
-
-                            suggestionBuffer.clear()
-                            if (singleSentence.isNotEmpty()) {
-                                suggestionBuffer.append(singleSentence)
-                            }
-
                             _ui.update { it.copy(suggestionText = singleSentence) }
+                        }
+                        "gpu.done" -> {
+                            suggestionBuffer.clear()
                         }
                     }
                 } catch (e: Exception) {
@@ -178,6 +174,27 @@ class MailComposeViewModel(
         if (suggestion.isNotEmpty()) {
             suggestionBuffer.clear()
             _ui.update { it.copy(suggestionText = "") }
+            debounceJob?.cancel()
+        }
+    }
+
+    /**
+     * Request new suggestion immediately (for tab completion)
+     */
+    fun requestImmediateSuggestion(currentText: String) {
+        if (!_ui.value.isRealtimeEnabled) return
+
+        debounceJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
+
+        viewModelScope.launch {
+            delay(100) // Short delay to let the UI update
+            wsClient?.sendMessage(
+                systemPrompt = "메일 초안 작성",
+                text = currentText,
+                maxTokens = 50
+            )
         }
     }
 
@@ -207,10 +224,10 @@ class MailComposeViewModel(
 
         if (normalized.isEmpty()) return ""
 
-        val terminatorIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
-        val end = if (terminatorIndex == -1) normalized.length else terminatorIndex + 1
+        val endIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
+        val cutoff = if (endIndex == -1) normalized.length else endIndex + 1
 
-        return normalized.substring(0, end).trim()
+        return normalized.substring(0, cutoff).trim()
     }
 
     override fun onCleared() {
