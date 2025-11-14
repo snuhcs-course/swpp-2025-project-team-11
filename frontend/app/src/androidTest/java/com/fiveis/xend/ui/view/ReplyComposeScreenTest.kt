@@ -298,7 +298,11 @@ class ReplyComposeScreenTest {
 
         // Click to collapse
         composeTestRule.onNodeWithContentDescription("접기").performClick()
-        Thread.sleep(200)
+        composeTestRule.waitForIdle()
+        Thread.sleep(300)
+
+        // Verify that expand icon is now displayed
+        composeTestRule.onNodeWithContentDescription("펼치기").assertExists()
     }
 
     @Test

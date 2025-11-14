@@ -67,6 +67,21 @@ class ProfileActivity : ComponentActivity() {
                     onDismissLogoutFailureDialog = {
                         viewModel.dismissLogoutFailureDialog()
                     },
+                    onToggleEditMode = {
+                        viewModel.toggleEditMode()
+                    },
+                    onUpdateDisplayName = { name ->
+                        viewModel.updateDisplayName(name)
+                    },
+                    onUpdateInfo = { info ->
+                        viewModel.updateInfo(info)
+                    },
+                    onSaveProfile = {
+                        viewModel.saveProfile()
+                    },
+                    onDismissProfileError = {
+                        viewModel.dismissProfileError()
+                    },
                     onBack = {
                         finish()
                         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)

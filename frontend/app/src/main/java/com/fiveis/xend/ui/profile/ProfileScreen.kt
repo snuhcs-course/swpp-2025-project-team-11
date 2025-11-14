@@ -14,17 +14,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +54,11 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onForceLogout: () -> Unit = {},
     onDismissLogoutFailureDialog: () -> Unit = {},
+    onToggleEditMode: () -> Unit = {},
+    onUpdateDisplayName: (String) -> Unit = {},
+    onUpdateInfo: (String) -> Unit = {},
+    onSaveProfile: () -> Unit = {},
+    onDismissProfileError: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -62,101 +75,126 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                    // Profile Icon
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        Color(0xFF6366F1),
-                                        Color(0xFF4285F4)
-                                    )
+                // Profile Icon
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFF6366F1),
+                                    Color(0xFF4285F4)
                                 )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.AccountCircle,
-                            contentDescription = "Profile",
-                            tint = Color.White,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // User Email
-                    Text(
-                        text = uiState.userEmail,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF202124)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AccountCircle,
+                        contentDescription = "Profile",
+                        tint = Color.White,
+                        modifier = Modifier.size(48.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Xend 계정",
-                        fontSize = 14.sp,
-                        color = Color(0xFF5F6368)
-                    )
-
-                    // Error Message
-                    if (uiState.logoutError != null) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = uiState.logoutError,
-                            fontSize = 14.sp,
-                            color = Color(0xFFEA4335),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // User Email
+                Text(
+                    text = uiState.userEmail,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF202124)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Xend 계정",
+                    fontSize = 14.sp,
+                    color = Color(0xFF5F6368)
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Profile Information Card
+                ProfileInfoCard(
+                    uiState = uiState,
+                    onToggleEditMode = onToggleEditMode,
+                    onUpdateDisplayName = onUpdateDisplayName,
+                    onUpdateInfo = onUpdateInfo,
+                    onSaveProfile = onSaveProfile
+                )
+
+                // Success/Error Messages
+                if (uiState.saveSuccess) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "프로필이 저장되었습니다",
+                        fontSize = 14.sp,
+                        color = Color(0xFF34A853),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                if (uiState.profileError != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = uiState.profileError,
+                        fontSize = 14.sp,
+                        color = Color(0xFFEA4335),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                if (uiState.logoutError != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = uiState.logoutError,
+                        fontSize = 14.sp,
+                        color = Color(0xFFEA4335),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // Logout Button
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Button(
+                    onClick = onLogout,
+                    enabled = !uiState.isLoggingOut,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEA4335),
+                        disabledContainerColor = Color(0xFFE0E0E0)
+                    )
                 ) {
-                    Button(
-                        onClick = onLogout,
-                        enabled = !uiState.isLoggingOut,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEA4335),
-                            disabledContainerColor = Color(0xFFE0E0E0)
+                    if (uiState.isLoggingOut) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
                         )
-                    ) {
-                        if (uiState.isLoggingOut) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = "로그아웃",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White
-                            )
-                        }
+                    } else {
+                        Text(
+                            text = "로그아웃",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
 
@@ -168,6 +206,159 @@ fun ProfileScreen(
                 onForceLogout = onForceLogout
             )
         }
+    }
+}
+
+@Composable
+private fun ProfileInfoCard(
+    uiState: ProfileUiState,
+    onToggleEditMode: () -> Unit,
+    onUpdateDisplayName: (String) -> Unit,
+    onUpdateInfo: (String) -> Unit,
+    onSaveProfile: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "개인정보",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF202124)
+                )
+
+                if (!uiState.isEditing) {
+                    IconButton(
+                        onClick = onToggleEditMode,
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = "편집",
+                            tint = Blue80
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = Blue80
+                    )
+                }
+            } else if (uiState.isEditing) {
+                // Edit Mode
+                OutlinedTextField(
+                    value = uiState.displayName,
+                    onValueChange = onUpdateDisplayName,
+                    label = { Text("표시 이름") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Blue80,
+                        focusedLabelColor = Blue80,
+                        cursorColor = Blue80
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = uiState.info,
+                    onValueChange = onUpdateInfo,
+                    label = { Text("소개") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Blue80,
+                        focusedLabelColor = Blue80,
+                        cursorColor = Blue80
+                    ),
+                    minLines = 3,
+                    maxLines = 5
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onToggleEditMode,
+                        enabled = !uiState.isSaving
+                    ) {
+                        Text("취소", color = Color(0xFF5F6368))
+                    }
+
+                    Spacer(modifier = Modifier.size(8.dp))
+
+                    Button(
+                        onClick = onSaveProfile,
+                        enabled = !uiState.isSaving,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Blue80
+                        )
+                    ) {
+                        if (uiState.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("저장")
+                        }
+                    }
+                }
+            } else {
+                // View Mode
+                ProfileInfoItem(label = "표시 이름", value = uiState.displayName.ifBlank { "설정되지 않음" })
+                Spacer(modifier = Modifier.height(16.dp))
+                ProfileInfoItem(label = "소개", value = uiState.info.ifBlank { "설정되지 않음" })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoItem(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color(0xFF5F6368),
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            color = Color(0xFF202124)
+        )
     }
 }
 

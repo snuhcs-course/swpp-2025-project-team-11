@@ -142,4 +142,8 @@ object RetrofitClient {
     fun getContactApiService(context: Context): ContactApiService {
         return getRetrofit(getClient(context)).create(ContactApiService::class.java)
     }
+
+    fun getProfileApiService(context: Context): ProfileApiService {
+        return getRetrofit(getClient(context)).create(ProfileApiService::class.java)
+    }
 }

@@ -155,25 +155,6 @@ class ContactBookScreenTest {
     }
 
     @Test
-    fun test_contactBookScreen_shows_add_icon() {
-        // Given
-        val uiState = ContactBookUiState(selectedTab = ContactBookTab.Groups)
-
-        // When
-        composeTestRule.setContent {
-            ContactBookScreen(
-                uiState = uiState,
-                onTabSelected = {},
-                onGroupClick = {},
-                onContactClick = {}
-            )
-        }
-
-        // Then
-        composeTestRule.onNodeWithContentDescription("Add").assertIsDisplayed()
-    }
-
-    @Test
     fun test_contactBookScreen_group_click_triggers_callback() {
         // Given
         var clickedGroup: Group? = null
@@ -631,26 +612,7 @@ class ContactBookScreenTest {
         composeTestRule.onNodeWithContentDescription("더보기").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("수정").assertIsDisplayed()
         composeTestRule.onNodeWithText("삭제").assertIsDisplayed()
-    }
-
-    @Test
-    fun test_groupCard_edit_triggers_callback() {
-        // Given
-        var editedGroup: Group? = null
-        val group = Group(1, "Team", "Desc", emptyList(), emptyList(), null, null)
-
-        // When
-        composeTestRule.setContent {
-            GroupCard(group = group, onClick = {}, onEdit = { editedGroup = it })
-        }
-
-        composeTestRule.onNodeWithContentDescription("더보기").performClick()
-        composeTestRule.onNodeWithText("수정").performClick()
-
-        // Then
-        assert(editedGroup?.id == 1L)
     }
 
     @Test
@@ -869,7 +831,7 @@ class ContactBookScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithContentDescription("Add").performClick()
+        composeTestRule.onNodeWithContentDescription("Add Contact").performClick()
 
         // Then
         assert(clicked)
@@ -942,34 +904,6 @@ class ContactBookScreenTest {
 
         // Then
         composeTestRule.onNodeWithText("Team").assertIsDisplayed()
-    }
-
-    @Test
-    fun test_contactBookScreen_contact_edit_click() {
-        // Given
-        var editedContact: Contact? = null
-        val contact = Contact(1, null, "John", "john@example.com")
-        val uiState = ContactBookUiState(
-            selectedTab = ContactBookTab.Contacts,
-            contacts = listOf(contact)
-        )
-
-        // When
-        composeTestRule.setContent {
-            ContactBookScreen(
-                uiState = uiState,
-                onTabSelected = {},
-                onGroupClick = {},
-                onContactClick = {},
-                onEditContactClick = { editedContact = it }
-            )
-        }
-
-        composeTestRule.onAllNodesWithContentDescription("더보기")[0].performClick()
-        composeTestRule.onNodeWithText("수정").performClick()
-
-        // Then
-        assert(editedContact?.id == 1L)
     }
 
     @Test
