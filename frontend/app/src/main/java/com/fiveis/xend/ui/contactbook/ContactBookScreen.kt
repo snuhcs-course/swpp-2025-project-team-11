@@ -444,6 +444,7 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val groupColor = StableColor.forId(group.id)
+    val sortedMembers = remember(group.members) { group.members.sortedBy { it.name } }
 
     Surface(
         color = groupColor.copy(alpha = 0.1f),
@@ -486,11 +487,11 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
             ) {
                 // 그룹에 속한 연락처 목록
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    group.members.take(3).forEach {
+                    sortedMembers.take(3).forEach {
                         MemberCircle(it.name.first().toString(), StableColor.forId(it.id))
                     }
-                    if (group.members.size > 3) {
-                        MemberCircle("+${group.members.size - 3}", Color.Gray)
+                    if (sortedMembers.size > 3) {
+                        MemberCircle("+${sortedMembers.size - 3}", Color.Gray)
                     }
                 }
 
@@ -521,7 +522,13 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
 //                            }
 //                        )
                         DropdownMenuItem(
-                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Outlined.Delete,
+                                    contentDescription = null,
+                                    tint = colorScheme.error
+                                )
+                            },
                             text = { Text("삭제", color = Red60) },
                             onClick = {
                                 menuExpanded = false
@@ -744,7 +751,13 @@ private fun ContactRow(
 //                    }
 //                )
                 DropdownMenuItem(
-                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = null,
+                            tint = colorScheme.error
+                        )
+                    },
                     text = { Text("삭제", color = Red60) },
                     onClick = {
                         menuExpanded = false

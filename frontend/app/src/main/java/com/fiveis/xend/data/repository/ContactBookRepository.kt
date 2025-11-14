@@ -18,6 +18,7 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.data.model.PromptOptionRequest
+import com.fiveis.xend.data.model.PromptOptionUpdateRequest
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import kotlinx.coroutines.flow.Flow
@@ -365,6 +366,28 @@ class ContactBookRepository(
         val tone = all.filter { it.key == "tone" }
         val format = all.filter { it.key == "format" }
         return tone to format
+    }
+
+    suspend fun updatePromptOption(id: Long, name: String, prompt: String): PromptOption {
+        val req = PromptOptionUpdateRequest(id = id, name = name, prompt = prompt)
+        val res = api.updatePromptOption(id, req)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Update prompt option failed: HTTP ${res.code()} ${res.message()} | body=$body")
+        }
+        val updated = res.body() ?: error("Success but body null")
+        optionDao.upsertOptions(listOf(updated.toEntity()))
+        return updated
+    }
+
+    suspend fun deletePromptOption(id: Long) {
+        val res = api.deletePromptOption(id)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Delete prompt option failed: HTTP ${res.code()} ${res.message()} | body=$body")
+        }
+        optionDao.deleteCrossRefsByOption(id)
+        optionDao.deleteOptionById(id)
     }
 }
 

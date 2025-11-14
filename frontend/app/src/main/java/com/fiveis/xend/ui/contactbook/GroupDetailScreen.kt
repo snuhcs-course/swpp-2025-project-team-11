@@ -3,11 +3,14 @@ package com.fiveis.xend.ui.contactbook
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -74,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,6 +107,8 @@ fun GroupDetailScreen(
     onRefreshPromptOptions: () -> Unit,
     onSavePromptOptions: (List<Long>) -> Unit,
     onAddPromptOption: AddPromptOptionHandler,
+    onUpdatePromptOption: UpdatePromptOptionHandler = { _, _, _, _, _ -> },
+    onDeletePromptOption: DeletePromptOptionHandler = { _, _, _ -> },
     onClearPromptError: () -> Unit
 ) {
     val group = uiState.group
@@ -129,6 +136,15 @@ fun GroupDetailScreen(
     var newPromptDescription by rememberSaveable { mutableStateOf("") }
     var addPromptError by rememberSaveable { mutableStateOf<String?>(null) }
     var isAddingPrompt by rememberSaveable { mutableStateOf(false) }
+
+    var editingPromptOption by rememberSaveable { mutableStateOf<PromptOption?>(null) }
+    var editPromptName by rememberSaveable { mutableStateOf("") }
+    var editPromptDescription by rememberSaveable { mutableStateOf("") }
+    var editPromptError by rememberSaveable { mutableStateOf<String?>(null) }
+    var isEditingPrompt by rememberSaveable { mutableStateOf(false) }
+    var deletingPromptOption by rememberSaveable { mutableStateOf<PromptOption?>(null) }
+    var deletePromptError by rememberSaveable { mutableStateOf<String?>(null) }
+    var isDeletingPrompt by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isRenaming, uiState.renameError, showRenameDialog) {
         if (!showRenameDialog) return@LaunchedEffect
@@ -438,6 +454,16 @@ fun GroupDetailScreen(
                 newPromptName = ""
                 newPromptDescription = ""
                 addPromptError = null
+            },
+            onRequestEditOption = { option ->
+                editingPromptOption = option
+                editPromptName = option.name
+                editPromptDescription = option.prompt
+                editPromptError = null
+            },
+            onRequestDeleteOption = { option ->
+                deletingPromptOption = option
+                deletePromptError = null
             }
         )
     }
@@ -519,6 +545,128 @@ fun GroupDetailScreen(
             }
         )
     }
+
+    val promptToEdit = editingPromptOption
+    if (promptToEdit != null) {
+        AlertDialog(
+            onDismissRequest = { if (!isEditingPrompt) editingPromptOption = null },
+            title = { Text("프롬프트 수정") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editPromptName,
+                        onValueChange = { editPromptName = it },
+                        label = { Text("이름") },
+                        singleLine = true,
+                        enabled = !isEditingPrompt
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editPromptDescription,
+                        onValueChange = { editPromptDescription = it },
+                        label = { Text("프롬프트 설명") },
+                        enabled = !isEditingPrompt,
+                        minLines = 3
+                    )
+                    if (!editPromptError.isNullOrBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(editPromptError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        editPromptError = null
+                        isEditingPrompt = true
+                        onUpdatePromptOption(
+                            promptToEdit.id,
+                            editPromptName.trim(),
+                            editPromptDescription.trim(),
+                            { updated ->
+                                isEditingPrompt = false
+                                editingPromptOption = null
+                                editPromptError = null
+                            },
+                            { msg ->
+                                editPromptError = msg
+                                isEditingPrompt = false
+                            }
+                        )
+                    },
+                    enabled = !isEditingPrompt && editPromptName.isNotBlank() && editPromptDescription.isNotBlank()
+                ) {
+                    if (isEditingPrompt) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("저장")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { editingPromptOption = null },
+                    enabled = !isEditingPrompt
+                ) { Text("취소") }
+            }
+        )
+    }
+
+    val promptToDelete = deletingPromptOption
+    if (promptToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeletingPrompt) deletingPromptOption = null },
+            title = { Text("프롬프트 삭제") },
+            text = {
+                Column {
+                    Text("\"${promptToDelete.name}\" 프롬프트를 삭제할까요?")
+                    if (!deletePromptError.isNullOrBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(deletePromptError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deletePromptError = null
+                        isDeletingPrompt = true
+                        onDeletePromptOption(
+                            promptToDelete.id,
+                            {
+                                if (promptToDelete.key.equals("tone", ignoreCase = true)) {
+                                    selectedToneIds = selectedToneIds.filterNot { it == promptToDelete.id }
+                                    originalToneIds = originalToneIds.filterNot { it == promptToDelete.id }
+                                } else {
+                                    selectedFormatIds = selectedFormatIds.filterNot { it == promptToDelete.id }
+                                    originalFormatIds = originalFormatIds.filterNot { it == promptToDelete.id }
+                                }
+                                isDeletingPrompt = false
+                                deletingPromptOption = null
+                            },
+                            { msg ->
+                                deletePromptError = msg
+                                isDeletingPrompt = false
+                            }
+                        )
+                    },
+                    enabled = !isDeletingPrompt
+                ) {
+                    if (isDeletingPrompt) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("삭제")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { deletingPromptOption = null },
+                    enabled = !isDeletingPrompt
+                ) { Text("취소") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -566,7 +714,13 @@ private fun MemberRow(member: Contact, modifier: Modifier = Modifier, onClick: (
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
                         text = { Text("멤버 삭제", color = Red60) },
                         onClick = {
                             menuExpanded = false
@@ -682,11 +836,13 @@ private fun PromptOptionsBottomSheet(
     onReset: () -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
-    onRequestAddNew: (String) -> Unit
+    onRequestAddNew: (String) -> Unit,
+    onRequestEditOption: (PromptOption) -> Unit,
+    onRequestDeleteOption: (PromptOption) -> Unit
 ) {
     val thresholdFraction = 0.20f
 
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val configuration = LocalConfiguration.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
@@ -750,7 +906,9 @@ private fun PromptOptionsBottomSheet(
                     options = toneOptions,
                     selectedIds = selectedToneIds,
                     onToggle = onToggleTone,
-                    onAddNew = { onRequestAddNew("tone") }
+                    onAddNew = { onRequestAddNew("tone") },
+                    onRequestEditOption = onRequestEditOption,
+                    onRequestDeleteOption = onRequestDeleteOption
                 )
             }
 
@@ -764,7 +922,9 @@ private fun PromptOptionsBottomSheet(
                     options = formatOptions,
                     selectedIds = selectedFormatIds,
                     onToggle = onToggleFormat,
-                    onAddNew = { onRequestAddNew("format") }
+                    onAddNew = { onRequestAddNew("format") },
+                    onRequestEditOption = onRequestEditOption,
+                    onRequestDeleteOption = onRequestDeleteOption
                 )
             }
 
@@ -895,6 +1055,7 @@ private fun AddMemberSelectableRow(contact: Contact, selected: Boolean, onToggle
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PromptOptionsSection(
     title: String,
@@ -902,7 +1063,9 @@ private fun PromptOptionsSection(
     options: List<PromptOption>,
     selectedIds: List<Long>,
     onToggle: (Long) -> Unit,
-    onAddNew: () -> Unit
+    onAddNew: () -> Unit,
+    onRequestEditOption: (PromptOption) -> Unit,
+    onRequestDeleteOption: (PromptOption) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -913,32 +1076,98 @@ private fun PromptOptionsSection(
         if (options.isEmpty()) {
             Text("아직 등록된 프롬프트가 없습니다", color = TextSecondary, fontSize = 12.sp)
         } else {
+            var contextMenuTargetId by remember { mutableStateOf<Long?>(null) }
+            val maxMenuWidth = LocalConfiguration.current.screenWidthDp.dp * (2f / 3f)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 options.forEach { option ->
                     val selected = selectedIds.contains(option.id)
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onToggle(option.id) },
-                        label = { Text(option.name.ifBlank { option.prompt }) },
-                        leadingIcon = {
-                            if (selected) {
-                                Icon(
-                                    Icons.Filled.CheckBox,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Filled.CheckBoxOutlineBlank,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                    val overlayInteraction = remember { MutableInteractionSource() }
+                    Box {
+                        FilterChip(
+                            selected = selected,
+                            onClick = {},
+                            label = { Text(option.name.ifBlank { option.prompt }) },
+                            leadingIcon = {
+                                if (selected) {
+                                    Icon(
+                                        Icons.Filled.CheckBox,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Filled.CheckBoxOutlineBlank,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .combinedClickable(
+                                    interactionSource = overlayInteraction,
+                                    indication = null,
+                                    role = Role.Checkbox,
+                                    onClick = { onToggle(option.id) },
+                                    onLongClick = { contextMenuTargetId = option.id }
+                                )
+                        )
+                        DropdownMenu(
+                            modifier = Modifier.widthIn(max = maxMenuWidth),
+                            expanded = contextMenuTargetId == option.id,
+                            onDismissRequest = { contextMenuTargetId = null }
+                        ) {
+                            val promptPreview = option.prompt.takeIf { it.isNotBlank() } ?: ""
+                            Text(
+                                text = "\"$promptPreview\"",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("수정") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    contextMenuTargetId = null
+                                    onRequestEditOption(option)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "삭제",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    contextMenuTargetId = null
+                                    onRequestDeleteOption(option)
+                                }
+                            )
                         }
-                    )
+                    }
                 }
 
                 // 새 프롬프트 추가 버튼
