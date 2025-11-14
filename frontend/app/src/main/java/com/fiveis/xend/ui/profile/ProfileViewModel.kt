@@ -27,7 +27,9 @@ data class ProfileUiState(
     val showLogoutFailureDialog: Boolean = false,
     val showLogoutSuccessToast: Boolean = false,
     val profileError: String? = null,
-    val saveSuccess: Boolean = false
+    val saveSuccess: Boolean = false,
+    val originalDisplayName: String? = null,
+    val originalInfo: String? = null
 )
 
 class ProfileViewModel(
@@ -73,11 +75,31 @@ class ProfileViewModel(
     }
 
     fun toggleEditMode() {
-        _uiState.value = _uiState.value.copy(
-            isEditing = !_uiState.value.isEditing,
-            profileError = null,
-            saveSuccess = false
-        )
+        val current = _uiState.value
+        if (!current.isEditing) {
+            _uiState.value = current.copy(
+                isEditing = true,
+                profileError = null,
+                saveSuccess = false,
+                originalDisplayName = current.displayName,
+                originalInfo = current.info
+            )
+        } else {
+            val shouldRestore = !current.saveSuccess
+            val restoredDisplayName =
+                if (shouldRestore) current.originalDisplayName ?: current.displayName else current.displayName
+            val restoredInfo = if (shouldRestore) current.originalInfo ?: current.info else current.info
+
+            _uiState.value = current.copy(
+                isEditing = false,
+                profileError = null,
+                saveSuccess = false,
+                displayName = restoredDisplayName,
+                info = restoredInfo,
+                originalDisplayName = null,
+                originalInfo = null
+            )
+        }
     }
 
     fun updateDisplayName(name: String) {
@@ -102,7 +124,9 @@ class ProfileViewModel(
                         isEditing = false,
                         displayName = result.data.displayName ?: "",
                         info = result.data.info ?: "",
-                        saveSuccess = true
+                        saveSuccess = true,
+                        originalDisplayName = null,
+                        originalInfo = null
                     )
                 }
                 is ProfileResult.Failure -> {
