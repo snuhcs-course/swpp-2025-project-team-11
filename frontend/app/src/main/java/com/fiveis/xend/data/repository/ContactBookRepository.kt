@@ -70,8 +70,8 @@ class ContactBookRepository(
 
     fun observeGroup(groupId: Long): Flow<Group?> = groupDao.observeGroup(groupId).map { it?.asDomain() }
 
-    fun observeContacts(): Flow<List<Contact>> = contactDao.observeAllWithContext()
-        .map { list -> list.map { it.asDomain(null) } }
+    fun observeContacts(): Flow<List<Contact>> = contactDao.observeAllWithGroup()
+        .map { list -> list.map { it.asDomain() } }
 
     fun observePromptOptions(): Flow<List<PromptOption>> = optionDao.observeAllOptions()
         .map { list -> list.map { it.asDomain() } }

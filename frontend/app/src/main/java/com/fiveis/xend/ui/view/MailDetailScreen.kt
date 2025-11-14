@@ -50,6 +50,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.ui.theme.BackgroundWhite
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
@@ -62,7 +63,12 @@ import com.fiveis.xend.ui.theme.ToolbarIconTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: () -> Unit = {}) {
+fun MailDetailScreen(
+    uiState: MailDetailUiState,
+    knownContactsByEmail: Map<String, Contact> = emptyMap(),
+    onBack: () -> Unit,
+    onReply: () -> Unit = {}
+) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
@@ -113,7 +119,8 @@ fun MailDetailScreen(uiState: MailDetailUiState, onBack: () -> Unit, onReply: ()
                 }
                 uiState.mail != null -> {
                     MailDetailContent(
-                        mail = uiState.mail
+                        mail = uiState.mail,
+                        knownContactsByEmail = knownContactsByEmail
                     )
                 }
             }
@@ -195,7 +202,7 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem) {
+private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem, knownContactsByEmail: Map<String, Contact>) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -207,7 +214,8 @@ private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem) {
         // A. 발신자 정보 섹션
         SenderInfoSection(
             senderEmail = mail.fromEmail,
-            date = mail.date
+            date = mail.date,
+            knownContactsByEmail = knownContactsByEmail
         )
         HorizontalDivider(
             thickness = 1.dp,
@@ -226,9 +234,12 @@ private fun MailDetailContent(mail: com.fiveis.xend.data.model.EmailItem) {
 }
 
 @Composable
-private fun SenderInfoSection(senderEmail: String, date: String) {
-    // 이메일 파싱: "김대표 <kim@company.com>" 또는 "kim@company.com"
-    val (senderName, email) = parseSenderEmail(senderEmail)
+private fun SenderInfoSection(senderEmail: String, date: String, knownContactsByEmail: Map<String, Contact>) {
+    val (_, email) = parseSenderEmail(senderEmail)
+    val normalized = email.trim().lowercase()
+    val savedContact = knownContactsByEmail[normalized]
+    val displayName = savedContact?.name?.takeIf { it.isNotBlank() }
+        ?: senderEmail.substringBefore("<").trim().ifBlank { email }
 
     Column(
         modifier = Modifier
@@ -236,10 +247,16 @@ private fun SenderInfoSection(senderEmail: String, date: String) {
             .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Text(
-            text = senderName,
+            text = displayName,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             color = TextPrimary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "<$email>",
+            fontSize = 13.sp,
+            color = TextSecondary
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -464,6 +481,7 @@ private fun MailDetailScreenPreview() {
     MaterialTheme {
         MailDetailScreen(
             uiState = uiState,
+            knownContactsByEmail = emptyMap(),
             onBack = {},
             onReply = {}
         )

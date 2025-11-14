@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.theme.XendTheme
 
 class MailDetailActivity : ComponentActivity() {
@@ -20,6 +21,14 @@ class MailDetailActivity : ComponentActivity() {
             context = this.applicationContext,
             messageId = intent.getStringExtra("message_id") ?: ""
         )
+    }
+    private val contactLookupViewModel: ContactLookupViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return ContactLookupViewModel(application) as T
+            }
+        }
     }
 
     // Re: 중복 방지 헬퍼 함수
@@ -37,8 +46,10 @@ class MailDetailActivity : ComponentActivity() {
         setContent {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
+                val knownContacts by contactLookupViewModel.byEmail.collectAsState()
                 MailDetailScreen(
                     uiState = uiState,
+                    knownContactsByEmail = knownContacts,
                     onBack = { finish() },
                     onReply = {
                         uiState.mail?.let { mail ->
