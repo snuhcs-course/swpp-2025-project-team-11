@@ -15,6 +15,7 @@ import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.repository.InboxRepository
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +36,25 @@ data class MailDetailUiState(
     val isAnalyzingAttachment: Boolean = false,
     val analysisResult: AttachmentAnalysisResponse? = null,
     val analysisErrorMessage: String? = null,
-    val analysisTarget: Attachment? = null
+    val analysisTarget: Attachment? = null,
+    val showPreviewDialog: Boolean = false,
+    val previewTarget: Attachment? = null,
+    val isPreviewLoading: Boolean = false,
+    val previewContent: AttachmentPreviewContent? = null,
+    val previewErrorMessage: String? = null,
+    val isExternalOpenLoading: Boolean = false,
+    val externalOpenErrorMessage: String? = null,
+    val externalOpenContent: AttachmentExternalContent? = null
+)
+
+sealed interface AttachmentPreviewContent {
+    data class Text(val text: String) : AttachmentPreviewContent
+    data class Pdf(val filePath: String) : AttachmentPreviewContent
+}
+
+data class AttachmentExternalContent(
+    val filePath: String,
+    val mimeType: String
 )
 
 class MailDetailViewModel(
@@ -228,6 +247,181 @@ class MailDetailViewModel(
         }
     }
 
+    fun openAttachmentExternally(attachment: Attachment) {
+        val mailId = _uiState.value.mail?.id ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            clearExternalOpenContentFile(_uiState.value.externalOpenContent)
+            _uiState.update {
+                it.copy(
+                    isExternalOpenLoading = true,
+                    externalOpenErrorMessage = null,
+                    externalOpenContent = null
+                )
+            }
+            try {
+                val safeFilename = attachment.filename.ifBlank { "attachment" }
+                val safeMimeType = attachment.mimeType.ifBlank { "application/octet-stream" }
+                val response = inboxRepository.downloadAttachment(
+                    mailId,
+                    attachment.attachmentId,
+                    safeFilename,
+                    safeMimeType
+                )
+                if (!response.isSuccessful) {
+                    _uiState.update {
+                        it.copy(
+                            isExternalOpenLoading = false,
+                            externalOpenErrorMessage = "파일을 불러오지 못했습니다. (${response.code()})"
+                        )
+                    }
+                    return@launch
+                }
+
+                val body = response.body()
+                if (body == null) {
+                    _uiState.update {
+                        it.copy(
+                            isExternalOpenLoading = false,
+                            externalOpenErrorMessage = "첨부파일이 비어 있습니다."
+                        )
+                    }
+                    return@launch
+                }
+
+                val cachedFile = body.use { responseBody ->
+                    writeExternalOpenFile(safeFilename, responseBody)
+                }
+
+                if (cachedFile == null) {
+                    _uiState.update {
+                        it.copy(
+                            isExternalOpenLoading = false,
+                            externalOpenErrorMessage = "파일을 준비하지 못했습니다."
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isExternalOpenLoading = false,
+                            externalOpenContent = AttachmentExternalContent(
+                                filePath = cachedFile.absolutePath,
+                                mimeType = safeMimeType
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MailDetailViewModel", "Error opening attachment externally", e)
+                _uiState.update {
+                    it.copy(
+                        isExternalOpenLoading = false,
+                        externalOpenErrorMessage = e.message ?: "외부 앱으로 여는 중 오류가 발생했습니다."
+                    )
+                }
+            }
+        }
+    }
+
+    fun consumeExternalOpenContent() {
+        _uiState.update { it.copy(externalOpenContent = null) }
+    }
+
+    fun clearExternalOpenError() {
+        _uiState.update { it.copy(externalOpenErrorMessage = null) }
+    }
+
+    fun previewAttachment(attachment: Attachment) {
+        val mailId = _uiState.value.mail?.id ?: return
+        val previewType = attachment.previewType()
+        clearCachedPreviewFile(_uiState.value.previewContent)
+        _uiState.update {
+            it.copy(
+                showPreviewDialog = true,
+                previewTarget = attachment,
+                previewContent = null,
+                previewErrorMessage = null,
+                isPreviewLoading = previewType != AttachmentPreviewType.UNSUPPORTED
+            )
+        }
+
+        if (previewType == AttachmentPreviewType.UNSUPPORTED) {
+            _uiState.update {
+                it.copy(
+                    isPreviewLoading = false,
+                    previewErrorMessage = "이 형식은 미리보기를 지원하지 않습니다. 외부 앱으로 열어주세요."
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val safeFilename = attachment.filename.ifBlank { "attachment" }
+                val safeMimeType = attachment.mimeType.ifBlank { "application/octet-stream" }
+                val response = inboxRepository.downloadAttachment(
+                    mailId,
+                    attachment.attachmentId,
+                    safeFilename,
+                    safeMimeType
+                )
+                if (!response.isSuccessful) {
+                    _uiState.update {
+                        it.copy(
+                            isPreviewLoading = false,
+                            previewErrorMessage = "첨부파일을 불러오지 못했습니다. (${response.code()})"
+                        )
+                    }
+                    return@launch
+                }
+                val body = response.body()
+                if (body == null) {
+                    _uiState.update {
+                        it.copy(
+                            isPreviewLoading = false,
+                            previewErrorMessage = "첨부파일이 비어 있습니다."
+                        )
+                    }
+                    return@launch
+                }
+
+                val previewContent = body.use { responseBody ->
+                    when (previewType) {
+                        AttachmentPreviewType.TEXT -> AttachmentPreviewContent.Text(readTextPreview(responseBody))
+                        AttachmentPreviewType.PDF -> writePreviewFile(safeFilename, responseBody)?.let {
+                            AttachmentPreviewContent.Pdf(it.absolutePath)
+                        }
+                        AttachmentPreviewType.UNSUPPORTED -> null
+                    }
+                }
+
+                if (previewContent == null) {
+                    _uiState.update {
+                        it.copy(
+                            isPreviewLoading = false,
+                            previewErrorMessage = "미리보기를 준비하지 못했습니다."
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isPreviewLoading = false,
+                            previewContent = previewContent,
+                            previewErrorMessage = null
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MailDetailViewModel", "Error previewing attachment", e)
+                _uiState.update {
+                    it.copy(
+                        isPreviewLoading = false,
+                        previewErrorMessage = e.message ?: "첨부파일 미리보기에 실패했습니다."
+                    )
+                }
+            }
+        }
+    }
+
     fun dismissAnalysisPopup() {
         _uiState.update {
             it.copy(
@@ -236,6 +430,19 @@ class MailDetailViewModel(
                 analysisResult = null,
                 analysisErrorMessage = null,
                 analysisTarget = null
+            )
+        }
+    }
+
+    fun dismissPreviewDialog() {
+        clearCachedPreviewFile(_uiState.value.previewContent)
+        _uiState.update {
+            it.copy(
+                showPreviewDialog = false,
+                previewTarget = null,
+                previewContent = null,
+                previewErrorMessage = null,
+                isPreviewLoading = false
             )
         }
     }
@@ -324,5 +531,103 @@ class MailDetailViewModel(
             index++
         }
         return file
+    }
+
+    private fun readTextPreview(responseBody: ResponseBody, maxChars: Int = MAX_TEXT_PREVIEW_CHARS): String {
+        val builder = StringBuilder()
+        var truncated = false
+        responseBody.charStream().use { reader ->
+            val buffer = CharArray(2048)
+            var total = 0
+            while (true) {
+                val read = reader.read(buffer)
+                if (read == -1) break
+                val remaining = maxChars - total
+                if (remaining <= 0) {
+                    truncated = true
+                    break
+                }
+                val toAppend = min(remaining, read)
+                builder.append(buffer, 0, toAppend)
+                total += toAppend
+                if (toAppend < read) {
+                    truncated = true
+                    break
+                }
+            }
+        }
+        if (truncated) {
+            builder.append("\n\n… (내용이 길어 일부만 표시됩니다)")
+        }
+        return builder.toString().ifBlank { "내용을 불러오지 못했습니다." }
+    }
+
+    private fun writePreviewFile(filename: String, responseBody: ResponseBody): File? =
+        writeCachedAttachmentFile("attachment_previews", "preview", filename, responseBody)
+
+    private fun writeExternalOpenFile(filename: String, responseBody: ResponseBody): File? =
+        writeCachedAttachmentFile("attachment_external", "external", filename, responseBody)
+
+    private fun writeCachedAttachmentFile(
+        subdirectory: String,
+        prefix: String,
+        filename: String,
+        responseBody: ResponseBody
+    ): File? {
+        return try {
+            val targetDir = File(appContext.cacheDir, subdirectory).apply {
+                if (!exists()) {
+                    mkdirs()
+                }
+            }
+            val extension = filename.substringAfterLast('.', "")
+            val suffix = if (extension.isNotBlank()) ".$extension" else ".tmp"
+            val tempFile = File.createTempFile(
+                "${prefix}_${System.currentTimeMillis()}",
+                suffix,
+                targetDir
+            )
+            FileOutputStream(tempFile).use { output ->
+                responseBody.byteStream().use { input ->
+                    input.copyTo(output)
+                }
+            }
+            tempFile
+        } catch (e: Exception) {
+            Log.e("MailDetailViewModel", "Failed to cache attachment file", e)
+            null
+        }
+    }
+
+    private fun clearCachedPreviewFile(content: AttachmentPreviewContent?) {
+        if (content is AttachmentPreviewContent.Pdf) {
+            runCatching {
+                val file = File(content.filePath)
+                if (file.exists()) {
+                    file.delete()
+                }
+            }
+        }
+    }
+
+    private fun clearExternalOpenContentFile(content: AttachmentExternalContent?) {
+        content?.let {
+            runCatching {
+                val file = File(it.filePath)
+                if (file.exists()) {
+                    file.delete()
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        clearCachedPreviewFile(_uiState.value.previewContent)
+        clearExternalOpenContentFile(_uiState.value.externalOpenContent)
+    }
+
+    companion object {
+        private const val MAX_TEXT_PREVIEW_CHARS = 20_000
     }
 }

@@ -64,6 +64,21 @@ class MailDetailActivity : ComponentActivity() {
                     },
                     onClearDownloadResult = {
                         viewModel.clearDownloadResult()
+                    },
+                    onPreviewAttachment = { attachment ->
+                        viewModel.previewAttachment(attachment)
+                    },
+                    onDismissPreview = {
+                        viewModel.dismissPreviewDialog()
+                    },
+                    onOpenAttachmentExternally = { attachment ->
+                        viewModel.openAttachmentExternally(attachment)
+                    },
+                    onConsumeExternalOpen = {
+                        viewModel.consumeExternalOpenContent()
+                    },
+                    onClearExternalOpenError = {
+                        viewModel.clearExternalOpenError()
                     }
                 )
             }

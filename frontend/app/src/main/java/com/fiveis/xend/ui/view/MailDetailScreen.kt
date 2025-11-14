@@ -1,9 +1,16 @@
 package com.fiveis.xend.ui.view
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +28,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +59,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -70,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import com.fiveis.xend.data.model.Attachment
 import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
@@ -86,7 +98,10 @@ import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
+import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,7 +112,12 @@ fun MailDetailScreen(
     onDownloadAttachment: (Attachment) -> Unit = {},
     onAnalyzeAttachment: (Attachment) -> Unit = {},
     onDismissAnalysis: () -> Unit = {},
-    onClearDownloadResult: () -> Unit = {}
+    onClearDownloadResult: () -> Unit = {},
+    onPreviewAttachment: (Attachment) -> Unit = {},
+    onDismissPreview: () -> Unit = {},
+    onOpenAttachmentExternally: (Attachment) -> Unit = {},
+    onConsumeExternalOpen: () -> Unit = {},
+    onClearExternalOpenError: () -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
@@ -115,6 +135,13 @@ fun MailDetailScreen(
         uiState.downloadErrorMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             onClearDownloadResult()
+        }
+    }
+
+    LaunchedEffect(uiState.externalOpenErrorMessage) {
+        uiState.externalOpenErrorMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            onClearExternalOpenError()
         }
     }
 
@@ -170,7 +197,9 @@ fun MailDetailScreen(
                         onAttachmentClick = { selected ->
                             attachmentToDownload = selected
                         },
-                        onAnalyzeAttachment = onAnalyzeAttachment
+                        onAnalyzeAttachment = onAnalyzeAttachment,
+                        onPreviewAttachment = onPreviewAttachment,
+                        onOpenAttachmentExternally = onOpenAttachmentExternally
                     )
                 }
             }
@@ -192,6 +221,10 @@ fun MailDetailScreen(
         DownloadingDialog()
     }
 
+    if (uiState.isExternalOpenLoading) {
+        ExternalOpenLoadingDialog()
+    }
+
     if (uiState.showAnalysisPopup && uiState.analysisTarget != null) {
         AttachmentAnalysisPopup(
             attachment = uiState.analysisTarget,
@@ -204,6 +237,47 @@ fun MailDetailScreen(
                 Toast.makeText(context, "답장 가이드가 복사되었습니다.", Toast.LENGTH_SHORT).show()
             }
         )
+    }
+
+    if (uiState.showPreviewDialog && uiState.previewTarget != null) {
+        AttachmentPreviewDialog(
+            attachment = uiState.previewTarget,
+            isLoading = uiState.isPreviewLoading,
+            content = uiState.previewContent,
+            errorMessage = uiState.previewErrorMessage,
+            onDismiss = onDismissPreview,
+            onRetry = { onPreviewAttachment(uiState.previewTarget) }
+        )
+    }
+
+    LaunchedEffect(uiState.externalOpenContent) {
+        val content = uiState.externalOpenContent ?: return@LaunchedEffect
+        val file = File(content.filePath)
+        val mime = content.mimeType.ifBlank { "*/*" }
+        if (!file.exists()) {
+            Toast.makeText(context, "파일을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+            onConsumeExternalOpen()
+            return@LaunchedEffect
+        }
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(intent, "앱 선택").apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            context.startActivity(chooser)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "열 수 있는 앱이 없습니다.", Toast.LENGTH_SHORT).show()
+        } finally {
+            onConsumeExternalOpen()
+        }
     }
 }
 
@@ -284,7 +358,9 @@ private fun ToolbarIconButton(
 private fun MailDetailContent(
     mail: EmailItem,
     onAttachmentClick: (Attachment) -> Unit,
-    onAnalyzeAttachment: (Attachment) -> Unit
+    onAnalyzeAttachment: (Attachment) -> Unit,
+    onPreviewAttachment: (Attachment) -> Unit,
+    onOpenAttachmentExternally: (Attachment) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -315,7 +391,9 @@ private fun MailDetailContent(
             AttachmentSection(
                 attachments = mail.attachments,
                 onAttachmentClick = onAttachmentClick,
-                onAnalyzeAttachment = onAnalyzeAttachment
+                onAnalyzeAttachment = onAnalyzeAttachment,
+                onPreviewAttachment = onPreviewAttachment,
+                onOpenAttachmentExternally = onOpenAttachmentExternally
             )
         }
     }
@@ -481,7 +559,9 @@ private fun BodySection(body: String) {
 private fun AttachmentSection(
     attachments: List<Attachment>,
     onAttachmentClick: (Attachment) -> Unit,
-    onAnalyzeAttachment: (Attachment) -> Unit
+    onAnalyzeAttachment: (Attachment) -> Unit,
+    onPreviewAttachment: (Attachment) -> Unit,
+    onOpenAttachmentExternally: (Attachment) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -504,10 +584,15 @@ private fun AttachmentSection(
                 color = AttachmentHeaderText
             )
             attachments.forEach { attachment ->
+                val previewType = attachment.previewType()
+                val supportsPreview = previewType != AttachmentPreviewType.UNSUPPORTED
                 AttachmentItem(
                     attachment = attachment,
                     onClick = { onAttachmentClick(attachment) },
-                    onAnalyze = { onAnalyzeAttachment(attachment) }
+                    onAnalyze = { onAnalyzeAttachment(attachment) },
+                    onPreview = { onPreviewAttachment(attachment) },
+                    onOpenExternal = { onOpenAttachmentExternally(attachment) },
+                    supportsPreview = supportsPreview
                 )
             }
         }
@@ -515,7 +600,14 @@ private fun AttachmentSection(
 }
 
 @Composable
-private fun AttachmentItem(attachment: Attachment, onClick: () -> Unit, onAnalyze: () -> Unit) {
+private fun AttachmentItem(
+    attachment: Attachment,
+    onClick: () -> Unit,
+    onAnalyze: () -> Unit,
+    onPreview: () -> Unit,
+    onOpenExternal: () -> Unit,
+    supportsPreview: Boolean
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -561,7 +653,15 @@ private fun AttachmentItem(attachment: Attachment, onClick: () -> Unit, onAnalyz
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AiAnalysisBadge(onClick = onAnalyze)
-                PreviewButton()
+                PreviewButton(
+                    onClick = {
+                        if (supportsPreview) {
+                            onPreview()
+                        } else {
+                            onOpenExternal()
+                        }
+                    }
+                )
             }
         }
     }
@@ -673,6 +773,31 @@ private fun DownloadingDialog() {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 Text(
                     text = "파일 저장 중입니다...",
+                    fontSize = 14.sp,
+                    color = TextPrimary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExternalOpenLoadingDialog() {
+    Dialog(onDismissRequest = { }) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = BackgroundWhite,
+            tonalElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Text(
+                    text = "파일을 준비하는 중입니다...",
                     fontSize = 14.sp,
                     color = TextPrimary
                 )
@@ -940,6 +1065,308 @@ private fun AnalysisSection(title: String, backgroundColor: Color, borderColor: 
 }
 
 @Composable
+private fun AttachmentPreviewDialog(
+    attachment: Attachment,
+    isLoading: Boolean,
+    content: AttachmentPreviewContent?,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x88000000)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .heightIn(min = 360.dp, max = 620.dp),
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 12.dp,
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    AttachmentPreviewHeader(
+                        attachment = attachment,
+                        onDismiss = onDismiss
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when {
+                            isLoading -> {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    CircularProgressIndicator()
+                                    Text(
+                                        text = "파일을 불러오는 중입니다...",
+                                        fontSize = 13.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                            errorMessage != null -> {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = errorMessage,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                    Button(onClick = onRetry) {
+                                        Text("다시 시도")
+                                    }
+                                }
+                            }
+                            content is AttachmentPreviewContent.Text -> {
+                                TextPreviewContent(
+                                    text = content.text,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            content is AttachmentPreviewContent.Pdf -> {
+                                PdfPreviewContent(
+                                    filePath = content.filePath,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    text = "미리볼 수 있는 내용이 없습니다.",
+                                    fontSize = 13.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentPreviewHeader(attachment: Attachment, onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            AttachmentFileIcon(filename = attachment.filename)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
+                Text(
+                    text = attachment.filename,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "파일 크기 ${formatFileSize(attachment.size)}",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        IconButton(onClick = onDismiss) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "닫기",
+                tint = TextSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun TextPreviewContent(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(MailDetailBodyBg, RoundedCornerShape(14.dp))
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            color = TextPrimary,
+            lineHeight = 18.sp
+        )
+    }
+}
+
+@Composable
+private fun PdfPreviewContent(filePath: String, modifier: Modifier = Modifier) {
+    val holder = rememberPdfRenderer(filePath)
+    when {
+        holder == null -> {
+            Box(
+                modifier = modifier
+                    .background(MailDetailBodyBg, RoundedCornerShape(14.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "PDF 파일을 열 수 없습니다.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+        holder.renderer.pageCount == 0 -> {
+            Box(
+                modifier = modifier
+                    .background(MailDetailBodyBg, RoundedCornerShape(14.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "표시할 페이지가 없습니다.",
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        else -> {
+            LazyColumn(
+                modifier = modifier
+                    .background(MailDetailBodyBg, RoundedCornerShape(14.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(holder.renderer.pageCount) { pageIndex ->
+                    PdfPagePreview(
+                        renderer = holder.renderer,
+                        pageIndex = pageIndex
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdfPagePreview(renderer: PdfRenderer, pageIndex: Int) {
+    var bitmap by remember(pageIndex, renderer) { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(renderer, pageIndex) {
+        bitmap?.recycle()
+        bitmap = null
+        val renderedBitmap = withContext(Dispatchers.IO) {
+            renderer.openPage(pageIndex).use { page ->
+                val bitmapWidth = page.width * 2
+                val bitmapHeight = page.height * 2
+                val rendered = Bitmap.createBitmap(
+                    bitmapWidth,
+                    bitmapHeight,
+                    Bitmap.Config.ARGB_8888
+                )
+                page.render(rendered, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                rendered
+            }
+        }
+        bitmap = renderedBitmap
+    }
+
+    DisposableEffect(renderer, pageIndex) {
+        onDispose {
+            bitmap?.recycle()
+            bitmap = null
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(8.dp))
+            .border(BorderStroke(1.dp, ComposeOutline), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "페이지 ${pageIndex + 1}",
+            fontSize = 12.sp,
+            color = TextSecondary,
+            fontWeight = FontWeight.Medium
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val currentBitmap = bitmap
+            if (currentBitmap != null) {
+                Image(
+                    bitmap = currentBitmap.asImageBitmap(),
+                    contentDescription = "PDF Page ${pageIndex + 1}",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                CircularProgressIndicator()
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberPdfRenderer(filePath: String): PdfRendererHolder? {
+    val holder = remember(filePath) {
+        runCatching {
+            val file = File(filePath)
+            if (!file.exists()) {
+                null
+            } else {
+                val descriptor = ParcelFileDescriptor.open(
+                    file,
+                    ParcelFileDescriptor.MODE_READ_ONLY
+                )
+                PdfRendererHolder(descriptor, PdfRenderer(descriptor))
+            }
+        }.getOrNull()
+    }
+    DisposableEffect(holder) {
+        onDispose {
+            holder?.renderer?.close()
+            holder?.descriptor?.close()
+        }
+    }
+    return holder
+}
+
+private data class PdfRendererHolder(
+    val descriptor: ParcelFileDescriptor,
+    val renderer: PdfRenderer
+)
+
+@Composable
 private fun ReplyButton(onClick: () -> Unit) {
     Box(
         modifier = Modifier
@@ -1066,7 +1493,9 @@ private fun MailDetailScreenPreview() {
             onDownloadAttachment = {},
             onAnalyzeAttachment = {},
             onDismissAnalysis = {},
-            onClearDownloadResult = {}
+            onClearDownloadResult = {},
+            onPreviewAttachment = {},
+            onDismissPreview = {}
         )
     }
 }
