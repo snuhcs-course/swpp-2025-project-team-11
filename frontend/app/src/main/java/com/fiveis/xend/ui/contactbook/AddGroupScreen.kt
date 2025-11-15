@@ -75,6 +75,8 @@ fun AddGroupScreen(
     onGroupDescriptionChange: (String) -> Unit,
     onPromptOptionsChange: (PromptingUiState) -> Unit,
     onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> },
+    onUpdatePromptOption: UpdatePromptOptionHandler = { _, _, _, _, _ -> },
+    onDeletePromptOption: DeletePromptOptionHandler = { _, _, _ -> },
     members: List<Contact> = emptyList(),
     onAddMember: () -> Unit = {},
     onMemberClick: () -> Unit = {},
@@ -211,7 +213,9 @@ fun AddGroupScreen(
                     onValueChange = onPromptOptionsChange,
                     allToneOptions = uiState.tonePromptOptions,
                     allFormatOptions = uiState.formatPromptOptions,
-                    onAddPromptOption = onAddPromptOption
+                    onAddPromptOption = onAddPromptOption,
+                    onUpdatePromptOption = onUpdatePromptOption,
+                    onDeletePromptOption = onDeletePromptOption
                 )
             }
 

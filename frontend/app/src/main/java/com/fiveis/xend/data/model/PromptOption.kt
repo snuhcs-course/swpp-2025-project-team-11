@@ -22,3 +22,10 @@ data class PromptOptionRequest(
     val name: String,
     val prompt: String
 )
+
+@Serializable
+data class PromptOptionUpdateRequest(
+    val id: Long,
+    val name: String,
+    val prompt: String
+)

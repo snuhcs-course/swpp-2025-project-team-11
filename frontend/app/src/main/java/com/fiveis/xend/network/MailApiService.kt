@@ -1,10 +1,14 @@
 package com.fiveis.xend.network
 
+import com.fiveis.xend.data.model.AttachmentAnalysisRequest
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.data.model.SendResponse
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -27,4 +31,15 @@ interface MailApiService {
 
     @GET("api/mail/emails/{message_id}/")
     suspend fun getMail(@Path("message_id") messageId: String): Response<MailDetailResponse>
+
+    @GET("api/mail/emails/{message_id}/attachments/{attachment_id}/")
+    suspend fun downloadAttachment(
+        @Path("message_id") messageId: String,
+        @Path("attachment_id") attachmentId: String,
+        @Query("filename") filename: String,
+        @Query("mime_type") mimeType: String
+    ): Response<ResponseBody>
+
+    @POST("api/ai/mail/attachments/analyze/")
+    suspend fun analyzeAttachment(@Body request: AttachmentAnalysisRequest): Response<AttachmentAnalysisResponse>
 }

@@ -6,6 +6,7 @@ import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.data.model.PromptOptionRequest
+import com.fiveis.xend.data.model.PromptOptionUpdateRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -58,4 +59,13 @@ interface ContactApiService {
 
     @GET("api/contact/prompt-options/")
     suspend fun getAllPromptOptions(): Response<List<PromptOption>>
+
+    @PATCH("api/contact/prompt-options/{id}/")
+    suspend fun updatePromptOption(
+        @Path("id") optionId: Long,
+        @Body payload: PromptOptionUpdateRequest
+    ): Response<PromptOption>
+
+    @DELETE("api/contact/prompt-options/{id}/")
+    suspend fun deletePromptOption(@Path("id") optionId: Long): Response<Void>
 }

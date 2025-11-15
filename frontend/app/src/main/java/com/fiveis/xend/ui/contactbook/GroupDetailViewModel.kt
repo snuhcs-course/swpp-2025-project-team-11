@@ -190,6 +190,38 @@ class GroupDetailViewModel(
         }
     }
 
+    fun updatePromptOption(
+        optionId: Long,
+        name: String,
+        prompt: String,
+        onSuccess: (PromptOption) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val updated = repo.updatePromptOption(optionId, name, prompt)
+                onSuccess(updated)
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 수정에 실패했습니다"
+                ui.update { it.copy(promptOptionsError = msg) }
+                onError(msg)
+            }
+        }
+    }
+
+    fun deletePromptOption(optionId: Long, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                repo.deletePromptOption(optionId)
+                onSuccess()
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 삭제에 실패했습니다"
+                ui.update { it.copy(promptOptionsError = msg) }
+                onError(msg)
+            }
+        }
+    }
+
     fun clearPromptOptionsError() {
         ui.update { it.copy(promptOptionsError = null) }
     }

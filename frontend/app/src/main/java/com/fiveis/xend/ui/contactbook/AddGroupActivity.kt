@@ -102,6 +102,22 @@ class AddGroupActivity : ComponentActivity() {
                             onError = onError
                         )
                     },
+                    onUpdatePromptOption = { id, nm, pr, onSuccess, onError ->
+                        addViewModel.updatePromptOption(
+                            optionId = id,
+                            name = nm,
+                            prompt = pr,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
+                    },
+                    onDeletePromptOption = { id, onSuccess, onError ->
+                        addViewModel.deletePromptOption(
+                            optionId = id,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
+                    },
                     members = members,
                     onAddMember = {
                         showContactSelectDialog = true

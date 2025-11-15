@@ -12,6 +12,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.theme.XendTheme
 
 class MailDetailActivity : ComponentActivity() {
@@ -50,6 +52,33 @@ class MailDetailActivity : ComponentActivity() {
                             }
                             startActivity(intent)
                         }
+                    },
+                    onDownloadAttachment = { attachment ->
+                        viewModel.downloadAttachment(attachment)
+                    },
+                    onAnalyzeAttachment = { attachment ->
+                        viewModel.analyzeAttachment(attachment)
+                    },
+                    onDismissAnalysis = {
+                        viewModel.dismissAnalysisPopup()
+                    },
+                    onClearDownloadResult = {
+                        viewModel.clearDownloadResult()
+                    },
+                    onPreviewAttachment = { attachment ->
+                        viewModel.previewAttachment(attachment)
+                    },
+                    onDismissPreview = {
+                        viewModel.dismissPreviewDialog()
+                    },
+                    onOpenAttachmentExternally = { attachment ->
+                        viewModel.openAttachmentExternally(attachment)
+                    },
+                    onConsumeExternalOpen = {
+                        viewModel.consumeExternalOpenContent()
+                    },
+                    onClearExternalOpenError = {
+                        viewModel.clearExternalOpenError()
                     }
                 )
             }
@@ -64,8 +93,12 @@ class MailDetailViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MailDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            val database = AppDatabase.getDatabase(context)
-            return MailDetailViewModel(database.emailDao(), messageId) as T
+            val appContext = context.applicationContext
+            val database = AppDatabase.getDatabase(appContext)
+            val emailDao = database.emailDao()
+            val mailApiService = RetrofitClient.getMailApiService(appContext)
+            val repository = InboxRepository(mailApiService, emailDao)
+            return MailDetailViewModel(appContext, emailDao, repository, messageId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
