@@ -148,4 +148,8 @@ object RetrofitClient {
     fun getProfileApiService(context: Context): ProfileApiService {
         return getRetrofit(getClient(context)).create(ProfileApiService::class.java)
     }
+
+    fun getProfileApiService(context: Context): ProfileApiService {
+        return getRetrofit(getClient(context)).create(ProfileApiService::class.java)
+    }
 }
