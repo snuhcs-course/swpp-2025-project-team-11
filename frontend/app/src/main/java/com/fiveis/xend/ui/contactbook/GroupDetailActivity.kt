@@ -92,6 +92,12 @@ class GroupDetailActivity : ComponentActivity() {
                     onAddPromptOption = { key, name, prompt, onSuccess, onError ->
                         vm.addPromptOption(key, name, prompt, onSuccess, onError)
                     },
+                    onUpdatePromptOption = { id, name, prompt, onSuccess, onError ->
+                        vm.updatePromptOption(id, name, prompt, onSuccess, onError)
+                    },
+                    onDeletePromptOption = { id, onSuccess, onError ->
+                        vm.deletePromptOption(id, onSuccess, onError)
+                    },
                     onClearPromptError = { vm.clearPromptOptionsError() }
                 )
 

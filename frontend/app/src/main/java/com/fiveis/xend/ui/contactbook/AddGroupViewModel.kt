@@ -122,6 +122,38 @@ class AddGroupViewModel(
         }
     }
 
+    fun updatePromptOption(
+        optionId: Long,
+        name: String,
+        prompt: String,
+        onSuccess: (PromptOption) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val updated = repository.updatePromptOption(optionId, name, prompt)
+                onSuccess(updated)
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 수정에 실패했습니다"
+                _uiState.update { it.copy(error = msg) }
+                onError(msg)
+            }
+        }
+    }
+
+    fun deletePromptOption(optionId: Long, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                repository.deletePromptOption(optionId)
+                onSuccess()
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 삭제에 실패했습니다"
+                _uiState.update { it.copy(error = msg) }
+                onError(msg)
+            }
+        }
+    }
+
     fun getAllPromptOptions() {
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingOptions = true, error = null) }

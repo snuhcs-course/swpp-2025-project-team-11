@@ -2,11 +2,14 @@ package com.fiveis.xend.data.repository
 
 import android.util.Log
 import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.model.AttachmentAnalysisRequest
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.network.MailApiService
 import kotlinx.coroutines.flow.Flow
+import okhttp3.ResponseBody
 import retrofit2.Response
 
 class SentRepository(
@@ -118,6 +121,30 @@ class SentRepository(
 
     suspend fun getMail(messageId: String): Response<MailDetailResponse> {
         return mailApiService.getMail(messageId)
+    }
+
+    suspend fun downloadAttachment(
+        messageId: String,
+        attachmentId: String,
+        filename: String,
+        mimeType: String
+    ): Response<ResponseBody> {
+        return mailApiService.downloadAttachment(messageId, attachmentId, filename, mimeType)
+    }
+
+    suspend fun analyzeAttachment(
+        messageId: String,
+        attachmentId: String,
+        filename: String,
+        mimeType: String
+    ): Response<AttachmentAnalysisResponse> {
+        val request = AttachmentAnalysisRequest(
+            messageId = messageId,
+            attachmentId = attachmentId,
+            filename = filename,
+            mimeType = mimeType
+        )
+        return mailApiService.analyzeAttachment(request)
     }
 
     suspend fun updateReadStatus(emailId: String, isUnread: Boolean) {

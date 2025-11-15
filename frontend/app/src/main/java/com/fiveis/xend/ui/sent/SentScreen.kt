@@ -373,9 +373,21 @@ fun EmailListContent(
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
     error: String?,
-    onScrollChange: (Int, Int) -> Unit = { _, _ -> }
+    onScrollChange: (Int, Int) -> Unit = { _, _ -> },
+    onScrollStopped: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
+
+    // 스크롤 멈춤 감지
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.isScrollInProgress
+        }.collect { isScrolling ->
+            if (!isScrolling) {
+                onScrollStopped()
+            }
+        }
+    }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -439,8 +451,9 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val recipientDisplay = formatRecipientDisplay(item.toEmail)
                     Text(
-                        text = extractSenderName(item.fromEmail),
+                        text = "To: $recipientDisplay",
                         color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -563,9 +576,18 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
-// Helper function to extract sender name from "Name <email>" format
-private fun extractSenderName(fromEmail: String): String {
+// Helper function to extract display name from "Name <email>" format
+private fun extractDisplayName(emailField: String): String {
     val nameRegex = "(.+?)\\s*<".toRegex()
-    val matchResult = nameRegex.find(fromEmail)
-    return matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
+    val matchResult = nameRegex.find(emailField)
+    return matchResult?.groupValues?.get(1)?.trim()
+        ?: emailField.substringBefore("<").trim().ifEmpty { emailField }
+}
+
+private fun formatRecipientDisplay(rawToField: String): String {
+    val recipients = rawToField.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    if (recipients.isEmpty()) return "알 수 없음"
+
+    val primary = extractDisplayName(recipients.first())
+    return if (recipients.size > 1) "$primary 외 ${recipients.size - 1}명" else primary
 }

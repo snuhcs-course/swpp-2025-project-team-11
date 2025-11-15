@@ -254,6 +254,9 @@ fun MailScreen(
                             }
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
+                        },
+                        onScrollStopped = {
+                            showBottomBar = true
                         }
                     )
                 }

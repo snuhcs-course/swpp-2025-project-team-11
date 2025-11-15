@@ -229,16 +229,17 @@ class InboxRepositoryTest {
         val messageId = "test_message_123"
         val mockMailDetail = com.fiveis.xend.data.model.MailDetailResponse(
             id = messageId,
-            thread_id = "thread_123",
+            threadId = "thread_123",
             subject = "Test Subject",
-            from_email = "sender@example.com",
-            to = "recipient@example.com",
+            fromEmail = "sender@example.com",
+            toEmail = "recipient@example.com",
+            to = "Recipient <recipient@example.com>",
             body = "Test email body",
             date = "2025-01-01T00:00:00Z",
-            date_raw = "Wed, 1 Jan 2025 00:00:00 +0000",
+            dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
             snippet = "Test snippet",
-            is_unread = true,
-            label_ids = listOf("INBOX")
+            isUnread = true,
+            labelIds = listOf("INBOX")
         )
         val mockResponse = Response.success(mockMailDetail)
 
