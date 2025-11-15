@@ -459,8 +459,16 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(groupColor)
-                )
+                        .background(groupColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (group.emoji != null) {
+                        Text(
+                            text = group.emoji,
+                            fontSize = 20.sp
+                        )
+                    }
+                }
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
@@ -793,28 +801,30 @@ private fun MonogramAvatar(letter: String, bg: Color) {
 fun ContactScreenPreview() {
     val sampleGroups = listOf(
         Group(
-            1,
-            "VIP",
-            "중요한 고객과 상급자들",
-            emptyList(),
-            listOf(
+            id = 1,
+            name = "VIP",
+            description = "중요한 고객과 상급자들",
+            emoji = "⭐",
+            options = emptyList(),
+            members = listOf(
                 Contact(0, null, name = "김철수", email = "kim@snu.ac.kr"),
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
-            null,
-            null
+            createdAt = null,
+            updatedAt = null
         ),
         Group(
-            2,
-            "업무 동료",
-            "같은 회사 팀원들과 협업 파트너",
-            emptyList(),
-            listOf(
+            id = 2,
+            name = "업무 동료",
+            description = "같은 회사 팀원들과 협업 파트너",
+            emoji = "💼",
+            options = emptyList(),
+            members = listOf(
                 Contact(0, null, name = "김철수", email = "kim@snu.ac.kr"),
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
-            null,
-            null
+            createdAt = null,
+            updatedAt = null
         )
     )
     ContactBookScreen(
