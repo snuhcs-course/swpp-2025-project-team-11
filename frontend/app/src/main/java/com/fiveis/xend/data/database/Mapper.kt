@@ -17,6 +17,7 @@ fun GroupWithMembersAndOptions.asDomain(): Group = Group(
     id = group.id,
     name = group.name,
     description = group.description,
+    emoji = group.emoji,
     options = options.map { it.asDomain() },
     // 그룹 안에서 순환 막기 위해 group = null
     members = members.map { it.asDomain(null) },
@@ -41,6 +42,7 @@ fun ContactWithGroupAndContext.asDomain(): Contact {
             id = g.id,
             name = g.name,
             description = g.description,
+            emoji = g.emoji,
             options = emptyList(),
             members = emptyList(),
             createdAt = g.createdAt,
@@ -88,6 +90,7 @@ fun Group.asEntity(): GroupEntity = GroupEntity(
     id = id,
     name = name,
     description = description,
+    emoji = emoji,
     createdAt = createdAt,
     updatedAt = updatedAt
 )

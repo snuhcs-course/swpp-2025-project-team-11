@@ -281,8 +281,14 @@ class ContactBookRepository(
         }
     }
 
-    suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
-        val request = AddGroupRequest(name = name, description = description, optionIds = options.map { it.id })
+    suspend fun addGroup(
+        name: String,
+        description: String,
+        emoji: String? = null,
+        options: List<PromptOption>
+    ): GroupResponse {
+        val request =
+            AddGroupRequest(name = name, description = description, emoji = emoji, optionIds = options.map { it.id })
         val res = api.addGroup(request)
         if (!res.isSuccessful) {
             val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"

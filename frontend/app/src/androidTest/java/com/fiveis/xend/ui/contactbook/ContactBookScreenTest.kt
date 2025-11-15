@@ -67,7 +67,7 @@ class ContactBookScreenTest {
     fun test_contactBookScreen_shows_group_list() {
         // Given
         val groups = listOf(
-            Group(1, "VIP", "Important", emptyList(), emptyList(), null, null)
+            Group(1, "VIP", "Important", null, emptyList(), emptyList(), null, null)
         )
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
@@ -158,7 +158,7 @@ class ContactBookScreenTest {
     fun test_contactBookScreen_group_click_triggers_callback() {
         // Given
         var clickedGroup: Group? = null
-        val group = Group(1, "Test", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Test", "Desc", null, emptyList(), emptyList(), null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -210,8 +210,8 @@ class ContactBookScreenTest {
     fun test_contactBookScreen_shows_multiple_groups() {
         // Given
         val groups = listOf(
-            Group(1, "Group1", "Desc1", emptyList(), emptyList(), null, null),
-            Group(2, "Group2", "Desc2", emptyList(), emptyList(), null, null)
+            Group(1, "Group1", "Desc1", null, emptyList(), emptyList(), null, null),
+            Group(2, "Group2", "Desc2", null, emptyList(), emptyList(), null, null)
         )
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
@@ -316,7 +316,7 @@ class ContactBookScreenTest {
             Contact(1, null, "M1", "m1@example.com"),
             Contact(2, null, "M2", "m2@example.com")
         )
-        val group = Group(1, "Team", "Desc", emptyList(), members, null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), members, null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -381,7 +381,7 @@ class ContactBookScreenTest {
     @Test
     fun test_contactBookScreen_shows_group_description() {
         // Given
-        val group = Group(1, "VIP", "Very Important People", emptyList(), emptyList(), null, null)
+        val group = Group(1, "VIP", "Very Important People", null, emptyList(), emptyList(), null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -510,7 +510,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_displays_group_name() {
         // Given
-        val group = Group(1, "TestGroup", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "TestGroup", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -525,7 +525,7 @@ class ContactBookScreenTest {
     fun test_groupCard_click_triggers_callback() {
         // Given
         var clicked = false
-        val group = Group(1, "TestGroup", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "TestGroup", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -546,7 +546,7 @@ class ContactBookScreenTest {
             Contact(2, null, "M2", "m2@example.com"),
             Contact(3, null, "M3", "m3@example.com")
         )
-        val group = Group(1, "Team", "Desc", emptyList(), members, null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), members, null, null)
 
         // When
         composeTestRule.setContent {
@@ -560,7 +560,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_shows_zero_members() {
         // Given
-        val group = Group(1, "Empty", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Empty", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -574,7 +574,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_shows_description() {
         // Given
-        val group = Group(1, "Team", "Team Description", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", "Team Description", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -588,7 +588,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_shows_more_button() {
         // Given
-        val group = Group(1, "Team", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -602,7 +602,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_more_button_opens_menu() {
         // Given
-        val group = Group(1, "Team", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -618,7 +618,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_delete_shows_confirmation() {
         // Given
-        val group = Group(1, "Team", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -635,7 +635,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_delete_confirmation_shows_group_name() {
         // Given
-        val group = Group(1, "MyTeam", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "MyTeam", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -652,7 +652,7 @@ class ContactBookScreenTest {
     @Test
     fun test_groupCard_delete_confirmation_cancel() {
         // Given
-        val group = Group(1, "Team", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -671,7 +671,7 @@ class ContactBookScreenTest {
     fun test_groupCard_delete_confirmation_confirm() {
         // Given
         var deletedGroup: Group? = null
-        val group = Group(1, "Team", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", "Desc", null, emptyList(), emptyList(), null, null)
 
         // When
         composeTestRule.setContent {
@@ -775,7 +775,7 @@ class ContactBookScreenTest {
     fun test_contactBookScreen_group_with_many_members_shows_overflow() {
         // Given
         val members = List(10) { Contact(it.toLong(), null, "M$it", "m$it@example.com") }
-        val group = Group(1, "Big Team", "Desc", emptyList(), members, null, null)
+        val group = Group(1, "Big Team", "Desc", null, emptyList(), members, null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -886,7 +886,7 @@ class ContactBookScreenTest {
     @Test
     fun test_contactBookScreen_group_with_null_description() {
         // Given
-        val group = Group(1, "Team", null, emptyList(), emptyList(), null, null)
+        val group = Group(1, "Team", null, null, emptyList(), emptyList(), null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -1020,7 +1020,7 @@ class ContactBookScreenTest {
         val options = listOf(
             PromptOption(1, "tone", "존댓말", "존댓말을 사용하세요")
         )
-        val group = Group(1, "Team", "Desc", options, emptyList(), null, null)
+        val group = Group(1, "Team", "Desc", null, options, emptyList(), null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -1112,7 +1112,7 @@ class ContactBookScreenTest {
     @Test
     fun test_contactBookScreen_group_with_long_name() {
         // Given
-        val group = Group(1, "Very Long Group Name That Exceeds Normal Length", "Desc", emptyList(), emptyList(), null, null)
+        val group = Group(1, "Very Long Group Name That Exceeds Normal Length", "Desc", null, emptyList(), emptyList(), null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -1138,7 +1138,7 @@ class ContactBookScreenTest {
         val group = Group(
             1, "Team",
             "This is a very long description that might be truncated in the UI based on maxLines settings",
-            emptyList(), emptyList(), null, null
+            null, emptyList(), emptyList(), null, null
         )
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
@@ -1203,7 +1203,7 @@ class ContactBookScreenTest {
     fun test_contactBookScreen_group_with_single_member() {
         // Given
         val member = Contact(1, null, "Solo", "solo@example.com")
-        val group = Group(1, "Solo Team", "Desc", emptyList(), listOf(member), null, null)
+        val group = Group(1, "Solo Team", "Desc", null, emptyList(), listOf(member), null, null)
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = listOf(group)
@@ -1250,8 +1250,8 @@ class ContactBookScreenTest {
     fun test_contactBookScreen_multiple_groups_with_same_member_count() {
         // Given
         val groups = listOf(
-            Group(1, "Team1", "Desc1", emptyList(), emptyList(), null, null),
-            Group(2, "Team2", "Desc2", emptyList(), emptyList(), null, null)
+            Group(1, "Team1", "Desc1", null, emptyList(), emptyList(), null, null),
+            Group(2, "Team2", "Desc2", null, emptyList(), emptyList(), null, null)
         )
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
@@ -1280,7 +1280,7 @@ class ContactBookScreenTest {
             Contact(2, null, "Bob", "bob@example.com")
         )
         val groups = listOf(
-            Group(1, "Group1", "Desc1", emptyList(), emptyList(), null, null)
+            Group(1, "Group1", "Desc1", null, emptyList(), emptyList(), null, null)
         )
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Contacts,
@@ -1344,7 +1344,7 @@ class ContactBookScreenTest {
     @Test
     fun test_contactBookScreen_stress_test_many_groups() {
         // Given
-        val groups = List(50) { Group(it.toLong(), "Group$it", "Desc$it", emptyList(), emptyList(), null, null) }
+        val groups = List(50) { Group(it.toLong(), "Group$it", "Desc$it", null, emptyList(), emptyList(), null, null) }
         val uiState = ContactBookUiState(
             selectedTab = ContactBookTab.Groups,
             groups = groups

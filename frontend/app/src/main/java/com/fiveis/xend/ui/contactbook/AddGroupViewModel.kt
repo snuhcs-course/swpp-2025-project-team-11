@@ -50,6 +50,7 @@ class AddGroupViewModel(
     fun addGroup(
         name: String,
         description: String,
+        emoji: String? = null,
         options: List<PromptOption>,
         members: List<com.fiveis.xend.data.model.Contact> = emptyList()
     ) {
@@ -63,8 +64,8 @@ class AddGroupViewModel(
         viewModelScope.launch {
             try {
                 // 1. 그룹 생성
-                android.util.Log.d("AddGroupViewModel", "Creating group: $name")
-                val res = repository.addGroup(name, description, options)
+                android.util.Log.d("AddGroupViewModel", "Creating group: $name with emoji: $emoji")
+                val res = repository.addGroup(name, description, emoji, options)
                 android.util.Log.d("AddGroupViewModel", "Group created with ID: ${res.id}")
 
                 // 2. 멤버들의 group_id 업데이트
