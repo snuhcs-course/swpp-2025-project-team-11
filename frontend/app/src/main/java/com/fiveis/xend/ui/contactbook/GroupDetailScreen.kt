@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -72,7 +73,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,7 +90,6 @@ import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.Red60
 import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextSecondary
-import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -840,30 +839,9 @@ private fun PromptOptionsBottomSheet(
     onRequestEditOption: (PromptOption) -> Unit,
     onRequestDeleteOption: (PromptOption) -> Unit
 ) {
-    val thresholdFraction = 0.20f
-
-    val configuration = LocalConfiguration.current
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-
-    // 드래그 중 시트의 현재 오프셋 추적
-    var lastOffsetPx by rememberSaveable { mutableStateOf(0f) }
-
     val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { target ->
-            if (target == androidx.compose.material3.SheetValue.Hidden) {
-                lastOffsetPx >= screenHeightPx * thresholdFraction
-            } else {
-                true
-            }
-        }
+        skipPartiallyExpanded = true
     )
-
-    LaunchedEffect(sheetState) {
-        snapshotFlow { runCatching { sheetState.requireOffset() }.getOrDefault(0f) }
-            .collectLatest { lastOffsetPx = it }
-    }
 
     // ▶ 변경 여부(저장 버튼 활성화 판단)
     val hasChanges =
@@ -871,6 +849,7 @@ private fun PromptOptionsBottomSheet(
             selectedFormatIds.toSet() != originalFormatIds.toSet()
 
     ModalBottomSheet(
+        modifier = Modifier.fillMaxHeight(),
         sheetState = sheetState,
         onDismissRequest = onDismiss,
         dragHandle = { BottomSheetDefaults.DragHandle() }

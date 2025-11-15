@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -52,7 +53,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -61,7 +61,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fiveis.xend.data.model.PromptOption
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -132,15 +131,6 @@ fun AiPromptingCard(
     onUpdatePromptOption: UpdatePromptOptionHandler = { _, _, _, _, _ -> },
     onDeletePromptOption: DeletePromptOptionHandler = { _, _, _ -> }
 ) {
-    val thresholdFraction = 0.20f
-
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-
-    // 드래그 중 시트의 현재 오프셋 추적
-    var lastOffsetPx by rememberSaveable { mutableStateOf(0f) }
-
     var uiState by remember { mutableStateOf(selectedState) }
 
     LaunchedEffect(selectedState) {
@@ -148,20 +138,8 @@ fun AiPromptingCard(
     }
     var showSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { target ->
-            if (target == androidx.compose.material3.SheetValue.Hidden) {
-                lastOffsetPx >= screenHeightPx * thresholdFraction
-            } else {
-                true
-            }
-        }
+        skipPartiallyExpanded = true
     )
-
-    LaunchedEffect(sheetState) {
-        snapshotFlow { runCatching { sheetState.requireOffset() }.getOrDefault(0f) }
-            .collectLatest { lastOffsetPx = it }
-    }
 
     val scope = rememberCoroutineScope()
 
@@ -190,32 +168,21 @@ fun AiPromptingCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // 선택된 요약 칩들 (최대 5개 + “+n개”)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val options = buildList {
-                    addAll(uiState.selectedTone)
-                    addAll(uiState.selectedFormat)
-                }
-                val shown = options.take(5)
-                val remain = (options.size - shown.size).coerceAtLeast(0)
-
-                shown.forEach { label ->
-                    SummaryChip(label = label.name)
-                }
-                if (remain > 0) {
-                    SummaryChip(label = "+${remain}개")
-                }
-            }
+            PromptSummarySection(title = "문체 스타일", options = uiState.selectedTone)
+            Spacer(Modifier.height(12.dp))
+            PromptSummarySection(title = "형식 가이드", options = uiState.selectedFormat)
 
             Spacer(Modifier.height(16.dp))
 
-            OutlinedButton(
-                onClick = { showSheet = true },
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) { Text("수정") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                OutlinedButton(
+                    onClick = { showSheet = true },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) { Text("수정") }
+            }
         }
     }
 
@@ -244,10 +211,6 @@ fun AiPromptingCard(
                 newName = ""
                 newPrompt = ""
                 addError = null
-            },
-            onSelectionChange = { newState ->
-                uiState = newState
-                onValueChange(newState)
             },
             onAddPromptOption = onAddPromptOption,
             onRequestEditOption = { option ->
@@ -492,7 +455,6 @@ fun PromptingBottomSheet(
     onSave: (PromptingUiState) -> Unit,
     onDismiss: () -> Unit,
     onRequestAddNew: (key: String) -> Unit,
-    onSelectionChange: (PromptingUiState) -> Unit,
     onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> },
     onRequestEditOption: (PromptOption) -> Unit,
     onRequestDeleteOption: (PromptOption) -> Unit
@@ -501,6 +463,7 @@ fun PromptingBottomSheet(
     var selectedFormat by remember { mutableStateOf(initial.selectedFormat) }
 
     ModalBottomSheet(
+        modifier = Modifier.fillMaxHeight(),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() }
@@ -531,12 +494,6 @@ fun PromptingBottomSheet(
                     selected = selectedTone,
                     onToggle = { option ->
                         selectedTone = selectedTone.toggle(option)
-                        onSelectionChange(
-                            PromptingUiState(
-                                selectedTone = selectedTone,
-                                selectedFormat = selectedFormat
-                            )
-                        )
                     },
                     onAddNew = { onRequestAddNew("tone") },
                     onAddPromptOption = onAddPromptOption,
@@ -555,12 +512,6 @@ fun PromptingBottomSheet(
                     selected = selectedFormat,
                     onToggle = { option ->
                         selectedFormat = selectedFormat.toggle(option)
-                        onSelectionChange(
-                            PromptingUiState(
-                                selectedTone = selectedTone,
-                                selectedFormat = selectedFormat
-                            )
-                        )
                     },
                     onAddNew = { onRequestAddNew("format") },
                     onAddPromptOption = onAddPromptOption,
@@ -575,7 +526,6 @@ fun PromptingBottomSheet(
                         onReset()
                         selectedTone = PromptingUiState().selectedTone
                         selectedFormat = PromptingUiState().selectedFormat
-                        onSelectionChange(PromptingUiState())
                     },
                     onSave = {
                         onSave(
@@ -822,3 +772,30 @@ private fun Set<PromptOption>.replaceOption(option: PromptOption): Set<PromptOpt
 }
 
 private fun Set<PromptOption>.removeOption(optionId: Long): Set<PromptOption> = filterNot { it.id == optionId }.toSet()
+
+@Composable
+private fun PromptSummarySection(title: String, options: Set<PromptOption>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "$title (${options.size}개)",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (options.isEmpty()) {
+            Text(
+                "선택된 프롬프트가 없습니다",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                options.forEach { option ->
+                    SummaryChip(label = option.name)
+                }
+            }
+        }
+    }
+}
