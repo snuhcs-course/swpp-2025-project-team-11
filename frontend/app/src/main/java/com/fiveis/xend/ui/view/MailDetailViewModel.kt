@@ -12,6 +12,7 @@ import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.Attachment
 import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.repository.InboxRepository
 import java.io.File
 import java.io.FileOutputStream
@@ -73,7 +74,7 @@ class MailDetailViewModel(
 
     private fun loadMail() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 Log.d("MailDetailViewModel", "Loading mail from DB: $messageId")
                 val email = emailDao.getEmailById(messageId)
@@ -86,14 +87,80 @@ class MailDetailViewModel(
                         )
                     }
                 } else {
-                    Log.e("MailDetailViewModel", "Email not found in DB")
-                    _uiState.update { it.copy(error = "Email not found", isLoading = false) }
+                    Log.e("MailDetailViewModel", "Email not found in DB cache")
+                    _uiState.update { it.copy(error = "메일을 찾을 수 없습니다.", isLoading = true) }
                 }
             } catch (e: Exception) {
                 Log.e("MailDetailViewModel", "Error loading email from DB", e)
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                _uiState.update { it.copy(error = e.message, isLoading = true) }
+            }
+
+            fetchMailDetailFromServer()
+        }
+    }
+
+    private suspend fun fetchMailDetailFromServer() {
+        try {
+            val response = withContext(Dispatchers.IO) {
+                inboxRepository.getMail(messageId)
+            }
+            if (!response.isSuccessful) {
+                Log.e("MailDetailViewModel", "Failed to fetch mail detail: ${response.code()}")
+                handleMailDetailError("메일을 불러오지 못했습니다. (${response.code()})")
+                return
+            }
+
+            val detail = response.body()
+            if (detail == null) {
+                Log.e("MailDetailViewModel", "Mail detail response body is null")
+                handleMailDetailError("메일 상세 정보가 비어 있습니다.")
+                return
+            }
+
+            val updatedMail = detail.toEmailItem(_uiState.value.mail)
+            withContext(Dispatchers.IO) {
+                emailDao.insertEmail(updatedMail)
+            }
+
+            _uiState.update {
+                it.copy(
+                    mail = updatedMail,
+                    isLoading = false,
+                    error = null
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("MailDetailViewModel", "Exception fetching mail detail", e)
+            handleMailDetailError(e.message ?: "메일을 불러오는 중 오류가 발생했습니다.")
+        }
+    }
+
+    private fun handleMailDetailError(message: String) {
+        _uiState.update { state ->
+            if (state.mail == null) {
+                state.copy(isLoading = false, error = message)
+            } else {
+                state.copy(isLoading = false)
             }
         }
+    }
+
+    private fun MailDetailResponse.toEmailItem(existing: EmailItem?): EmailItem {
+        return EmailItem(
+            id = id,
+            threadId = threadId,
+            subject = subject,
+            fromEmail = fromEmail,
+            toEmail = toEmail.ifBlank { existing?.toEmail ?: "" },
+            snippet = snippet,
+            date = date,
+            dateRaw = dateRaw,
+            isUnread = existing?.isUnread ?: isUnread,
+            labelIds = labelIds,
+            body = body,
+            attachments = attachments,
+            cachedAt = existing?.cachedAt ?: System.currentTimeMillis()
+        )
     }
 
     fun downloadAttachment(attachment: Attachment) {

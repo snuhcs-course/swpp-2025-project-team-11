@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -1085,8 +1085,8 @@ private fun AttachmentPreviewDialog(
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .heightIn(min = 360.dp, max = 620.dp),
+                    .fillMaxWidth(0.96f)
+                    .heightIn(min = 420.dp, max = 780.dp),
                 shape = RoundedCornerShape(20.dp),
                 shadowElevation = 12.dp,
                 color = Color.White
@@ -1281,11 +1281,9 @@ private fun PdfPagePreview(renderer: PdfRenderer, pageIndex: Int) {
         bitmap = null
         val renderedBitmap = withContext(Dispatchers.IO) {
             renderer.openPage(pageIndex).use { page ->
-                val bitmapWidth = page.width * 2
-                val bitmapHeight = page.height * 2
                 val rendered = Bitmap.createBitmap(
-                    bitmapWidth,
-                    bitmapHeight,
+                    page.width * 2,
+                    page.height * 2,
                     Bitmap.Config.ARGB_8888
                 )
                 page.render(rendered, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
@@ -1327,7 +1325,9 @@ private fun PdfPagePreview(renderer: PdfRenderer, pageIndex: Int) {
                 Image(
                     bitmap = currentBitmap.asImageBitmap(),
                     contentDescription = "PDF Page ${pageIndex + 1}",
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
                 )
             } else {
                 CircularProgressIndicator()
