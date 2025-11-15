@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -235,8 +236,9 @@ fun AddContactDialog(
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(isSenderExpanded) },
                                 modifier = Modifier
                                     .menuAnchor()
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = BackgroundLight,
@@ -295,8 +297,9 @@ fun AddContactDialog(
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(isRecipientExpanded) },
                                 modifier = Modifier
                                     .menuAnchor()
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = BackgroundLight,
@@ -458,8 +461,9 @@ fun AddContactDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor()
-                                .height(48.dp),
+                                .heightIn(min = 48.dp),
                             textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                            singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = BackgroundLight,

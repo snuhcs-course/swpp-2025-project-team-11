@@ -8,11 +8,11 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
 import com.fiveis.xend.data.repository.ContactBookTab
 import com.fiveis.xend.ui.mail.MailActivity
@@ -23,6 +23,10 @@ class ContactBookActivity : ComponentActivity() {
         const val START_TAB = "start_tab"
     }
 
+    private val contactViewModel: ContactBookViewModel by viewModels {
+        ContactBookViewModel.Factory(application)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -31,17 +35,20 @@ class ContactBookActivity : ComponentActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    finish()
-                    overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                    val uiState = contactViewModel.uiState.value
+                    if (uiState.isSearchMode) {
+                        contactViewModel.closeContactSearch()
+                    } else {
+                        finish()
+                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                    }
                 }
             }
         )
 
         setContent {
             XendTheme {
-                val viewModel: ContactBookViewModel = viewModel(
-                    factory = ContactBookViewModel.Factory(application)
-                )
+                val viewModel = contactViewModel
                 val uiState by viewModel.uiState.collectAsState()
 
                 val startTab = intent.getStringExtra(START_TAB)

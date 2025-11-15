@@ -84,6 +84,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import com.fiveis.xend.data.model.Attachment
 import com.fiveis.xend.data.model.AttachmentAnalysisResponse
+import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.AttachmentExcelBg
 import com.fiveis.xend.ui.theme.AttachmentHeaderText
@@ -107,6 +108,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun MailDetailScreen(
     uiState: MailDetailUiState,
+    knownContactsByEmail: Map<String, Contact> = emptyMap(),
     onBack: () -> Unit,
     onReply: () -> Unit = {},
     onDownloadAttachment: (Attachment) -> Unit = {},
@@ -194,9 +196,8 @@ fun MailDetailScreen(
                 uiState.mail != null -> {
                     MailDetailContent(
                         mail = uiState.mail,
-                        onAttachmentClick = { selected ->
-                            attachmentToDownload = selected
-                        },
+                        knownContactsByEmail = knownContactsByEmail,
+                        onAttachmentClick = { selected -> attachmentToDownload = selected },
                         onAnalyzeAttachment = onAnalyzeAttachment,
                         onPreviewAttachment = onPreviewAttachment,
                         onOpenAttachmentExternally = onOpenAttachmentExternally
@@ -357,12 +358,17 @@ private fun ToolbarIconButton(
 @Composable
 private fun MailDetailContent(
     mail: EmailItem,
+    knownContactsByEmail: Map<String, Contact>,
     onAttachmentClick: (Attachment) -> Unit,
     onAnalyzeAttachment: (Attachment) -> Unit,
     onPreviewAttachment: (Attachment) -> Unit,
     onOpenAttachmentExternally: (Attachment) -> Unit
 ) {
     val scrollState = rememberScrollState()
+
+    val isSentMail = mail.labelIds.any { label ->
+        label.contains("SENT", ignoreCase = true)
+    }
 
     Column(
         modifier = Modifier
@@ -371,14 +377,12 @@ private fun MailDetailContent(
             .background(BackgroundWhite)
     ) {
         // A. 발신자 정보 섹션
-        val isSentMail = mail.labelIds.any { label ->
-            label.contains("SENT", ignoreCase = true)
-        }
         SenderInfoSection(
             senderEmail = mail.fromEmail,
             recipientEmail = mail.toEmail,
             isSentMail = isSentMail,
-            date = mail.date
+            date = mail.date,
+            knownContactsByEmail = knownContactsByEmail
         )
         HorizontalDivider(
             thickness = 1.dp,
@@ -405,12 +409,21 @@ private fun MailDetailContent(
 }
 
 @Composable
-private fun SenderInfoSection(senderEmail: String, recipientEmail: String, isSentMail: Boolean, date: String) {
+private fun SenderInfoSection(
+    senderEmail: String,
+    recipientEmail: String,
+    isSentMail: Boolean,
+    date: String,
+    knownContactsByEmail: Map<String, Contact>
+) {
     val (displayName, displayEmail) = if (isSentMail) {
         parseSenderEmail(recipientEmail)
     } else {
         parseSenderEmail(senderEmail)
     }
+    val normalized = displayEmail.trim().lowercase()
+    val savedContact = knownContactsByEmail[normalized]
+    val resolvedDisplayName = savedContact?.name?.takeIf { it.isNotBlank() } ?: displayName
 
     Column(
         modifier = Modifier
@@ -418,10 +431,16 @@ private fun SenderInfoSection(senderEmail: String, recipientEmail: String, isSen
             .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Text(
-            text = if (isSentMail) "To. $displayName" else displayName,
+            text = if (isSentMail) "To. $resolvedDisplayName" else resolvedDisplayName,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             color = TextPrimary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "<$displayEmail>",
+            fontSize = 13.sp,
+            color = TextSecondary
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -1496,6 +1515,7 @@ private fun MailDetailScreenPreview() {
     MaterialTheme {
         MailDetailScreen(
             uiState = uiState,
+            knownContactsByEmail = emptyMap(),
             onBack = {},
             onReply = {},
             onDownloadAttachment = {},

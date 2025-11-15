@@ -148,7 +148,11 @@ class MailReplySseClient(
                                             val id = obj.getInt("id")
                                             val seq = obj.getInt("seq")
                                             val text = obj.getString("text")
-                                            Log.d("SSE_DELTA", "id=$id, seq=$seq, text='${text.take(20)}'")
+                                            Log.d("SSE_DELTA", "id=$id, seq=$seq, text='$text' (length=${text.length})")
+                                            if (seq == 0) {
+                                                val bytes = text.toByteArray().joinToString()
+                                                Log.d("SSE_DELTA_FIRST", "첫 델타: id=$id, text='$text', bytes=$bytes")
+                                            }
                                             onOptionDelta(id, seq, text)
                                         }
                                         "option.done" -> {

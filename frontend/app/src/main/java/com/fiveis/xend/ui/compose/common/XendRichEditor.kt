@@ -279,6 +279,10 @@ class XendRichEditor @JvmOverloads constructor(
                 range.deleteContents();
                 sel.removeAllRanges();
                 sel.addRange(range);
+                // Force RichEditor to notify Android side about the HTML change
+                if (typeof RE !== 'undefined' && RE.callback) {
+                    RE.callback();
+                }
             })();
         """.trimIndent()
         evaluateJavascript(js, null)

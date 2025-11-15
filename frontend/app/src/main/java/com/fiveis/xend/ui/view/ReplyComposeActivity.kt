@@ -9,7 +9,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.theme.XendTheme
 
 class ReplyComposeActivity : ComponentActivity() {
@@ -36,7 +39,7 @@ class ReplyComposeActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Intent에서 메일 정보 가져오기
-        val senderEmail = intent.getStringExtra("sender_email") ?: ""
+        val senderEmailRaw = intent.getStringExtra("sender_email") ?: ""
         val date = intent.getStringExtra("date") ?: ""
         val subject = intent.getStringExtra("subject") ?: ""
         val body = intent.getStringExtra("body") ?: ""
@@ -47,13 +50,29 @@ class ReplyComposeActivity : ComponentActivity() {
                     factory = ReplyComposeViewModel.Factory(application)
                 )
                 val uiState by viewModel.uiState.collectAsState()
+                val contactLookupVm: ContactLookupViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ContactLookupViewModel(application) as T
+                        }
+                    }
+                )
+                val knownContacts by contactLookupVm.byEmail.collectAsState()
+                val senderEmailAddress = extractEmail(senderEmailRaw)
+                val normalizedSender = senderEmailAddress.trim().lowercase()
+                val senderContact = knownContacts[normalizedSender]
+                val senderDisplay = senderContact?.let { contact ->
+                    "${contact.name} <${contact.email}>"
+                } ?: senderEmailRaw
+                val senderGroupNames = senderContact?.group?.name?.let { arrayListOf(it) } ?: arrayListOf()
 
                 // 답장 옵션 자동 로딩
                 LaunchedEffect(Unit) {
                     viewModel.startReplyOptions(
                         subject = subject,
                         body = body,
-                        toEmail = extractEmail(senderEmail)
+                        toEmail = senderEmailAddress
                     )
                 }
 
@@ -65,7 +84,7 @@ class ReplyComposeActivity : ComponentActivity() {
                 }
 
                 ReplyComposeScreen(
-                    senderEmail = senderEmail,
+                    senderEmail = senderDisplay,
                     date = date,
                     subject = subject,
                     body = body,
@@ -82,30 +101,29 @@ class ReplyComposeActivity : ComponentActivity() {
                     onSend = { /* TODO: 답장 전송 */ },
                     onDirectCompose = {
                         val intent = Intent(this@ReplyComposeActivity, ReplyDirectComposeActivity::class.java).apply {
-                            putExtra("recipient_email", senderEmail)
-                            putExtra("recipient_name", senderEmail)
+                            putExtra("recipient_email", senderEmailAddress)
+                            putExtra("recipient_name", senderDisplay)
                             putExtra("subject", addReplyPrefix(subject))
-                            putStringArrayListExtra("groups", ArrayList<String>())
-                            putExtra("sender_email", senderEmail)
+                            putStringArrayListExtra("group_names", senderGroupNames)
+                            putExtra("sender_email", senderDisplay)
                             putExtra("date", date)
                             putExtra("original_body", body)
                         }
                         startActivity(intent)
                     },
                     onGenerateMore = {
-                        viewModel.startReplyOptions(subject, body, extractEmail(senderEmail))
+                        viewModel.startReplyOptions(subject, body, senderEmailAddress)
                     },
                     onUseOption = { selectedOption ->
                         // 선택한 옵션으로 직접 작성 화면으로 이동
                         val intent = Intent(this@ReplyComposeActivity, ReplyDirectComposeActivity::class.java).apply {
-                            putExtra("recipient_email", senderEmail)
-                            putExtra("recipient_name", senderEmail)
-                            putExtra("subject", addReplyPrefix(subject)) // 원본 제목 사용
-                            putStringArrayListExtra("groups", ArrayList<String>())
-                            putExtra("sender_email", senderEmail)
+                            putExtra("recipient_email", senderEmailAddress)
+                            putExtra("recipient_name", senderDisplay)
+                            putExtra("subject", addReplyPrefix(subject))
+                            putStringArrayListExtra("group_names", senderGroupNames)
+                            putExtra("sender_email", senderDisplay)
                             putExtra("date", date)
                             putExtra("original_body", body)
-                            // 생성된 본문을 초기값으로 전달
                             putExtra("generated_body", selectedOption.body)
                         }
                         startActivity(intent)

@@ -207,7 +207,7 @@ class ReplyComposeScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("추가 생성").performClick()
+        composeTestRule.onNodeWithText("새로 생성").performClick()
         assert(generateClicked)
     }
 
