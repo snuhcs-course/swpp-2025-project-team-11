@@ -2,31 +2,31 @@ package com.fiveis.xend.integration
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.intent.Intents
+import androidx.test.espresso.intent.Intents.intended
+import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.source.TokenManager
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
 import com.fiveis.xend.ui.inbox.InboxActivity
 import com.fiveis.xend.ui.login.MainActivity
+import com.fiveis.xend.ui.mail.MailActivity
+import com.fiveis.xend.ui.profile.ProfileActivity
 import com.fiveis.xend.ui.search.SearchActivity
+import com.fiveis.xend.ui.sent.SentActivity
 import com.fiveis.xend.ui.view.MailDetailActivity
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
-import org.junit.Test
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.performClick
-import androidx.test.espresso.intent.Intents
-import androidx.test.espresso.intent.Intents.intended
-import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
-import com.fiveis.xend.ui.mail.MailActivity
-import com.fiveis.xend.ui.profile.ProfileActivity
-import com.fiveis.xend.ui.sent.SentActivity
 import org.junit.Rule
+import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
