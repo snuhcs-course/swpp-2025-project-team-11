@@ -119,12 +119,11 @@ class ReplyComposeActivity : ComponentActivity() {
                         val intent = Intent(this@ReplyComposeActivity, ReplyDirectComposeActivity::class.java).apply {
                             putExtra("recipient_email", senderEmailAddress)
                             putExtra("recipient_name", senderDisplay)
-                            putExtra("subject", addReplyPrefix(subject)) // 원본 제목 사용
+                            putExtra("subject", addReplyPrefix(subject))
                             putStringArrayListExtra("group_names", senderGroupNames)
                             putExtra("sender_email", senderDisplay)
                             putExtra("date", date)
                             putExtra("original_body", body)
-                            // 생성된 본문을 초기값으로 전달
                             putExtra("generated_body", selectedOption.body)
                         }
                         startActivity(intent)

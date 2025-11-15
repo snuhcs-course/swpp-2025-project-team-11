@@ -40,6 +40,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class ReplyDirectComposeActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -52,7 +53,9 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         val senderEmail = intent.getStringExtra("sender_email") ?: ""
         val date = intent.getStringExtra("date") ?: ""
         val originalBody = intent.getStringExtra("original_body") ?: ""
-        val generatedBody = intent.getStringExtra("generated_body") ?: ""
+        val generatedBody = intent.getStringExtra("generated_body")
+            ?.normalizeAsHtml()
+            .orEmpty()
 
         // 이메일 주소 추출 ("이름 <email@example.com>" 형식에서 이메일만 추출)
         val recipientEmail = EmailUtils.extractEmailAddress(recipientEmailRaw)
@@ -110,34 +113,70 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 val editorState = rememberXendRichEditorState()
                 val contactRepository = remember { ContactBookRepository(application.applicationContext) }
 
+                // Track if generatedBody has been applied
+                var generatedBodyApplied by remember { mutableStateOf(false) }
+
                 // Enable/disable realtime mode
                 LaunchedEffect(aiRealtime) {
                     composeVm.enableRealtimeMode(aiRealtime)
                 }
 
-                // Monitor text changes for realtime suggestions
-                LaunchedEffect(editorState.editor) {
-                    editorState.editor?.setTextChangedListener { html ->
-                        if (aiRealtime) {
-                            composeVm.onTextChanged(html)
+                // AI가 생성한 본문이 있으면 초기값으로 설정 (한 번만)
+                LaunchedEffect(generatedBody) {
+                    android.util.Log.d(
+                        "ReplyDirectCompose",
+                        "LaunchedEffect(generatedBody): len=${generatedBody.length}, " +
+                            "editor=${editorState.editor}, applied=$generatedBodyApplied"
+                    )
+                    if (generatedBody.isNotEmpty() && !generatedBodyApplied) {
+                        // Wait for editor to be ready
+                        while (editorState.editor == null) {
+                            kotlinx.coroutines.delay(50)
+                        }
+                        // Additional delay to ensure WebView is fully loaded
+                        kotlinx.coroutines.delay(200)
+                        android.util.Log.d("ReplyDirectCompose", "Setting HTML from generatedBody (after delay)")
+                        editorState.setHtml(generatedBody)
+                        generatedBodyApplied = true
+                        android.util.Log.d(
+                            "ReplyDirectCompose",
+                            "HTML set complete, applied flag = $generatedBodyApplied"
+                        )
+                    }
+                }
+
+                // Monitor text changes for realtime suggestions (AFTER generatedBody is applied)
+                LaunchedEffect(editorState.editor, generatedBodyApplied) {
+                    if (generatedBody.isEmpty() || generatedBodyApplied) {
+                        editorState.editor?.setTextChangedListener { html ->
+                            if (aiRealtime) {
+                                composeVm.onTextChanged(html)
+                            }
                         }
                     }
                 }
 
-                // Sync AI generated content
+                // Sync AI generated content (only when no Intent-provided content)
                 LaunchedEffect(composeUi.subject) {
-                    if (composeUi.subject.isNotBlank()) currentSubject = composeUi.subject
-                }
-                LaunchedEffect(composeUi.bodyRendered) {
-                    if (composeUi.bodyRendered.isNotEmpty()) {
-                        editorState.setHtml(composeUi.bodyRendered)
+                    android.util.Log.d(
+                        "ReplyDirectCompose",
+                        "LaunchedEffect(subject): subj='${composeUi.subject}', " +
+                            "genEmpty=${generatedBody.isEmpty()}"
+                    )
+                    if (composeUi.subject.isNotBlank() && generatedBody.isEmpty()) {
+                        currentSubject = composeUi.subject
                     }
                 }
-
-                // AI가 생성한 본문이 있으면 초기값으로 설정
-                LaunchedEffect(editorState.editor, generatedBody) {
-                    if (generatedBody.isNotEmpty() && editorState.editor != null) {
-                        editorState.setHtml(generatedBody)
+                LaunchedEffect(composeUi.bodyRendered, generatedBody) {
+                    android.util.Log.d(
+                        "ReplyDirectCompose",
+                        "LaunchedEffect(bodyRendered): bodyLen=${composeUi.bodyRendered.length}, " +
+                            "genLen=${generatedBody.length}, editor=${editorState.editor}"
+                    )
+                    // Only apply AI-streamed body if there's no Intent-provided body
+                    if (composeUi.bodyRendered.isNotEmpty() && generatedBody.isEmpty()) {
+                        android.util.Log.d("ReplyDirectCompose", "Setting HTML from bodyRendered")
+                        editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
 
@@ -353,4 +392,51 @@ class ReplyDirectComposeActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/**
+ * Normalize a plain-text reply body so the rich editor respects formatting.
+ */
+private fun String.normalizeAsHtml(): String {
+    if (isBlank()) return ""
+    return if (containsHtmlMarkup()) {
+        this
+    } else {
+        toHtmlPreservingLineBreaks()
+    }
+}
+
+private fun String.containsHtmlMarkup(): Boolean {
+    val trimmed = trim()
+    if (!trimmed.contains('<')) return false
+    val lower = trimmed.lowercase()
+    return lower.contains("<br") ||
+        lower.contains("</") ||
+        lower.contains("<p") ||
+        lower.contains("<div") ||
+        lower.contains("<span")
+}
+
+private fun String.toHtmlPreservingLineBreaks(): String {
+    val sb = StringBuilder(length + 16)
+    var index = 0
+    while (index < length) {
+        when (val ch = this[index]) {
+            '&' -> sb.append("&amp;")
+            '<' -> sb.append("&lt;")
+            '>' -> sb.append("&gt;")
+            '"' -> sb.append("&quot;")
+            '\'' -> sb.append("&#39;")
+            '\r' -> {
+                if (index + 1 < length && this[index + 1] == '\n') {
+                    index++
+                }
+                sb.append("<br>")
+            }
+            '\n' -> sb.append("<br>")
+            else -> sb.append(ch)
+        }
+        index++
+    }
+    return sb.toString()
 }

@@ -33,7 +33,6 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PersonAdd
@@ -77,6 +76,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.ui.compose.TemplateTIcon
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.compose.common.XendRichEditorState
@@ -170,7 +170,7 @@ fun ReplyDirectComposeScreen(
                         border = null,
                         modifier = Modifier.padding(end = 2.dp)
                     ) {
-                        Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
+                        Icon(TemplateTIcon, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     DirectComposeToolbarIconButton(
@@ -229,7 +229,7 @@ fun ReplyDirectComposeScreen(
                             onActionClick = it.onActionClick,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .padding(bottom = 16.dp)
+                                .padding(bottom = 8.dp)
                         )
                     }
                 }
@@ -265,7 +265,7 @@ fun ReplyDirectComposeScreen(
                 onAddContactClick = onAddContactClick
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             SubjectControlRow(
                 canUndo = canUndo,
@@ -284,7 +284,7 @@ fun ReplyDirectComposeScreen(
                 enabled = !isStreaming
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // 본문 헤더 + 실시간 AI 토글
             BodyHeader(

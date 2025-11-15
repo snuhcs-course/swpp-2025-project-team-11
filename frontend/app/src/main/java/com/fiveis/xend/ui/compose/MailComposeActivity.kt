@@ -43,7 +43,6 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.PersonAdd
@@ -216,11 +215,18 @@ fun EmailComposeScreen(
                             message = it.message,
                             type = it.type,
                             onDismiss = onDismissBanner,
-                            actionText = it.actionText,
-                            onActionClick = it.onActionClick,
+                            actionText = null,
+                            onActionClick = null,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .padding(bottom = 16.dp)
+                                .padding(bottom = 8.dp)
+                                .then(
+                                    if (it.onActionClick != null) {
+                                        Modifier.clickable { it.onActionClick.invoke() }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                         )
                     }
                 }
@@ -228,10 +234,11 @@ fun EmailComposeScreen(
 
             SectionHeaderWithAction(
                 title = "받는 사람",
-                actionLabel = "프롬프트",
-                actionEnabled = contacts.isNotEmpty(),
-                onActionClick = onShowPrompt
+                actionLabel = null,
+                actionEnabled = false,
+                onActionClick = null
             )
+            Spacer(modifier = Modifier.height(4.dp))
             RecipientSection(
                 contacts = contacts,
                 onContactsChange = onContactsChange,
@@ -243,7 +250,7 @@ fun EmailComposeScreen(
                 onSuggestionClick = onSuggestionClick
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             SubjectControlRow(
                 label = "제목",
@@ -264,7 +271,7 @@ fun EmailComposeScreen(
                 onValueChange = onSubjectChange
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             BodyHeader(
                 isRealtimeOn = aiRealtime,
@@ -334,7 +341,7 @@ private fun ComposeTopBar(
                 border = null,
                 modifier = Modifier.padding(end = 2.dp)
             ) {
-                Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
+                Icon(TemplateTIcon, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
             }
             Spacer(modifier = Modifier.width(8.dp))
             ToolbarIconButton(
@@ -797,7 +804,7 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
             Text(
                 "제목을 입력하세요",
                 color = TextSecondary,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp)
             )
         },
         singleLine = true,
@@ -1070,18 +1077,35 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
-                // Show info banner when unregistered contacts exist
+                // AI Prompt Dialog state
+                var showAiPromptDialog by remember { mutableStateOf(false) }
+
+                // Show banner based on contact status
                 LaunchedEffect(contacts, knownByEmail) {
                     val hasUnknown = contacts.any { contact ->
                         contact.id < 0L && contact.email.lowercase() !in knownByEmail
                     }
-                    bannerState = if (hasUnknown) {
-                        BannerState(
-                            message = "저장되지 않은 연락처가 있습니다. 저장하면 더 향상된 AI 메일 작성이 가능해요.",
-                            type = BannerType.INFO
-                        )
-                    } else {
-                        null
+                    val hasKnownContacts = contacts.any { contact ->
+                        contact.id >= 0L
+                    }
+
+                    bannerState = when {
+                        hasUnknown -> {
+                            // 미등록 연락처가 있는 경우
+                            BannerState(
+                                message = "저장되지 않은 연락처가 있습니다. 저장하면 더 향상된 AI 메일 작성이 가능해요.",
+                                type = BannerType.INFO
+                            )
+                        }
+                        hasKnownContacts -> {
+                            // 등록된 연락처만 있는 경우 - AI 작성 방식 안내
+                            BannerState(
+                                message = "AI가 연락처 정보를 활용해 메일을 작성해요. 자세히 보기",
+                                type = BannerType.INFO,
+                                onActionClick = { showAiPromptDialog = true }
+                            )
+                        }
+                        else -> null
                     }
                 }
 
@@ -1452,6 +1476,14 @@ class MailComposeActivity : ComponentActivity() {
                                     }
                                 )
                             }
+
+                            // Show AI Prompt Preview Dialog
+                            if (showAiPromptDialog) {
+                                AiPromptPreviewDialog(
+                                    contacts = contacts,
+                                    onDismiss = { showAiPromptDialog = false }
+                                )
+                            }
                         }
                     }
                 }
@@ -1544,4 +1576,219 @@ private fun LoadDraftConfirmationDialog(onDismiss: () -> Unit, onLoad: () -> Uni
             }
         }
     )
+}
+
+@Composable
+private fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var promptData by remember { mutableStateOf<com.fiveis.xend.network.PromptPreviewResponse?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Fetch prompt preview data
+    LaunchedEffect(contacts) {
+        isLoading = true
+        errorMessage = null
+        try {
+            val aiApiService = RetrofitClient.getAiApiService(context)
+            val requestEmails = contacts.map { it.email }
+            Log.d("AiPromptPreview", "Requesting prompt preview for emails: $requestEmails")
+
+            val response = aiApiService.getPromptPreview(
+                com.fiveis.xend.network.PromptPreviewRequest(
+                    to = requestEmails
+                )
+            )
+
+            Log.d("AiPromptPreview", "Response code: ${response.code()}")
+
+            if (response.isSuccessful) {
+                promptData = response.body()
+                Log.d("AiPromptPreview", "Success! Data: $promptData")
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e("AiPromptPreview", "Error ${response.code()}: $errorBody")
+                errorMessage = "프롬프트 정보를 불러오는데 실패했습니다.\n코드: ${response.code()}\n${errorBody?.take(200) ?: ""}"
+            }
+        } catch (e: Exception) {
+            Log.e("AiPromptPreview", "Exception: ${e.message}", e)
+            errorMessage = "네트워크 오류: ${e.message}"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "AI 작성 방식",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Recipient info
+                Text(
+                    text = "받는 사람",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = ToolbarIconTint
+                    )
+                )
+                contacts.forEach { contact ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ComposeSurface)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(StableColor.forId(contact.id)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = (contact.name.firstOrNull() ?: '?').uppercaseChar().toString(),
+                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = contact.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextPrimary
+                                )
+                            )
+                            Text(
+                                text = contact.email,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+                }
+
+                // Loading/Error/Data state
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Blue60)
+                        }
+                    }
+                    errorMessage != null -> {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = errorMessage ?: "오류가 발생했습니다",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                    promptData != null -> {
+                        Text(
+                            text = "AI는 다음 정보를 활용해요",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = ToolbarIconTint
+                            )
+                        )
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Blue80.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, Blue80.copy(alpha = 0.3f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                promptData?.relationship?.let {
+                                    InfoRow(label = "관계", value = it)
+                                }
+                                if (promptData?.sender_role != null || promptData?.recipient_role != null) {
+                                    val sender = promptData?.sender_role ?: ""
+                                    val recipient = promptData?.recipient_role ?: ""
+                                    val separator = if (sender.isNotEmpty() && recipient.isNotEmpty()) " → " else ""
+                                    InfoRow(
+                                        label = "역할",
+                                        value = "$sender$separator$recipient"
+                                    )
+                                }
+                                promptData?.personal_prompt?.let {
+                                    InfoRow(label = "개인 프롬프트", value = it)
+                                }
+                                promptData?.situational_prompt?.let {
+                                    InfoRow(label = "상황", value = it)
+                                }
+                                promptData?.style_prompt?.let {
+                                    InfoRow(label = "스타일", value = it)
+                                }
+                                promptData?.format_prompt?.let {
+                                    InfoRow(label = "형식", value = it)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "확인",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = Blue60,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = ToolbarIconTint,
+                fontWeight = FontWeight.Medium
+            ),
+            modifier = Modifier.weight(0.3f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+            modifier = Modifier.weight(0.7f)
+        )
+    }
 }
