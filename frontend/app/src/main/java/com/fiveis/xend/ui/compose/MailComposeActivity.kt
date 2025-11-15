@@ -12,10 +12,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,6 +84,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -596,6 +601,7 @@ private fun SubjectControlRow(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun RecipientSection(
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
@@ -629,25 +635,53 @@ private fun RecipientSection(
         onNewContactChange(TextFieldValue(""))
     }
 
-    val scrollState = rememberScrollState()
+    var isInputFocused by remember { mutableStateOf(false) }
+    var forceExpanded by remember { mutableStateOf(false) }
+    var isExpanding by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    val shouldShowInput = contacts.isEmpty() ||
+        isInputFocused ||
+        newContact.text.isNotEmpty() ||
+        forceExpanded ||
+        isExpanding
+
+    LaunchedEffect(forceExpanded) {
+        if (forceExpanded && !isExpanding) {
+            Log.d("RecipientSection", "LaunchedEffect: Starting expansion process")
+            isExpanding = true
+            Log.d("RecipientSection", "LaunchedEffect: Requesting focus")
+            focusRequester.requestFocus()
+            Log.d("RecipientSection", "LaunchedEffect: Expansion complete")
+            isExpanding = false
+        }
+    }
+
     Column {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .clickable(enabled = !shouldShowInput) {
+                    Log.d(
+                        "RecipientSection",
+                        "Surface clicked: shouldShowInput=$shouldShowInput, setting forceExpanded=true"
+                    )
+                    isExpanding = true
+                    forceExpanded = true
+                },
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, ComposeOutline),
             color = ComposeSurface
         ) {
-            Row(
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 36.dp)
-                    .padding(horizontal = 12.dp)
-                    .horizontalScroll(scrollState),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                contacts.forEachIndexed { index, contact ->
+                contacts.forEach { contact ->
                     ContactChip(
                         contact = contact,
                         onRemove = {
@@ -663,23 +697,64 @@ private fun RecipientSection(
                             null
                         }
                     )
-                    if (index != contacts.lastIndex) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
                 }
-                if (contacts.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(8.dp))
+                if (shouldShowInput) {
+                    val inputModifier =
+                        if (!isInputFocused && contacts.isNotEmpty() && newContact.text.isEmpty()) {
+                            Modifier.wrapContentWidth(unbounded = true)
+                                .widthIn(min = 80.dp)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        }
+                    RecipientInputField(
+                        value = newContact,
+                        onValueChange = {
+                            onNewContactChange(it)
+                            forceExpanded = true
+                        },
+                        onAdd = {
+                            addContact()
+                            forceExpanded = false
+                        },
+                        modifier = inputModifier.focusRequester(focusRequester),
+                        onFocusChanged = { focused ->
+                            Log.d(
+                                "RecipientSection",
+                                "onFocusChanged: focused=$focused, isExpanding=$isExpanding, " +
+                                    "isInputFocused=$isInputFocused, forceExpanded=$forceExpanded, " +
+                                    "contacts.size=${contacts.size}, " +
+                                    "newContact.isEmpty=${newContact.text.isEmpty()}"
+                            )
+
+                            // Only collapse if we were previously focused
+                            if (!focused && isInputFocused && newContact.text.isEmpty() &&
+                                contacts.isNotEmpty() && !isExpanding
+                            ) {
+                                Log.d(
+                                    "RecipientSection",
+                                    "onFocusChanged: Setting forceExpanded=false (lost focus, collapsing)"
+                                )
+                                forceExpanded = false
+                            }
+
+                            isInputFocused = focused
+                            if (focused) {
+                                Log.d(
+                                    "RecipientSection",
+                                    "onFocusChanged: Setting forceExpanded=true and isExpanding=false (gained focus)"
+                                )
+                                forceExpanded = true
+                                isExpanding = false
+                            }
+                        }
+                    )
                 }
-                RecipientInputField(
-                    value = newContact,
-                    onValueChange = onNewContactChange,
-                    onAdd = addContact
-                )
-                Spacer(modifier = Modifier.width(8.dp))
             }
         }
 
-        AnimatedVisibility(visible = contactSuggestions.isNotEmpty()) {
+        AnimatedVisibility(
+            visible = contactSuggestions.isNotEmpty() || (newContact.text.length >= 2 && onAddContactClick != null)
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -687,19 +762,61 @@ private fun RecipientSection(
                     .padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "연락처 추천",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        color = ToolbarIconTint,
-                        fontWeight = FontWeight.Medium
-                    ),
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-                contactSuggestions.forEach { suggestion ->
-                    RecipientSuggestionRow(
-                        contact = suggestion,
-                        onClick = { onSuggestionClick(suggestion) }
+                if (contactSuggestions.isNotEmpty()) {
+                    Text(
+                        text = "연락처 추천",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = ToolbarIconTint,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
+                    contactSuggestions.forEach { suggestion ->
+                        RecipientSuggestionRow(
+                            contact = suggestion,
+                            onClick = { onSuggestionClick(suggestion) }
+                        )
+                    }
+                }
+
+                // 연락처 추가 버튼
+                if (newContact.text.length >= 2 && onAddContactClick != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Blue80.copy(alpha = 0.05f))
+                            .border(BorderStroke(1.dp, Blue80.copy(alpha = 0.3f)), RoundedCornerShape(10.dp))
+                            .clickable {
+                                val email = newContact.text.trim()
+                                onAddContactClick(Contact(id = -1L, name = email, email = email, group = null))
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Blue80.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PersonAdd,
+                                contentDescription = "연락처 추가",
+                                tint = Blue80,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Text(
+                            text = "연락처 추가",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Blue80,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -749,20 +866,25 @@ private fun RecipientSuggestionRow(contact: Contact, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RecipientInputField(value: TextFieldValue, onValueChange: (TextFieldValue) -> Unit, onAdd: () -> Unit) {
+private fun RecipientInputField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocusChanged: (Boolean) -> Unit = {}
+) {
     val borderModifier = if (value.text.isNotEmpty()) {
         Modifier.border(BorderStroke(1.dp, AddButtonText), RoundedCornerShape(6.dp))
     } else {
         Modifier
     }
     Box(
-        modifier = Modifier
-            .height(24.dp)
-            .widthIn(min = 80.dp, max = 200.dp)
-            .padding(vertical = 4.dp)
+        modifier = modifier
+            .heightIn(min = 32.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(ComposeSurface)
-            .then(borderModifier),
+            .then(borderModifier)
+            .padding(vertical = 4.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         BasicTextField(
@@ -774,7 +896,8 @@ private fun RecipientInputField(value: TextFieldValue, onValueChange: (TextField
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Done
             ),
-            keyboardActions = KeyboardActions(onDone = { onAdd() })
+            keyboardActions = KeyboardActions(onDone = { onAdd() }),
+            modifier = Modifier.onFocusChanged { onFocusChanged(it.isFocused) }
         ) { inner ->
             Box(
                 contentAlignment = Alignment.CenterStart,
