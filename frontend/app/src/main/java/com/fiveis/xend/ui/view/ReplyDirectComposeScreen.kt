@@ -301,13 +301,15 @@ fun ReplyDirectComposeScreen(
                 showInlineSwipeBar = showInlineSwipeBar,
                 onEditorFocused = {
                     coroutineScope.launch {
-                        scrollState.animateScrollTo(scrollState.maxValue)
+                        val immediateOffset = (scrollState.maxValue - 300).coerceAtLeast(0)
+                        scrollState.scrollTo(immediateOffset)
+                        val target = (scrollState.maxValue - 300).coerceAtLeast(0)
+                        scrollState.animateScrollTo(target)
                     }
                 }
             )
 
-            // Extra spacer so keyboard focus can scroll a bit further down
-            Spacer(modifier = Modifier.height(240.dp))
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }

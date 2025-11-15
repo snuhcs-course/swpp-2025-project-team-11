@@ -285,12 +285,13 @@ fun EmailComposeScreen(
                 showInlineSwipeBar = showInlineSwipeBar,
                 onEditorFocused = {
                     coroutineScope.launch {
-                        scrollState.animateScrollTo(scrollState.maxValue)
+                        val target = (scrollState.maxValue - 400).coerceAtLeast(0)
+                        scrollState.animateScrollTo(target)
                     }
                 }
             )
 
-            Spacer(modifier = Modifier.height(240.dp))
+            Spacer(modifier = Modifier.height(1.dp))
 
             error?.let { ErrorMessage(it) }
         }

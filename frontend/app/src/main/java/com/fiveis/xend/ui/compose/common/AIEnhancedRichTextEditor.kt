@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -85,8 +83,7 @@ fun AIEnhancedRichTextEditor(
     showInlineSwipeBar: Boolean = true,
     onEditorFocused: (() -> Unit)? = null
 ) {
-    val editorHeight = 320.dp
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val editorHeight = 360.dp
     val coroutineScope = rememberCoroutineScope()
 
     DisposableEffect(editorState.editor) {
@@ -98,7 +95,6 @@ fun AIEnhancedRichTextEditor(
                     coroutineScope.launch {
                         // Allow keyboard animation to start before scrolling
                         delay(150)
-                        bringIntoViewRequester.bringIntoView()
                     }
                 }
             }
@@ -140,7 +136,6 @@ fun AIEnhancedRichTextEditor(
                     .fillMaxWidth()
                     .height(editorHeight)
                     .padding(8.dp)
-                    .bringIntoViewRequester(bringIntoViewRequester)
             ) {
                 XendRichEditorView(
                     state = editorState,

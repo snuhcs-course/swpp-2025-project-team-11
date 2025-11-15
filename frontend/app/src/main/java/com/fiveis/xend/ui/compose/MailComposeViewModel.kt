@@ -67,7 +67,14 @@ class MailComposeViewModel(
 
     fun startStreaming(payload: JSONObject) {
         bodyBuffer.clear()
-        _ui.value = MailComposeUiState(isStreaming = true)
+        _ui.update {
+            it.copy(
+                isStreaming = true,
+                bodyRendered = "",
+                error = null,
+                suggestionText = ""
+            )
+        }
 
         api.start(
             payload = payload,
