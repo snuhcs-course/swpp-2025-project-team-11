@@ -366,6 +366,10 @@ private fun MailDetailContent(
 ) {
     val scrollState = rememberScrollState()
 
+    val isSentMail = mail.labelIds.any { label ->
+        label.contains("SENT", ignoreCase = true)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
