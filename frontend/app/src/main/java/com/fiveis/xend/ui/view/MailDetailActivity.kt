@@ -12,9 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.fiveis.xend.data.database.AppDatabase
-import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.RetrofitClient
+import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.theme.XendTheme
 
 class MailDetailActivity : ComponentActivity() {
