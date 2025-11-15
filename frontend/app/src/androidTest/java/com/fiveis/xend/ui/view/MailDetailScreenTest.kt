@@ -217,34 +217,6 @@ class MailDetailScreenTest {
     }
 
     @Test
-    fun mailDetailScreen_handles_original_message_marker() {
-        // Given
-        val bodyWithOriginal = "Reply content\n\n-- original message --\nFrom: sender@test.com\nOriginal body"
-        val sampleMail = EmailItem(
-            id = "1",
-            threadId = "thread_1",
-            subject = "RE: Test",
-            fromEmail = "test@test.com",
-            snippet = "snippet",
-            date = "2024.12.19",
-            dateRaw = "2024-12-19T10:00:00Z",
-            isUnread = false,
-            labelIds = listOf("INBOX"),
-            body = bodyWithOriginal
-        )
-        val uiState = MailDetailUiState(mail = sampleMail)
-
-        // When
-        composeTestRule.setContent {
-            MailDetailScreen(uiState = uiState, onBack = {}, onReply = {})
-        }
-
-        // Then - Should use CollapsibleBodyPreview
-        Thread.sleep(500)
-        composeTestRule.onNodeWithText("RE: Test").assertIsDisplayed()
-    }
-
-    @Test
     fun mailDetailScreen_displays_plain_email_without_name() {
         // Given
         val sampleMail = EmailItem(

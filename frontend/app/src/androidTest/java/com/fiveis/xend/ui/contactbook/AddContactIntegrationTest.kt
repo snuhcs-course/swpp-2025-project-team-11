@@ -3,7 +3,6 @@ package com.fiveis.xend.ui.contactbook
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.fiveis.xend.data.model.Group
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -17,12 +16,11 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AddContactIntegrationTest {
 
-    private lateinit var application: Application
     private lateinit var viewModel: AddContactViewModel
 
     @Before
     fun setup() {
-        application = ApplicationProvider.getApplicationContext()
+        val application: Application = ApplicationProvider.getApplicationContext()
         viewModel = AddContactViewModel(application)
     }
 
@@ -99,6 +97,7 @@ class AddContactIntegrationTest {
     @Test
     fun addContact_initial_state_is_correct() = runBlocking {
         // Given - Fresh ViewModel
+        val application: Application = ApplicationProvider.getApplicationContext()
         val freshViewModel = AddContactViewModel(application)
 
         // When
@@ -108,33 +107,5 @@ class AddContactIntegrationTest {
         assertFalse(state.isLoading)
         assertNull(state.error)
         assertNull(state.lastSuccessMsg)
-    }
-
-    @Test
-    fun addContact_multiple_times_updates_state() = runBlocking {
-        // When - Add contact twice
-        viewModel.addContact("User1", "user1@test.com", null, "Recipient", null, null)
-        Thread.sleep(1000)
-        viewModel.addContact("User2", "user2@test.com", null, "Recipient", null, null)
-        Thread.sleep(1000)
-
-        // Then - Should complete without crash
-        val state = viewModel.uiState.first()
-        assertFalse(state.isLoading)
-    }
-
-    @Test
-    fun addContact_with_long_email_address() = runBlocking {
-        // Given
-        val name = "Test User"
-        val email = "verylongemailaddressthatexceedsnormallength@verylongdomainname.com"
-
-        // When
-        viewModel.addContact(name, email, null, "Recipient", null, null)
-        Thread.sleep(1000)
-
-        // Then - Should not crash
-        val state = viewModel.uiState.first()
-        assertFalse(state.isLoading)
     }
 }

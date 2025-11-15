@@ -162,8 +162,6 @@ def _fetch_analysis_for_single(user, contact) -> dict | None:
             "lexical_style": obj.lexical_style,
             "grammar_patterns": obj.grammar_patterns,
             "emotional_tone": obj.emotional_tone,
-            "figurative_usage": obj.figurative_usage,
-            "long_sentence_ratio": obj.long_sentence_ratio,
             "representative_sentences": obj.representative_sentences,
         }
 
@@ -182,8 +180,6 @@ def _fetch_analysis_for_group(user, group) -> dict | None:
         "lexical_style": obj.lexical_style,
         "grammar_patterns": obj.grammar_patterns,
         "emotional_tone": obj.emotional_tone,
-        "figurative_usage": obj.figurative_usage,
-        "long_sentence_ratio": obj.long_sentence_ratio,
         "representative_sentences": obj.representative_sentences,
     }
 
