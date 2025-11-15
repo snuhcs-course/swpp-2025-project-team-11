@@ -23,6 +23,9 @@ data class EmailItem(
     @SerializedName("from_email")
     val fromEmail: String,
 
+    @SerializedName("to_email")
+    val toEmail: String = "",
+
     @SerializedName("snippet")
     val snippet: String,
 
@@ -41,6 +44,10 @@ data class EmailItem(
     @ColumnInfo(defaultValue = "")
     @SerializedName("body")
     val body: String = "",
+
+    @ColumnInfo(defaultValue = "[]")
+    @SerializedName("attachments")
+    val attachments: List<Attachment> = emptyList(),
 
     val cachedAt: Long = System.currentTimeMillis()
 )

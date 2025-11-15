@@ -19,7 +19,7 @@ import com.fiveis.xend.data.model.EmailItem
  * v1 -> v2: Contact/Group 관련 테이블 추가, EmailItem에 body 필드 추가
  * v2 -> v3: body 필드 DEFAULT 값 추가 (스키마만 변경, 마이그레이션 불필요)
  * v3 -> v4: drafts 테이블 추가
- * v4 -> v5: groups 테이블에 emoji 필드 추가
+ * v4 -> v5: groups 테이블에 emoji 필드 추가, EmailItem에 toEmail/attachments 컬럼 추가
  */
 @Database(
     entities = [
@@ -167,10 +167,20 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * Migration from v4 to v5:
+         * - Add toEmail + attachments columns to emails table (stores metadata references)
          * - Add emoji column to groups table
          */
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(database: SupportSQLiteDatabase) {
+                // Add toEmail and attachments to emails table
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN toEmail TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'"
+                )
+
+                // Add emoji to groups table
                 database.execSQL("ALTER TABLE `groups` ADD COLUMN `emoji` TEXT")
             }
         }

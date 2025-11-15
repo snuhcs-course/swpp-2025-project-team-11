@@ -24,6 +24,7 @@ celery = "^5.5.3"
 flower = "^2.0.1"
 pandas = "^2.3.3"
 pdfplumber = "^0.11.7"
+docx2txt = "^0.9"
 
 
 [tool.poetry.group.django.dependencies]
@@ -47,6 +48,7 @@ langchain-community = "^0.4.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
 
 
 
