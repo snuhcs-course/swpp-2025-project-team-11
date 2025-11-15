@@ -371,8 +371,13 @@ private fun MailDetailContent(
             .background(BackgroundWhite)
     ) {
         // A. 발신자 정보 섹션
+        val isSentMail = mail.labelIds.any { label ->
+            label.contains("SENT", ignoreCase = true)
+        }
         SenderInfoSection(
             senderEmail = mail.fromEmail,
+            recipientEmail = mail.toEmail,
+            isSentMail = isSentMail,
             date = mail.date
         )
         HorizontalDivider(
@@ -400,9 +405,12 @@ private fun MailDetailContent(
 }
 
 @Composable
-private fun SenderInfoSection(senderEmail: String, date: String) {
-    // 이메일 파싱: "김대표 <kim@company.com>" 또는 "kim@company.com"
-    val (senderName, email) = parseSenderEmail(senderEmail)
+private fun SenderInfoSection(senderEmail: String, recipientEmail: String, isSentMail: Boolean, date: String) {
+    val (displayName, displayEmail) = if (isSentMail) {
+        parseSenderEmail(recipientEmail)
+    } else {
+        parseSenderEmail(senderEmail)
+    }
 
     Column(
         modifier = Modifier
@@ -410,7 +418,7 @@ private fun SenderInfoSection(senderEmail: String, date: String) {
             .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Text(
-            text = senderName,
+            text = if (isSentMail) "To. $displayName" else displayName,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             color = TextPrimary
