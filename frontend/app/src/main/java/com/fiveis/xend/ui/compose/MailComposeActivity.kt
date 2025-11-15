@@ -106,6 +106,7 @@ import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.data.model.toDomain
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailComposeSseClient
@@ -781,6 +782,7 @@ private fun RecipientSection(
 
                 // 연락처 추가 버튼
                 if (newContact.text.length >= 2 && onAddContactClick != null) {
+                    val pendingEmail = newContact.text.trim()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -788,8 +790,9 @@ private fun RecipientSection(
                             .background(Blue80.copy(alpha = 0.05f))
                             .border(BorderStroke(1.dp, Blue80.copy(alpha = 0.3f)), RoundedCornerShape(10.dp))
                             .clickable {
-                                val email = newContact.text.trim()
-                                onAddContactClick(Contact(id = -1L, name = email, email = email, group = null))
+                                onAddContactClick(
+                                    Contact(id = -1L, name = pendingEmail, email = pendingEmail, group = null)
+                                )
                             }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -809,13 +812,19 @@ private fun RecipientSection(
                                 modifier = Modifier.size(18.dp)
                             )
                         }
-                        Text(
-                            text = "연락처 추가",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Blue80,
-                                fontWeight = FontWeight.Medium
+                        Column {
+                            Text(
+                                text = "연락처 추가",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Blue80,
+                                    fontWeight = FontWeight.Medium
+                                )
                             )
-                        )
+                            Text(
+                                text = pendingEmail,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
                     }
                 }
             }
@@ -1509,14 +1518,29 @@ class MailComposeActivity : ComponentActivity() {
                                         onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
                                             coroutineScope.launch {
                                                 try {
-                                                    contactRepository.addContact(
+                                                    val added = contactRepository.addContact(
                                                         name = name,
                                                         email = email,
                                                         groupId = groupId,
                                                         senderRole = senderRole,
                                                         recipientRole = recipientRole,
                                                         personalPrompt = personalPrompt
-                                                    )
+                                                    ).toDomain()
+                                                    contacts = if (contacts.any
+                                                            { it.email.equals(added.email, ignoreCase = true) }
+                                                    ) {
+                                                        contacts.map { existing ->
+                                                            if (existing.email.equals(added.email, ignoreCase = true)) {
+                                                                added
+                                                            } else {
+                                                                existing
+                                                            }
+                                                        }
+                                                    } else {
+                                                        contacts + added
+                                                    }
+                                                    newContact = TextFieldValue("")
+                                                    contactSuggestions = emptyList()
                                                     showAddContactDialog = false
                                                     selectedContactForDialog = null
                                                     // Show success banner
