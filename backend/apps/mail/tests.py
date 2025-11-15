@@ -5,6 +5,7 @@ from cryptography.fernet import Fernet
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.mail.views import (
@@ -595,8 +596,7 @@ class EmailSendViewTest(TestCase):
     @patch("apps.mail.views.send_email_logic")
     def test_send_email_invalid_serializer_returns_400(self, mock_send_logic):
         mock_serializer = MagicMock()
-        mock_serializer.is_valid.return_value = False
-        mock_serializer.errors = {"to": ["This field is required."]}
+        mock_serializer.is_valid.side_effect = ValidationError({"to": ["This field is required."]})
 
         request = self.factory.post(
             "/api/mail/emails/send/",
@@ -605,11 +605,12 @@ class EmailSendViewTest(TestCase):
         )
         force_authenticate(request, user=self.user)
 
+        view = EmailSendView.as_view()
         with patch.object(EmailSendView, "get_serializer", return_value=mock_serializer):
-            response = EmailSendView.as_view()(request)
+            response = view(request)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("to", response.data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "to" in response.data
         mock_send_logic.assert_not_called()
 
     @patch("apps.mail.views.send_email_logic")
