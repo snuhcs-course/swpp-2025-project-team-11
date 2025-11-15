@@ -423,8 +423,8 @@ class AddContactScreenTest {
     fun test_addContactScreen_with_groups_displays_them() {
         // Given
         val groups = listOf(
-            Group(1, "VIP", "Important", emptyList(), emptyList(), null, null),
-            Group(2, "Team", "Work", emptyList(), emptyList(), null, null)
+            Group(1, "VIP", "Important", null, emptyList(), emptyList(), null, null),
+            Group(2, "Team", "Work", null, emptyList(), emptyList(), null, null)
         )
 
         // When
@@ -1013,7 +1013,7 @@ class AddContactScreenTest {
     @Test
     fun test_addContactScreen_with_many_groups() {
         // Given
-        val groups = List(20) { Group(it.toLong(), "Group$it", "Desc$it", emptyList(), emptyList(), null, null) }
+        val groups = List(20) { Group(it.toLong(), "Group$it", "Desc$it", null, emptyList(), emptyList(), null, null) }
 
         // When
         composeTestRule.setContent {
