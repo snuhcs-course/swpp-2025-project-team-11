@@ -19,7 +19,17 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ## Features
 
-### Iteration 3 (Current)
+### What's New in Iteration 4
+- **Addition of tone analysis module**: Analyze and apply the user's writing style based on emails previously sent to the same recipient during email generation
+- **Email composition prompt preview**: Review the prompt currently used by the AI to generate emails
+- **Attachment preview and AI analysis**: In-app attachment preview and AI-driven analysis of attachment contents
+- **Profile information management**: Enter details such as name and affiliation to be utilized in email generation
+- **Email draft saving**
+- **Redo/undo for AI-generated content**
+- **Contact search**
+- **Overall user interface enhancements**
+
+### Previous Iterations
 - **Real-time AI Suggestions**: Live text completion as you type with WebSocket streaming
 - **Smart Reply Options**: Generate multiple reply styles (positive/neutral/firm) with SSE streaming
 - **Contact & Group Management**: Organize contacts by groups with personalized AI prompts
@@ -27,7 +37,6 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 - **Rich Text Editing**: Full formatting support (bold, italic, underline, colors, font sizes)
 - **Template System**: Save and reuse frequently used email templates
 
-### Previous Iterations
 - **Streaming Draft Generation**: First sentence appears quickly; content streams until completion
 - **Relationship-Aware Tone**: Select **Group** (e.g., Manager/Clients) and **Tone** (e.g., Polite/Formal) and see rules applied
 - **Inline Reply Options**: Positive / Neutral / Firm candidates shown inline; insert with a tap
@@ -43,14 +52,14 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ### Installation
 
-#### For Iteration 3 Demo
+#### For Iteration 4 Demo
 
-> **Branch**: `iteration-3-demo`
+> **Branch**: `iteration-4-demo`
 
 ```bash
 git clone https://github.com/snuhcs-course/swpp-2025-project-team-11.git
 cd swpp-2025-project-team-11
-git switch iteration-3-demo
+git switch iteration-4-demo
 ```
 
 **Backend Setup**
@@ -93,10 +102,11 @@ docker compose up -d --build
 
 Default URL: http://localhost/
 
-## What Iteration 3 Demonstrates
+## What Iteration 4 Demonstrates
 
 ### Core Features
 - **Gmail Integration**: OAuth 2.0 authentication and inbox synchronization
+- **Personalized email generation**: Create tailored emails that reflect the user's writing style and the relationship between the user and the recipient
 - **Real-time AI Composition**: Live text suggestions as you type via WebSocket
 - **Smart Reply Generation**: Multiple reply options (positive/neutral/firm) via SSE streaming
 - **Contact Management**: Organize contacts by groups with custom AI prompts
@@ -106,10 +116,12 @@ Default URL: http://localhost/
 ### Technical Highlights
 - **Incremental Sync**: Only fetch new emails since last update
 - **Streaming Responses**: SSE/WebSocket for real-time AI feedback
-- **Database Migrations**: Safe schema updates without data loss (v1→v2→v3)
+- **Database Migrations**: Safe schema updates without data loss
 - **JSON Parsing**: Clean extraction of AI responses from markdown code blocks
+- **Attachment AI analysis**: Real-time analysis of Gmail attachments and uploaded files to provide summaries, insights, and guidance for composing emails
 
 ## Demo Videos
 
 - **Iteration 1 Demo**: https://drive.google.com/file/d/1to4deCD6jBssx2V_oZgZU5E5Os2PlfP1/view?usp=sharing
 - **Iteration 3 Demo**: https://drive.google.com/file/d/1UmfNOg-AQAKq9O-n2GzkcnLeweSbvZ1W/view?usp=sharing
+- **Iteration 4 Demo**: https://drive.google.com/file/d/1neQrvApVfsdF6zUwdBuIUTQQ30xQDPFO/view?usp=sharing
