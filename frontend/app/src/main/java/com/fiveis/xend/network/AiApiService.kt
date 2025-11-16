@@ -9,14 +9,7 @@ data class PromptPreviewRequest(
 )
 
 data class PromptPreviewResponse(
-    val to_emails: List<String>,
-    val relationship: String?,
-    val sender_role: String?,
-    val recipient_role: String?,
-    val personal_prompt: String?,
-    val situational_prompt: String?,
-    val style_prompt: String?,
-    val format_prompt: String?
+    val previewText: String?
 )
 
 interface AiApiService {

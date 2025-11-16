@@ -1870,35 +1870,12 @@ private fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit
                             color = Blue80.copy(alpha = 0.1f),
                             border = BorderStroke(1.dp, Blue80.copy(alpha = 0.3f))
                         ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                promptData?.relationship?.let {
-                                    InfoRow(label = "관계", value = it)
-                                }
-                                if (promptData?.sender_role != null || promptData?.recipient_role != null) {
-                                    val sender = promptData?.sender_role ?: ""
-                                    val recipient = promptData?.recipient_role ?: ""
-                                    val separator = if (sender.isNotEmpty() && recipient.isNotEmpty()) " → " else ""
-                                    InfoRow(
-                                        label = "역할",
-                                        value = "$sender$separator$recipient"
-                                    )
-                                }
-                                promptData?.personal_prompt?.let {
-                                    InfoRow(label = "개인 프롬프트", value = it)
-                                }
-                                promptData?.situational_prompt?.let {
-                                    InfoRow(label = "상황", value = it)
-                                }
-                                promptData?.style_prompt?.let {
-                                    InfoRow(label = "스타일", value = it)
-                                }
-                                promptData?.format_prompt?.let {
-                                    InfoRow(label = "형식", value = it)
-                                }
-                            }
+                            Text(
+                                text = promptData?.previewText?.takeIf { it.isNotBlank() }
+                                    ?: "해당 수신자에 대한 프롬프트 정보를 아직 준비하지 못했습니다.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+                                modifier = Modifier.padding(12.dp)
+                            )
                         }
                     }
                 }
@@ -1916,27 +1893,4 @@ private fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit
             }
         }
     )
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall.copy(
-                color = ToolbarIconTint,
-                fontWeight = FontWeight.Medium
-            ),
-            modifier = Modifier.weight(0.3f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
-            modifier = Modifier.weight(0.7f)
-        )
-    }
 }
