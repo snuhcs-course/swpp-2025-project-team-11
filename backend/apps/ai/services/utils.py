@@ -150,7 +150,7 @@ def collect_prompt_context(
         **base,
         "group_name": group_names,
         "group_description": None,
-        "prompt_options": serialize_opts(opts) if opts else None,
+        "prompt_options": serialize_opts(opts) if opts else [],
     }
 
 

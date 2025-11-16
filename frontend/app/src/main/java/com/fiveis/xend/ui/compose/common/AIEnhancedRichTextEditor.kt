@@ -2,6 +2,7 @@ package com.fiveis.xend.ui.compose.common
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -39,9 +40,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +61,8 @@ import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
 import com.fiveis.xend.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * AI 기능이 포함된 Rich Text Editor (XendRichEditor 기반)
@@ -65,6 +70,7 @@ import com.fiveis.xend.ui.theme.TextSecondary
  * - AI 제안 미리보기
  * - 탭 완성 버튼
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AIEnhancedRichTextEditor(
     editorState: XendRichEditorState,
@@ -74,9 +80,29 @@ fun AIEnhancedRichTextEditor(
     onTextChanged: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     placeholder: String = "내용을 입력하세요",
-    showInlineSwipeBar: Boolean = true
+    showInlineSwipeBar: Boolean = true,
+    onEditorFocused: (() -> Unit)? = null
 ) {
-    val editorHeight = 320.dp
+    val editorHeight = 360.dp
+    val coroutineScope = rememberCoroutineScope()
+
+    DisposableEffect(editorState.editor) {
+        val editor = editorState.editor
+        if (editor != null) {
+            editor.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    onEditorFocused?.invoke()
+                    coroutineScope.launch {
+                        // Allow keyboard animation to start before scrolling
+                        delay(150)
+                    }
+                }
+            }
+        }
+        onDispose {
+            editor?.setOnFocusChangeListener(null)
+        }
+    }
 
     // Show/remove suggestion in editor
     androidx.compose.runtime.LaunchedEffect(suggestionText) {

@@ -58,24 +58,23 @@ class ReplyComposeViewModel(
             },
             onOptions = { optionInfos ->
                 Log.d("ReplyComposeVM", "onOptions 호출: ${optionInfos.size}개 옵션")
-                viewModelScope.launch(Dispatchers.Main) {
-                    _uiState.update { state ->
-                        state.copy(
-                            isLoading = false,
-                            options = optionInfos.map { info ->
-                                ReplyOptionState(
-                                    id = info.id,
-                                    type = info.type,
-                                    title = info.title
-                                )
-                            }
-                        )
-                    }
-                    Log.d(
-                        "ReplyComposeVM",
-                        "onOptions 완료: isLoading=${_uiState.value.isLoading}, options=${_uiState.value.options.size}"
+                // Main 디스패처 사용하지 않고 즉시 업데이트
+                _uiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        options = optionInfos.map { info ->
+                            ReplyOptionState(
+                                id = info.id,
+                                type = info.type,
+                                title = info.title
+                            )
+                        }
                     )
                 }
+                Log.d(
+                    "ReplyComposeVM",
+                    "onOptions 완료: isLoading=${_uiState.value.isLoading}, options=${_uiState.value.options.size}"
+                )
             },
             onOptionDelta = { optionId, seq, text ->
                 // 상태를 즉시 업데이트
@@ -83,7 +82,15 @@ class ReplyComposeViewModel(
                     state.copy(
                         options = state.options.map { option ->
                             if (option.id == optionId) {
-                                option.copy(body = option.body + text)
+                                val newBody = option.body + text
+                                if (seq == 0) {
+                                    Log.d(
+                                        "ReplyComposeVM",
+                                        "첫 델타: id=$optionId, 기존=${option.body.length}, " +
+                                            "text='$text', 새=${newBody.length}"
+                                    )
+                                }
+                                option.copy(body = newBody)
                             } else {
                                 option
                             }
@@ -113,6 +120,12 @@ class ReplyComposeViewModel(
                         state.copy(
                             options = state.options.map { option ->
                                 if (option.id == optionId) {
+                                    Log.d(
+                                        "ReplyComposeVM",
+                                        "옵션 완료: id=$optionId, 최종body길이=${option.body.length}, 첫10글자='${option.body.take(
+                                            10
+                                        )}'"
+                                    )
                                     option.copy(
                                         isComplete = true,
                                         totalSeq = totalSeq

@@ -798,7 +798,7 @@ private fun BottomActionButtons(onDirectCompose: () -> Unit, onGenerateMore: () 
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "추가 생성",
+                text = "새로 생성",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium
             )
