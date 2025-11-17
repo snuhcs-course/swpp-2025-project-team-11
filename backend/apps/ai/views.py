@@ -15,12 +15,13 @@ from .serializers import (
     AttachmentAnalysisResponseSerializer,
     AttachmentAnalyzeFromMailSerializer,
     AttachmentAnalyzeUploadSerializer,
+    MailGenerateAnalysisResponseSerializer,
     MailGenerateRequest,
     PromptPreviewRequestSerializer,
     ReplyGenerateRequest,
 )
 from .services.attachment_analysis import analyze_gmail_attachment, analyze_uploaded_file
-from .services.mail_generation import stream_mail_generation, stream_mail_generation_with_plan
+from .services.mail_generation import debug_mail_generation_analysis, stream_mail_generation, stream_mail_generation_with_plan
 from .services.prompt_preview import generate_prompt_preview
 from .services.reply import stream_reply_options_llm
 
@@ -433,3 +434,42 @@ class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class MailGenerateAnalysisTestView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = MailGenerateRequest
+
+    @extend_schema(
+        summary="[Debug] Generate mail with/without analysis (non-streaming)",
+        request=MailGenerateRequest,
+        responses={
+            200: OpenApiResponse(
+                response=MailGenerateAnalysisResponseSerializer,
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "analysis": "수신자가 최근 회의에서 언급한 요청사항을 기반으로 공손한 톤 권장.",
+                            "without_analysis": {"subject": "프로젝트 관련 안내드립니다", "body": "안녕하세요. 프로젝트 관련하여 안내드립니다..."},
+                            "with_analysis": {
+                                "subject": "요청하신 프로젝트 관련 안내드립니다",
+                                "body": "안녕하세요. 지난 회의에서 요청하신 내용을 바탕으로...",
+                            },
+                        },
+                    )
+                ],
+            ),
+        },
+    )
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        result = debug_mail_generation_analysis(
+            user=request.user,
+            subject=data.get("subject"),
+            body=data.get("body"),
+            to_emails=data.get("to_emails"),
+        )
+        return Response(result)

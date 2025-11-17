@@ -4,6 +4,7 @@ from .views import (
     AttachmentAnalyzeFromMailView,
     AttachmentAnalyzeUploadView,
     EmailPromptPreviewView,
+    MailGenerateAnalysisTestView,
     MailGenerateStreamView,
     MailGenerateWithPlanStreamView,
     ReplyOptionsStreamView,
@@ -24,4 +25,5 @@ urlpatterns = [
         AttachmentAnalyzeUploadView.as_view(),
         name="mail-attachment-analyze-upload",
     ),
+    path("mail/generate/test/", MailGenerateAnalysisTestView.as_view(), name="mail-generate-test"),
 ]

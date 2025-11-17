@@ -53,3 +53,14 @@ class AttachmentAnalysisResponseSerializer(serializers.Serializer):
     summary = serializers.CharField(help_text="첨부파일 요약")
     insights = serializers.CharField(help_text="핵심 인사이트")
     mail_guide = serializers.CharField(help_text="이메일 작성 가이드")
+
+
+class _MailGenResultSerializer(serializers.Serializer):
+    subject = serializers.CharField(help_text="생성된 이메일 제목")
+    body = serializers.CharField(help_text="생성된 이메일 본문")
+
+
+class MailGenerateAnalysisResponseSerializer(serializers.Serializer):
+    analysis = serializers.CharField(allow_null=True, help_text="collect_prompt_context에서 생성된 analysis 값 (없으면 null)")
+    without_analysis = _MailGenResultSerializer(help_text="analysis 없이 invoke한 결과")
+    with_analysis = _MailGenResultSerializer(help_text="analysis 포함 후 invoke한 결과")
