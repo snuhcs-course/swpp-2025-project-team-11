@@ -7,16 +7,18 @@ from django.contrib.auth import logout as django_logout
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, OpenApiTypes, extend_schema
 from rest_framework import generics, status
+from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..core.mixins import AuthRequiredMixin
-from .models import GoogleAccount, User
+from .models import GoogleAccount, User, UserProfile
 from .serializers import (
     GoogleCallbackRequestSerializer,
     GoogleCallbackResponseSerializer,
     LogoutRequestSerializer,
+    UserProfileSerializer,
 )
 
 
@@ -162,3 +164,12 @@ class LogoutView(AuthRequiredMixin, generics.GenericAPIView):
 
         django_logout(request)
         return Response({"detail": "Successfully logged out"}, status=status.HTTP_200_OK)
+
+
+class MeProfileView(AuthRequiredMixin, RetrieveUpdateAPIView):
+    serializer_class = UserProfileSerializer
+
+    def get_object(self):
+        user = self.request.user
+        profile, _ = UserProfile.objects.get_or_create(user=user, defaults={"display_name": user.name})
+        return profile

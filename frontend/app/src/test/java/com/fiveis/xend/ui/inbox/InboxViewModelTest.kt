@@ -3,6 +3,7 @@ package com.fiveis.xend.ui.inbox
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailListResponse
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -36,12 +37,16 @@ class InboxViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var repository: InboxRepository
+    private lateinit var contactRepository: ContactBookRepository
     private lateinit var viewModel: InboxViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = mockk()
+        contactRepository = mockk()
+        every { contactRepository.observeGroups() } returns flowOf(emptyList())
+        every { contactRepository.observeContacts() } returns flowOf(emptyList())
     }
 
     @After
@@ -58,7 +63,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(mockEmails)
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         assertEquals(mockEmails, viewModel.uiState.value.emails)
@@ -69,7 +74,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.success("token123")
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         assertEquals("token123", viewModel.uiState.value.loadMoreNextPageToken)
@@ -82,7 +87,12 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.failure(Exception("Network error"))
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
+        advanceUntilIdle()
+
+        // Silent refresh in init doesn't set error (showLoading=false)
+        // So we need to explicitly call refreshEmails() to test error handling
+        viewModel.refreshEmails()
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.error)
@@ -106,7 +116,7 @@ class InboxViewModelTest {
         coEvery { repository.getMails(pageToken = "token123") } returns mockResponse
         coEvery { repository.saveEmailsToCache(newEmails) } returns Unit
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -122,7 +132,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()

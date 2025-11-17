@@ -18,6 +18,7 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.data.model.PromptOptionRequest
+import com.fiveis.xend.data.model.PromptOptionUpdateRequest
 import com.fiveis.xend.network.ContactApiService
 import com.fiveis.xend.network.RetrofitClient
 import kotlinx.coroutines.flow.Flow
@@ -40,11 +41,13 @@ data class ContactData(val contacts: List<Contact>) : ContactBookData
 //     return Color.hsv(hue, saturation, value)
 // }
 
-class ContactBookRepository(context: Context) {
+class ContactBookRepository(
+    context: Context,
+    private val db: AppDatabase = AppDatabase.getDatabase(context)
+) {
     private val api: ContactApiService = RetrofitClient.getContactApiService(context)
 
     // Room 주입
-    private val db = AppDatabase.getDatabase(context)
     private val groupDao = db.groupDao()
     private val contactDao = db.contactDao()
     private val optionDao = db.promptOptionDao()
@@ -68,13 +71,16 @@ class ContactBookRepository(context: Context) {
 
     fun observeGroup(groupId: Long): Flow<Group?> = groupDao.observeGroup(groupId).map { it?.asDomain() }
 
-    fun observeContacts(): Flow<List<Contact>> = contactDao.observeAllWithContext()
-        .map { list -> list.map { it.asDomain(null) } }
+    fun observeContacts(): Flow<List<Contact>> = contactDao.observeAllWithGroup()
+        .map { list -> list.map { it.asDomain() } }
 
     fun observePromptOptions(): Flow<List<PromptOption>> = optionDao.observeAllOptions()
         .map { list -> list.map { it.asDomain() } }
 
     fun observeContact(id: Long): Flow<Contact?> = contactDao.observeByIdWithGroup(id).map { it?.asDomain() }
+
+    fun searchContacts(keyword: String): Flow<List<Contact>> =
+        contactDao.searchByNameOrEmail(keyword).map { list -> list.map { it.asDomain(null) } }
 
     // ----- DB 동기화(refresh) -----
 
@@ -185,7 +191,7 @@ class ContactBookRepository(context: Context) {
         personalPrompt: String?
     ): ContactResponse {
         val requestContext = AddContactRequestContext(
-            senderRole = senderRole ?: "Mail writer",
+            senderRole = senderRole ?: "",
             recipientRole = recipientRole,
             personalPrompt = personalPrompt ?: ""
         )
@@ -214,8 +220,8 @@ class ContactBookRepository(context: Context) {
         contactDao.deleteById(contactId)
     }
 
-    suspend fun updateContactGroup(contactId: Long, groupId: Long) {
-        val payload = mapOf("group_id" to groupId)
+    suspend fun updateContactGroup(contactId: Long, groupId: Long?) {
+        val payload = mapOf<String, Any?>("group_id" to groupId)
         val response = api.updateContact(contactId, payload)
         if (!response.isSuccessful) {
             val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
@@ -223,12 +229,66 @@ class ContactBookRepository(context: Context) {
                 "Update contact group failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
             )
         }
-        // 로컬 반영
-        contactDao.updateGroupId(contactId, groupId)
+        val body = response.body()
+        if (body != null) {
+            db.withTransaction {
+                val (contact, ctx) = body.toEntities()
+                contactDao.upsertContacts(listOf(contact))
+                ctx?.let { contactDao.upsertContexts(listOf(it)) }
+            }
+        } else {
+            refreshContact(contactId)
+        }
     }
 
-    suspend fun addGroup(name: String, description: String, options: List<PromptOption>): GroupResponse {
-        val request = AddGroupRequest(name = name, description = description, optionIds = options.map { it.id })
+    suspend fun updateContact(
+        contactId: Long,
+        name: String,
+        email: String,
+        senderRole: String?,
+        recipientRole: String?,
+        personalPrompt: String?,
+        groupId: Long?
+    ) {
+        val payload = mutableMapOf<String, Any?>(
+            "name" to name,
+            "email" to email,
+            "group_id" to groupId
+        )
+        val contextPayload = mutableMapOf<String, Any?>()
+        if (senderRole != null) contextPayload["sender_role"] = senderRole
+        if (recipientRole != null) contextPayload["recipient_role"] = recipientRole
+        if (personalPrompt != null) contextPayload["personal_prompt"] = personalPrompt
+        if (contextPayload.isNotEmpty()) {
+            payload["context"] = contextPayload
+        }
+        val response = api.updateContact(contactId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update contact failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+        val body = response.body()
+        if (body != null) {
+            db.withTransaction {
+                val (contact, ctx) = body.toEntities()
+                contactDao.upsertContacts(listOf(contact))
+                ctx?.let { contactDao.upsertContexts(listOf(it)) }
+            }
+        } else {
+            refreshContact(contactId)
+        }
+    }
+
+    suspend fun addGroup(
+        name: String,
+        description: String,
+        emoji: String? = null,
+        options: List<PromptOption>
+    ): GroupResponse {
+        val request =
+            AddGroupRequest(name = name, description = description, emoji = emoji, optionIds = options.map { it.id })
         val res = api.addGroup(request)
         if (!res.isSuccessful) {
             val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
@@ -253,6 +313,38 @@ class ContactBookRepository(context: Context) {
         }
         // 로컬 반영 (crossRef는 FK onDelete에 따라 정리되지만, 안전하게 그룹만 지우기)
         groupDao.deleteById(groupId)
+    }
+
+    suspend fun updateGroup(
+        groupId: Long,
+        name: String? = null,
+        description: String? = null,
+        optionIds: List<Long>? = null
+    ): GroupResponse {
+        val payload = mutableMapOf<String, Any>()
+        if (name != null) payload["name"] = name
+        if (description != null) payload["description"] = description
+        if (optionIds != null) payload["option_ids"] = optionIds
+        require(payload.isNotEmpty()) { "updateGroup payload is empty" }
+
+        val response = api.updateGroup(groupId, payload)
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException(
+                "Update group info failed: HTTP ${response.code()} ${response.message()} | body=$errorBody"
+            )
+        }
+        val updated = response.body() ?: error("Success but body null")
+
+        // 로컬 반영
+        db.withTransaction {
+            val (g, opts, refs) = updated.toEntities()
+            groupDao.upsertGroups(listOf(g))
+            optionDao.deleteCrossRefsByGroup(groupId)
+            if (opts.isNotEmpty()) optionDao.upsertOptions(opts)
+            if (refs.isNotEmpty()) optionDao.upsertCrossRefs(refs)
+        }
+        return updated
     }
 
     suspend fun addPromptOption(key: String, name: String, prompt: String): PromptOption {
@@ -280,6 +372,28 @@ class ContactBookRepository(context: Context) {
         val tone = all.filter { it.key == "tone" }
         val format = all.filter { it.key == "format" }
         return tone to format
+    }
+
+    suspend fun updatePromptOption(id: Long, name: String, prompt: String): PromptOption {
+        val req = PromptOptionUpdateRequest(id = id, name = name, prompt = prompt)
+        val res = api.updatePromptOption(id, req)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Update prompt option failed: HTTP ${res.code()} ${res.message()} | body=$body")
+        }
+        val updated = res.body() ?: error("Success but body null")
+        optionDao.upsertOptions(listOf(updated.toEntity()))
+        return updated
+    }
+
+    suspend fun deletePromptOption(id: Long) {
+        val res = api.deletePromptOption(id)
+        if (!res.isSuccessful) {
+            val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
+            throw IllegalStateException("Delete prompt option failed: HTTP ${res.code()} ${res.message()} | body=$body")
+        }
+        optionDao.deleteCrossRefsByOption(id)
+        optionDao.deleteOptionById(id)
     }
 }
 

@@ -174,4 +174,122 @@ class AddContactViewModelTest {
         assertNotNull(viewModel.uiState.value.error)
         assertTrue(viewModel.uiState.value.error?.contains("Network error") == true)
     }
+
+    @Test
+    fun add_contact_with_long_email_address_succeeds() = runTest {
+        val longEmail = "verylongemailaddressthatexceedsnormallength@verylongdomainname.com"
+        val mockResponse = ContactResponse(
+            id = 1L,
+            name = "Test User",
+            email = longEmail
+        )
+
+        coEvery {
+            anyConstructed<ContactBookRepository>().addContact(
+                "Test User",
+                longEmail,
+                null,
+                null,
+                "Recipient",
+                null
+            )
+        } returns mockResponse
+
+        viewModel = AddContactViewModel(application)
+
+        viewModel.addContact(
+            "Test User",
+            longEmail,
+            null,
+            "Recipient",
+            null,
+            null
+        )
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun add_contact_multiple_times_updates_state_correctly() = runTest {
+        val mockResponse1 = ContactResponse(id = 1L, name = "User1", email = "user1@test.com")
+        val mockResponse2 = ContactResponse(id = 2L, name = "User2", email = "user2@test.com")
+
+        coEvery {
+            anyConstructed<ContactBookRepository>().addContact(
+                "User1",
+                "user1@test.com",
+                null,
+                null,
+                "Recipient",
+                null
+            )
+        } returns mockResponse1
+
+        coEvery {
+            anyConstructed<ContactBookRepository>().addContact(
+                "User2",
+                "user2@test.com",
+                null,
+                null,
+                "Recipient",
+                null
+            )
+        } returns mockResponse2
+
+        viewModel = AddContactViewModel(application)
+
+        // First add
+        viewModel.addContact("User1", "user1@test.com", null, "Recipient", null, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+
+        // Second add
+        viewModel.addContact("User2", "user2@test.com", null, "Recipient", null, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("2") == true)
+    }
+
+    @Test
+    fun add_contact_with_whitespace_name_sets_error() = runTest {
+        viewModel = AddContactViewModel(application)
+
+        viewModel.addContact("   ", "test@example.com", null, "Recipient", null, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.error)
+        assertTrue(viewModel.uiState.value.error?.contains("이름") == true)
+    }
+
+    @Test
+    fun add_contact_with_whitespace_email_sets_error() = runTest {
+        viewModel = AddContactViewModel(application)
+
+        viewModel.addContact("Test User", "   ", null, "Recipient", null, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.error)
+        assertTrue(viewModel.uiState.value.error?.contains("이메일") == true)
+    }
+
+    @Test
+    fun initial_state_is_correct() = runTest {
+        viewModel = AddContactViewModel(application)
+
+        val state = viewModel.uiState.value
+
+        assertFalse(state.isLoading)
+        assertEquals(null, state.error)
+        assertEquals(null, state.lastSuccessMsg)
+    }
 }

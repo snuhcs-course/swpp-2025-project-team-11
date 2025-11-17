@@ -21,7 +21,6 @@ class ContactTest {
         assertNull(contact.context)
         assertNull(contact.createdAt)
         assertNull(contact.updatedAt)
-        assertEquals(Color(0xFF5A7DFF), contact.color)
     }
 
     @Test
@@ -47,8 +46,7 @@ class ContactTest {
             email = "jane@example.com",
             context = context,
             createdAt = "2024-10-30T10:00:00Z",
-            updatedAt = "2024-10-30T12:00:00Z",
-            color = Color.Red
+            updatedAt = "2024-10-30T12:00:00Z"
         )
 
         assertEquals(1L, contact.id)
@@ -58,7 +56,6 @@ class ContactTest {
         assertEquals(context, contact.context)
         assertEquals("2024-10-30T10:00:00Z", contact.createdAt)
         assertEquals("2024-10-30T12:00:00Z", contact.updatedAt)
-        assertEquals(Color.Red, contact.color)
     }
 
     @Test
@@ -81,15 +78,13 @@ class ContactTest {
         val contact1 = Contact(
             id = 1L,
             name = "John Doe",
-            email = "john@example.com",
-            color = Color.Blue
+            email = "john@example.com"
         )
 
         val contact2 = Contact(
             id = 1L,
             name = "John Doe",
-            email = "john@example.com",
-            color = Color.Blue
+            email = "john@example.com"
         )
 
         assertEquals(contact1, contact2)

@@ -4,13 +4,17 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EmailDao {
-    @Query("SELECT * FROM emails ORDER BY date DESC")
+    @Query("SELECT * FROM emails ORDER BY cachedAt DESC")
     fun getAllEmails(): Flow<List<EmailItem>>
+
+    @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY date DESC")
+    fun getEmailsByLabel(label: String): Flow<List<EmailItem>>
 
     @Query("SELECT * FROM emails WHERE id = :emailId")
     suspend fun getEmailById(emailId: String): EmailItem?
@@ -41,7 +45,7 @@ interface EmailDao {
      * 1. Backend sending consistent ISO 8601 format, or
      * 2. Adding a separate timestamp field for sorting
      */
-    @Query("SELECT dateRaw FROM emails ORDER BY cachedAt DESC LIMIT 1")
+    @Query("SELECT date FROM emails ORDER BY cachedAt DESC LIMIT 1")
     suspend fun getLatestEmailDate(): String?
 
     @Query(
@@ -53,4 +57,22 @@ interface EmailDao {
         """
     )
     fun searchEmails(query: String): Flow<List<EmailItem>>
+
+    // Drafts
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDraft(draft: DraftItem): Long
+
+    @Query("SELECT * FROM drafts WHERE id = :id")
+    suspend fun getDraft(id: Long): DraftItem?
+
+    @Query(
+        "SELECT * FROM drafts WHERE recipients LIKE '%\"' || :recipientEmail || '\"%' ORDER BY timestamp DESC LIMIT 1"
+    )
+    suspend fun getDraftByRecipient(recipientEmail: String): DraftItem?
+
+    @Query("SELECT * FROM drafts ORDER BY timestamp DESC")
+    fun getAllDrafts(): Flow<List<DraftItem>>
+
+    @Query("DELETE FROM drafts WHERE id = :id")
+    suspend fun deleteDraft(id: Long)
 }

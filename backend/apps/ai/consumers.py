@@ -3,10 +3,11 @@ import json
 
 import redis.asyncio as aioredis
 import requests
+from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 
-# from . import services
+from .services.utils import build_prompt_inputs, collect_prompt_context
 
 
 class MailGenerateConsumer(AsyncWebsocketConsumer):
@@ -49,14 +50,42 @@ class MailGenerateConsumer(AsyncWebsocketConsumer):
         프론트엔드에서 GPU 요청 전송 시 호출됨.
         Django는 이 요청을 GPU 서버에 중계함.
         """
-        data = json.loads(text_data)  # to_emails 포함
+        data = json.loads(text_data)
+        # json should include: to_emails, body
+        user = self.user
+
+        to_emails = data.get("to_emails", [])  # 보내는 사람들 = list[str]
+
+        ctx = await sync_to_async(collect_prompt_context)(user, to_emails)
+        # async한 receive 함수 내부 / collect_prompt_context 함수 내부에서 ORM 호출(sync)이 존재함
+        # Django ORM을 async context 내부에서 바로 호출 할 수 없음 -> sync_to_async로 변환하여 스레드에서 실행되게
+        raw_inputs = build_prompt_inputs(ctx)
+        raw_inputs["body"] = data.get("body", "")
 
         system_prompt = """
         당신은 사용자가 작성 중인 메일을 이어서 완성하는 역할을 수행합니다.
         사용자가 작성한 내용에 자연스럽게 이어서 6단어 정도만 작성하세요.
         사용자가 이미 작성한 내용을 중복하여 출력하지 않습니다.
         출력은 반드시 JSON 형태로 아래와 같이 작성합니다.
+        """
 
+        if raw_inputs["recipients"]:
+            recipients_str = ", ".join(raw_inputs["recipients"])
+            system_prompt += f"\n사용자는 다음의 수신자에게 메일을 작성하고 있습니다:\n{recipients_str}"
+
+        if raw_inputs["group_description"]:
+            system_prompt += f"\n수신자들에 대한 설명은 다음과 같습니다:\n{raw_inputs['group_description']}"
+
+        if raw_inputs["prompt_text"]:
+            system_prompt += f"\n문장을 작성할 때 다음과 같은 스타일의 문체를 사용합니다:\n{raw_inputs['prompt_text']}"
+
+        if raw_inputs["body"]:
+            system_prompt += f"\n사용자는 다음 내용의 메일에 답장하고 있습니다:\n{raw_inputs["body"]}"
+
+        if raw_inputs["analysis"]:
+            system_prompt += f"\n사용자가 수신자들에게 작성한 메일을 분석한 내용은 다음과 같습니다:\n{raw_inputs["analysis"]}"
+
+        system_prompt += """\n\n
         user: 안녕하세요 오늘 회의 진행을 맡은 홍길동 대리입니다.
         output: {"output": "오늘 회의 자료를 준비하면서"}
 

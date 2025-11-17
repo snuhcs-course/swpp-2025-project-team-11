@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -31,22 +30,50 @@ class MailComposeViewModel(
     val ui: StateFlow<MailComposeUiState> = _ui
 
     private val bodyBuffer = StringBuilder()
-    private var throttleJob: Job? = null
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
 
+    // Undo/redo snapshots
+    private var undoSnapshot: UndoSnapshot? = null
+    private var redoSnapshot: UndoSnapshot? = null
+
+    data class UndoSnapshot(
+        val subject: String,
+        val bodyHtml: String
+    )
+
+    fun saveUndoSnapshot(subject: String, bodyHtml: String) {
+        undoSnapshot = UndoSnapshot(subject, bodyHtml)
+        redoSnapshot = null
+    }
+
+    fun undo(currentSubject: String? = null, currentBodyHtml: String? = null): UndoSnapshot? {
+        val snapshot = undoSnapshot ?: return null
+        if (currentSubject != null && currentBodyHtml != null) {
+            redoSnapshot = UndoSnapshot(currentSubject, currentBodyHtml)
+        }
+        undoSnapshot = null
+        return snapshot
+    }
+
+    fun redo(currentSubject: String? = null, currentBodyHtml: String? = null): UndoSnapshot? {
+        val snapshot = redoSnapshot ?: return null
+        if (currentSubject != null && currentBodyHtml != null) {
+            undoSnapshot = UndoSnapshot(currentSubject, currentBodyHtml)
+        }
+        redoSnapshot = null
+        return snapshot
+    }
+
     fun startStreaming(payload: JSONObject) {
         bodyBuffer.clear()
-        _ui.value = MailComposeUiState(isStreaming = true)
-
-        // 80ms 스로틀로 화면 반영, 깜빡임 방지
-        throttleJob?.cancel()
-        throttleJob = viewModelScope.launch {
-            while (isActive) {
-                delay(80)
-                val text = bodyBuffer.toString().replace("\n", "<br>")
-                _ui.update { it.copy(bodyRendered = text) }
-            }
+        _ui.update {
+            it.copy(
+                isStreaming = true,
+                bodyRendered = "",
+                error = null,
+                suggestionText = ""
+            )
         }
 
         api.start(
@@ -58,11 +85,10 @@ class MailComposeViewModel(
                 bodyBuffer.append(text)
             },
             onDone = {
-                throttleJob?.cancel()
-                _ui.update { it.copy(isStreaming = false, bodyRendered = bodyBuffer.toString().replace("\n", "<br>")) }
+                val finalText = bodyBuffer.toString().replace("\n", "<br>")
+                _ui.update { it.copy(isStreaming = false, bodyRendered = finalText) }
             },
             onError = { msg ->
-                throttleJob?.cancel()
                 _ui.update { it.copy(isStreaming = false, error = msg) }
             }
         )
@@ -70,7 +96,6 @@ class MailComposeViewModel(
 
     fun stopStreaming() {
         api.stop()
-        throttleJob?.cancel()
         _ui.update { it.copy(isStreaming = false) }
     }
 
@@ -94,15 +119,17 @@ class MailComposeViewModel(
                             val data = json.optJSONObject("data")
                             val rawText = data?.optString("text") ?: ""
 
-                            // GPU sends word by word, append with space
                             if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
                                 suggestionBuffer.append(" ")
                             }
                             suggestionBuffer.append(rawText)
 
-                            // Parse the entire buffer
                             val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
-                            _ui.update { it.copy(suggestionText = parsed) }
+                            val singleSentence = extractFirstSentence(parsed)
+                            _ui.update { it.copy(suggestionText = singleSentence) }
+                        }
+                        "gpu.done" -> {
+                            suggestionBuffer.clear()
                         }
                     }
                 } catch (e: Exception) {
@@ -128,9 +155,10 @@ class MailComposeViewModel(
         if (!_ui.value.isRealtimeEnabled) return
 
         debounceJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
         debounceJob = viewModelScope.launch {
             delay(500)
-            suggestionBuffer.clear()
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
                 text = currentText,
@@ -167,6 +195,27 @@ class MailComposeViewModel(
         if (suggestion.isNotEmpty()) {
             suggestionBuffer.clear()
             _ui.update { it.copy(suggestionText = "") }
+            debounceJob?.cancel()
+        }
+    }
+
+    /**
+     * Request new suggestion immediately (for tab completion)
+     */
+    fun requestImmediateSuggestion(currentText: String) {
+        if (!_ui.value.isRealtimeEnabled) return
+
+        debounceJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
+
+        viewModelScope.launch {
+            delay(100) // Short delay to let the UI update
+            wsClient?.sendMessage(
+                systemPrompt = "메일 초안 작성",
+                text = currentText,
+                maxTokens = 50
+            )
         }
     }
 
@@ -186,6 +235,20 @@ class MailComposeViewModel(
             // If parsing fails, return original text
             text
         }
+    }
+
+    private fun extractFirstSentence(text: String): String {
+        val normalized = text
+            .replace("\n", " ")
+            .replace("\\s+".toRegex(), " ")
+            .trim()
+
+        if (normalized.isEmpty()) return ""
+
+        val endIndex = normalized.indexOfFirst { it == '.' || it == '!' || it == '?' }
+        val cutoff = if (endIndex == -1) normalized.length else endIndex + 1
+
+        return normalized.substring(0, cutoff).trim()
     }
 
     override fun onCleared() {

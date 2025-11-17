@@ -44,8 +44,22 @@ interface ContactDao {
     fun observeByGroupIdWithContext(groupId: Long): Flow<List<ContactWithContext>>
 
     @Transaction
+    @Query("SELECT * FROM contacts")
+    fun observeAllWithGroup(): Flow<List<ContactWithGroupAndContext>>
+
+    @Transaction
     @Query("SELECT * FROM contacts WHERE id = :contactId")
     fun observeByIdWithGroup(contactId: Long): Flow<ContactWithGroupAndContext?>
+
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM contacts
+        WHERE LOWER(name) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(email) LIKE '%' || LOWER(:query) || '%'
+        """
+    )
+    fun searchByNameOrEmail(query: String): Flow<List<ContactWithContext>>
 
     @Query("DELETE FROM contacts")
     suspend fun deleteAllContacts()

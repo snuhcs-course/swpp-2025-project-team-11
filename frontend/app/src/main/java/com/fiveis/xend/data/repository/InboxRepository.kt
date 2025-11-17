@@ -2,11 +2,15 @@ package com.fiveis.xend.data.repository
 
 import android.util.Log
 import com.fiveis.xend.data.database.EmailDao
+import com.fiveis.xend.data.model.AttachmentAnalysisRequest
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.network.MailApiService
 import kotlinx.coroutines.flow.Flow
+import okhttp3.ResponseBody
 import retrofit2.Response
 
 class InboxRepository(
@@ -14,8 +18,8 @@ class InboxRepository(
     private val emailDao: EmailDao
 ) {
     fun getCachedEmails(): Flow<List<EmailItem>> {
-        return emailDao.getAllEmails().also {
-            Log.d("InboxRepository", "getCachedEmails Flow created")
+        return emailDao.getEmailsByLabel("INBOX").also {
+            Log.d("InboxRepository", "getCachedEmails Flow created for INBOX")
         }
     }
 
@@ -94,7 +98,14 @@ class InboxRepository(
                     emailDao.insertEmails(newEmails)
                 }
 
-                pageToken = mailListResponse.nextPageToken
+                val previousToken = pageToken
+                val nextToken = mailListResponse.nextPageToken?.takeIf { it.isNotBlank() }
+                if (nextToken != null && nextToken == previousToken) {
+                    Log.d("InboxRepository", "Received identical nextPageToken; stopping pagination to avoid loop")
+                    break
+                }
+
+                pageToken = nextToken
                 Log.d("InboxRepository", "nextPageToken: $pageToken")
             } while (pageToken != null)
 
@@ -113,6 +124,30 @@ class InboxRepository(
         return mailApiService.getMail(messageId)
     }
 
+    suspend fun downloadAttachment(
+        messageId: String,
+        attachmentId: String,
+        filename: String,
+        mimeType: String
+    ): Response<ResponseBody> {
+        return mailApiService.downloadAttachment(messageId, attachmentId, filename, mimeType)
+    }
+
+    suspend fun analyzeAttachment(
+        messageId: String,
+        attachmentId: String,
+        filename: String,
+        mimeType: String
+    ): Response<AttachmentAnalysisResponse> {
+        val request = AttachmentAnalysisRequest(
+            messageId = messageId,
+            attachmentId = attachmentId,
+            filename = filename,
+            mimeType = mimeType
+        )
+        return mailApiService.analyzeAttachment(request)
+    }
+
     suspend fun updateReadStatus(emailId: String, isUnread: Boolean) {
         emailDao.updateReadStatus(emailId, isUnread)
     }
@@ -122,5 +157,26 @@ class InboxRepository(
         emailDao.insertEmails(emails)
         val count = emailDao.getEmailCount()
         Log.d("InboxRepository", "saveEmailsToCache: total emails in DB = $count")
+    }
+
+    // Drafts operations
+    suspend fun saveDraft(draft: DraftItem): Long {
+        return emailDao.insertDraft(draft)
+    }
+
+    suspend fun getDraft(id: Long): DraftItem? {
+        return emailDao.getDraft(id)
+    }
+
+    suspend fun getDraftByRecipient(recipientEmail: String): DraftItem? {
+        return emailDao.getDraftByRecipient(recipientEmail)
+    }
+
+    fun getAllDrafts(): Flow<List<DraftItem>> {
+        return emailDao.getAllDrafts()
+    }
+
+    suspend fun deleteDraft(id: Long) {
+        emailDao.deleteDraft(id)
     }
 }

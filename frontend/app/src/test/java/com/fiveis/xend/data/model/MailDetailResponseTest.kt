@@ -5,68 +5,82 @@ import org.junit.Test
 
 class MailDetailResponseTest {
 
+    private fun attachmentList() = listOf(
+        Attachment(
+            attachmentId = "att-1",
+            filename = "report.pdf",
+            mimeType = "application/pdf",
+            size = 1024
+        )
+    )
+
     @Test
     fun create_mail_detail_response_with_all_fields() {
         val response = MailDetailResponse(
             id = "mail-123",
-            thread_id = "thread-456",
+            threadId = "thread-456",
             subject = "Meeting Tomorrow",
-            from_email = "sender@example.com",
-            to = "recipient@example.com",
+            fromEmail = "sender@example.com",
+            toEmail = "recipient@example.com",
+            to = "Recipient <recipient@example.com>",
             date = "2025-10-30",
-            date_raw = "1698624000",
+            dateRaw = "1698624000",
             body = "Let's have a meeting tomorrow at 10 AM.",
             snippet = "Let's have a meeting tomorrow...",
-            is_unread = true,
-            label_ids = listOf("INBOX", "IMPORTANT")
+            isUnread = true,
+            labelIds = listOf("INBOX", "IMPORTANT"),
+            attachments = attachmentList()
         )
 
         assertEquals("mail-123", response.id)
-        assertEquals("thread-456", response.thread_id)
+        assertEquals("thread-456", response.threadId)
         assertEquals("Meeting Tomorrow", response.subject)
-        assertEquals("sender@example.com", response.from_email)
-        assertEquals("recipient@example.com", response.to)
+        assertEquals("sender@example.com", response.fromEmail)
+        assertEquals("recipient@example.com", response.toEmail)
         assertEquals("2025-10-30", response.date)
-        assertEquals("1698624000", response.date_raw)
+        assertEquals("1698624000", response.dateRaw)
         assertEquals("Let's have a meeting tomorrow at 10 AM.", response.body)
         assertEquals("Let's have a meeting tomorrow...", response.snippet)
-        assertTrue(response.is_unread)
-        assertEquals(2, response.label_ids.size)
+        assertTrue(response.isUnread)
+        assertEquals(2, response.labelIds.size)
+        assertEquals(1, response.attachments.size)
     }
 
     @Test
     fun create_mail_detail_response_with_read_status() {
         val response = MailDetailResponse(
             id = "mail-789",
-            thread_id = "thread-abc",
+            threadId = "thread-abc",
             subject = "Read Email",
-            from_email = "from@test.com",
+            fromEmail = "from@test.com",
+            toEmail = "to@test.com",
             to = "to@test.com",
             date = "2025-10-29",
-            date_raw = "1698537600",
+            dateRaw = "1698537600",
             body = "This email has been read.",
             snippet = "This email has been read.",
-            is_unread = false,
-            label_ids = listOf("INBOX")
+            isUnread = false,
+            labelIds = listOf("INBOX")
         )
 
-        assertFalse(response.is_unread)
+        assertFalse(response.isUnread)
     }
 
     @Test
     fun mail_detail_response_copy_updates_subject() {
         val original = MailDetailResponse(
             id = "id",
-            thread_id = "thread",
+            threadId = "thread",
             subject = "Original Subject",
-            from_email = "from@test.com",
+            fromEmail = "from@test.com",
+            toEmail = "to@test.com",
             to = "to@test.com",
             date = "2025-10-30",
-            date_raw = "1698624000",
+            dateRaw = "1698624000",
             body = "Body",
             snippet = "Snippet",
-            is_unread = true,
-            label_ids = emptyList()
+            isUnread = true,
+            labelIds = emptyList()
         )
 
         val updated = original.copy(subject = "Updated Subject")
@@ -79,31 +93,21 @@ class MailDetailResponseTest {
     fun mail_detail_responses_with_same_values_are_equal() {
         val response1 = MailDetailResponse(
             id = "same-id",
-            thread_id = "same-thread",
+            threadId = "same-thread",
             subject = "Same Subject",
-            from_email = "same@test.com",
+            fromEmail = "same@test.com",
+            toEmail = "same@test.com",
             to = "same@test.com",
             date = "2025-10-30",
-            date_raw = "1698624000",
+            dateRaw = "1698624000",
             body = "Same body",
             snippet = "Same snippet",
-            is_unread = true,
-            label_ids = listOf("INBOX")
+            isUnread = true,
+            labelIds = listOf("INBOX"),
+            attachments = attachmentList()
         )
 
-        val response2 = MailDetailResponse(
-            id = "same-id",
-            thread_id = "same-thread",
-            subject = "Same Subject",
-            from_email = "same@test.com",
-            to = "same@test.com",
-            date = "2025-10-30",
-            date_raw = "1698624000",
-            body = "Same body",
-            snippet = "Same snippet",
-            is_unread = true,
-            label_ids = listOf("INBOX")
-        )
+        val response2 = response1.copy()
 
         assertEquals(response1, response2)
         assertEquals(response1.hashCode(), response2.hashCode())
@@ -113,31 +117,20 @@ class MailDetailResponseTest {
     fun mail_detail_responses_with_different_ids_are_not_equal() {
         val response1 = MailDetailResponse(
             id = "id1",
-            thread_id = "thread",
+            threadId = "thread",
             subject = "Subject",
-            from_email = "from@test.com",
+            fromEmail = "from@test.com",
+            toEmail = "to@test.com",
             to = "to@test.com",
             date = "2025-10-30",
-            date_raw = "1698624000",
+            dateRaw = "1698624000",
             body = "Body",
             snippet = "Snippet",
-            is_unread = true,
-            label_ids = emptyList()
+            isUnread = true,
+            labelIds = emptyList()
         )
 
-        val response2 = MailDetailResponse(
-            id = "id2",
-            thread_id = "thread",
-            subject = "Subject",
-            from_email = "from@test.com",
-            to = "to@test.com",
-            date = "2025-10-30",
-            date_raw = "1698624000",
-            body = "Body",
-            snippet = "Snippet",
-            is_unread = true,
-            label_ids = emptyList()
-        )
+        val response2 = response1.copy(id = "id2")
 
         assertNotEquals(response1, response2)
     }
@@ -146,16 +139,17 @@ class MailDetailResponseTest {
     fun mail_detail_response_to_string_contains_subject() {
         val response = MailDetailResponse(
             id = "id",
-            thread_id = "thread",
+            threadId = "thread",
             subject = "Important Email",
-            from_email = "from@test.com",
+            fromEmail = "from@test.com",
+            toEmail = "to@test.com",
             to = "to@test.com",
             date = "2025-10-30",
-            date_raw = "1698624000",
+            dateRaw = "1698624000",
             body = "Body",
             snippet = "Snippet",
-            is_unread = true,
-            label_ids = emptyList()
+            isUnread = true,
+            labelIds = emptyList()
         )
 
         val toString = response.toString()
@@ -166,18 +160,19 @@ class MailDetailResponseTest {
     fun mail_detail_response_with_empty_label_ids() {
         val response = MailDetailResponse(
             id = "id",
-            thread_id = "thread",
+            threadId = "thread",
             subject = "Subject",
-            from_email = "from@test.com",
+            fromEmail = "from@test.com",
+            toEmail = "to@test.com",
             to = "to@test.com",
             date = "2025-10-30",
-            date_raw = "1698624000",
+            dateRaw = "1698624000",
             body = "Body",
             snippet = "Snippet",
-            is_unread = false,
-            label_ids = emptyList()
+            isUnread = false,
+            labelIds = emptyList()
         )
 
-        assertTrue(response.label_ids.isEmpty())
+        assertTrue(response.labelIds.isEmpty())
     }
 }

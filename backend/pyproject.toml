@@ -22,6 +22,10 @@ jinja2 = "^3.1.6"
 coverage = "^7.11.0"
 celery = "^5.5.3"
 flower = "^2.0.1"
+pandas = "^2.3.3"
+pdfplumber = "^0.11.7"
+docx2txt = "^0.9"
+openpyxl = "^3.1.5"
 
 
 [tool.poetry.group.django.dependencies]
@@ -29,23 +33,22 @@ django = "^5.2.6"
 django-environ = "^0.12.0"
 djangorestframework = "^3.16.1"
 djangorestframework-simplejwt = "^5.5.1"
-drf-spectacular = "^0.28.0"
+drf-spectacular = "^0.29.0"
 django-redis = "^6.0.0"
 django-celery-beat = "^2.8.1"
 django-celery-results = "^2.6.0"
 
 
 [tool.poetry.group.langchain.dependencies]
-langchain-core = "^0.3.77"
-langchain-openai = "^0.3.33"
+langchain-core = "^1.0.3"
+langchain-openai = "^1.0.2"
+langgraph = "^1.0.2"
+langchain-community = "^0.4.1"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-
-
 
 
 

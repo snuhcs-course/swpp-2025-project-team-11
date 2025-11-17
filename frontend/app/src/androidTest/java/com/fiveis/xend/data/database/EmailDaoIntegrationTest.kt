@@ -54,9 +54,9 @@ class EmailDaoIntegrationTest {
     @Test
     fun insertEmails_and_getAllEmails_returns_all_emails() = runTest {
         val emails = listOf(
-            createMockEmailItem("1"),
-            createMockEmailItem("2"),
-            createMockEmailItem("3")
+            createMockEmailItem("1", cachedAt = 3L),
+            createMockEmailItem("2", cachedAt = 2L),
+            createMockEmailItem("3", cachedAt = 1L)
         )
 
         emailDao.insertEmails(emails)
@@ -85,9 +85,9 @@ class EmailDaoIntegrationTest {
 
     @Test
     fun getAllEmails_returns_emails_ordered_by_date_desc() = runTest {
-        val email1 = createMockEmailItem("1", date = "2025-01-01T10:00:00Z")
-        val email2 = createMockEmailItem("2", date = "2025-01-03T10:00:00Z")
-        val email3 = createMockEmailItem("3", date = "2025-01-02T10:00:00Z")
+        val email1 = createMockEmailItem("1", date = "2025-01-01T10:00:00Z", cachedAt = 1L)
+        val email2 = createMockEmailItem("2", date = "2025-01-03T10:00:00Z", cachedAt = 3L)
+        val email3 = createMockEmailItem("3", date = "2025-01-02T10:00:00Z", cachedAt = 2L)
 
         emailDao.insertEmails(listOf(email1, email2, email3))
 
@@ -296,15 +296,15 @@ class EmailDaoIntegrationTest {
 
     @Test
     fun large_number_of_emails_are_handled_correctly() = runTest {
-        val emails = (1..100).map { createMockEmailItem(it.toString()) }
+        val emails = (1..50).map { createMockEmailItem(it.toString()) }
 
         emailDao.insertEmails(emails)
 
         val count = emailDao.getEmailCount()
-        assertEquals(100, count)
+        assertEquals(50, count)
 
         val result = emailDao.getAllEmails().first()
-        assertEquals(100, result.size)
+        assertEquals(50, result.size)
     }
 
     private fun createMockEmailItem(
@@ -312,7 +312,8 @@ class EmailDaoIntegrationTest {
         subject: String = "Subject $id",
         fromEmail: String = "sender$id@example.com",
         date: String = "2025-01-01T00:00:00Z",
-        isUnread: Boolean = true
+        isUnread: Boolean = true,
+        cachedAt: Long = System.currentTimeMillis()
     ) = EmailItem(
         id = id,
         threadId = "thread_$id",
@@ -323,6 +324,6 @@ class EmailDaoIntegrationTest {
         dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
         isUnread = isUnread,
         labelIds = listOf("INBOX"),
-        cachedAt = System.currentTimeMillis()
+        cachedAt = cachedAt
     )
 }

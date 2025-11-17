@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.contactbook
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -12,9 +13,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.data.repository.ContactBookRepository
+import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.theme.StableColor
 
 class ContactDetailActivity : ComponentActivity() {
@@ -47,7 +53,19 @@ class ContactDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val contactColor = StableColor.forId(contactId)
 
-                val vm: ContactDetailViewModel = viewModel()
+                val factory = remember {
+                    object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ContactDetailViewModel(
+                                application,
+                                ContactBookRepository(applicationContext)
+                            ) as T
+                        }
+                    }
+                }
+
+                val vm: ContactDetailViewModel = viewModel(factory = factory)
                 LaunchedEffect(contactId) { vm.load(contactId) }
                 val state by vm.uiState.collectAsState()
 
@@ -61,11 +79,24 @@ class ContactDetailActivity : ComponentActivity() {
                     onRefresh = { vm.load(contactId, force = true) },
                     onOpenGroup = { groupId ->
                         startActivity(
-                            android.content.Intent(this, GroupDetailActivity::class.java)
+                            Intent(this, GroupDetailActivity::class.java)
                                 .putExtra(GroupDetailActivity.EXTRA_GROUP_ID, groupId)
                         )
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-                    }
+                    },
+                    onComposeMail = { contact ->
+                        startActivity(
+                            Intent(this, MailComposeActivity::class.java)
+                                .putExtra(MailComposeActivity.EXTRA_PREFILL_CONTACT_ID, contact.id)
+                                .putExtra(MailComposeActivity.EXTRA_PREFILL_CONTACT_NAME, contact.name)
+                                .putExtra(MailComposeActivity.EXTRA_PREFILL_CONTACT_EMAIL, contact.email)
+                        )
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
+                    onUpdateContact = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                        vm.updateContact(name, email, senderRole, recipientRole, personalPrompt, groupId)
+                    },
+                    onClearEditError = { vm.clearUpdateError() }
                 )
 
                 if (state.isLoading && state.contact == null) {

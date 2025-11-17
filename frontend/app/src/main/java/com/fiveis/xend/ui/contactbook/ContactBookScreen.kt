@@ -9,29 +9,35 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +50,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -82,9 +90,14 @@ fun ContactBookScreen(
     onEditGroupClick: (Group) -> Unit = {},
     onDeleteGroupClick: (Group) -> Unit = {},
     onEditContactClick: (Contact) -> Unit = {},
-    onDeleteContactClick: (Contact) -> Unit = {}
+    onDeleteContactClick: (Contact) -> Unit = {},
+    onSearchIconClick: () -> Unit = {},
+    onSearchClose: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {}
 ) {
     val selectedTab = uiState.selectedTab
+    val sortedGroups = remember(uiState.groups) { uiState.groups.sortedBy { it.name } }
+    val sortedContacts = remember(uiState.contacts) { uiState.contacts.sortedBy { it.name } }
 
     val refreshing = uiState.isLoading
     val pullState = rememberPullRefreshState(
@@ -93,9 +106,20 @@ fun ContactBookScreen(
     )
 
     Box(modifier.fillMaxSize()) {
-        if (selectedTab == ContactBookTab.Groups) {
+        if (uiState.isSearchMode) {
+            ContactSearchContent(
+                query = uiState.searchQuery,
+                results = uiState.searchResults,
+                onQueryChange = onSearchQueryChange,
+                onClose = onSearchClose,
+                onContactClick = onContactClick,
+                onEditContactClick = onEditContactClick,
+                onDeleteContactClick = onDeleteContactClick
+            )
+        } else if (selectedTab == ContactBookTab.Groups) {
             Scaffold(
-                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
+                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
+                contentWindowInsets = WindowInsets(0, 0, 0, 0)
             ) { padding ->
                 Column(
                     modifier = Modifier
@@ -107,11 +131,11 @@ fun ContactBookScreen(
                     TopAppBar(
                         title = { Text("연락처", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
                         actions = {
-                            IconButton(onClick = { /* 연락처 검색 */ }) {
+                            IconButton(onClick = onSearchIconClick) {
                                 Icon(Icons.Default.Search, contentDescription = "Search")
                             }
                             IconButton(onClick = onAddContactClick) {
-                                Icon(Icons.Default.Add, contentDescription = "Add")
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Add Contact")
                             }
                         }
                     )
@@ -139,9 +163,9 @@ fun ContactBookScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(uiState.groups.size) { index ->
+                        items(sortedGroups.size) { index ->
                             GroupCard(
-                                group = uiState.groups[index],
+                                group = sortedGroups[index],
                                 onClick = onGroupClick,
                                 onEdit = onEditGroupClick,
                                 onDelete = onDeleteGroupClick
@@ -157,7 +181,8 @@ fun ContactBookScreen(
             }
         } else {
             Scaffold(
-                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) }
+                bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
+                contentWindowInsets = WindowInsets(0, 0, 0, 0)
             ) { padding ->
                 Column(
                     modifier = Modifier
@@ -169,11 +194,11 @@ fun ContactBookScreen(
                     TopAppBar(
                         title = { Text("연락처", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
                         actions = {
-                            IconButton(onClick = { /* 연락처 검색 */ }) {
+                            IconButton(onClick = onSearchIconClick) {
                                 Icon(Icons.Default.Search, contentDescription = "Search")
                             }
                             IconButton(onClick = onAddContactClick) {
-                                Icon(Icons.Default.Add, contentDescription = "Add")
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Add Contact")
                             }
                         }
                     )
@@ -208,18 +233,18 @@ fun ContactBookScreen(
                         Spacer(Modifier.weight(1f))
                         Text("${uiState.contacts.size}명", color = Color.Gray)
                     }
-                    Divider()
+                    HorizontalDivider()
 
                     // 연락처 리스트
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        items(uiState.contacts.size) { index ->
+                        items(sortedContacts.size) { index ->
                             ContactRow(
-                                contact = uiState.contacts[index],
-                                subtitle = uiState.contacts[index].email,
-                                color = StableColor.forId(uiState.contacts[index].id),
+                                contact = sortedContacts[index],
+                                subtitle = sortedContacts[index].email,
+                                color = StableColor.forId(sortedContacts[index].id),
                                 onClick = onContactClick,
                                 onEdit = onEditContactClick,
                                 onDelete = onDeleteContactClick
@@ -234,13 +259,15 @@ fun ContactBookScreen(
             }
         }
 
-        PullRefreshIndicator(
-            refreshing = refreshing,
-            state = pullState,
-            modifier = Modifier
-                .align(Alignment.TopCenter),
-            contentColor = colorScheme.primary
-        )
+        if (!uiState.isSearchMode) {
+            PullRefreshIndicator(
+                refreshing = refreshing,
+                state = pullState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter),
+                contentColor = colorScheme.primary
+            )
+        }
     }
 }
 
@@ -260,12 +287,172 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ContactSearchContent(
+    query: String,
+    results: List<Contact>,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit,
+    onContactClick: (Contact) -> Unit,
+    onEditContactClick: (Contact) -> Unit,
+    onDeleteContactClick: (Contact) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundLight)
+    ) {
+        ContactSearchBar(
+            query = query,
+            onQueryChange = onQueryChange,
+            onClose = onClose
+        )
+        Spacer(Modifier.height(8.dp))
+
+        when {
+            query.isBlank() -> ContactSearchHint()
+            results.isEmpty() -> ContactSearchEmptyState(query)
+            else -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("검색 결과", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("${results.size}명", color = Color.Gray)
+                }
+                HorizontalDivider()
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    items(results, key = { it.id }) { contact ->
+                        ContactRow(
+                            contact = contact,
+                            subtitle = contact.email,
+                            color = StableColor.forId(contact.id),
+                            onClick = onContactClick,
+                            onEdit = onEditContactClick,
+                            onDelete = onDeleteContactClick
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactSearchBar(query: String, onQueryChange: (String) -> Unit, onClose: () -> Unit) {
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(
+                top = statusBarPadding.calculateTopPadding() + 8.dp,
+                bottom = 8.dp,
+                start = 8.dp,
+                end = 8.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "검색 닫기",
+                tint = Color(0xFF5F6368)
+            )
+        }
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+            placeholder = {
+                Text("연락처 검색...", color = Color(0xFF80868B), fontSize = 16.sp)
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = Color(0xFF5F6368),
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "검색어 지우기",
+                            tint = Color(0xFF5F6368),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color(0xFFF1F3F4),
+                unfocusedContainerColor = Color(0xFFF1F3F4),
+                disabledContainerColor = Color(0xFFF1F3F4),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+}
+
+@Composable
+private fun ContactSearchHint() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = Color(0xFFDADCE0),
+            modifier = Modifier.size(64.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+        Text("이름이나 이메일 주소로 검색하세요", color = Color(0xFF5F6368))
+    }
+}
+
+@Composable
+private fun ContactSearchEmptyState(query: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("검색 결과가 없습니다", color = Color(0xFF5F6368), fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(8.dp))
+        Text("\"$query\"에 해당하는 연락처가 없어요", color = Color(0xFF80868B))
+    }
+}
+
 @Composable
 fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = {}, onDelete: (Group) -> Unit = {}) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val groupColor = StableColor.forId(group.id)
+    val sortedMembers = remember(group.members) { group.members.sortedBy { it.name } }
 
     Surface(
         color = groupColor.copy(alpha = 0.1f),
@@ -281,14 +468,23 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(groupColor)
-                )
+                        .background(groupColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (group.emoji != null) {
+                        Text(
+                            text = group.emoji,
+                            fontSize = 20.sp
+                        )
+                    }
+                }
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
                     Text(
                         group.description ?: "",
-                        color = Color.Gray,
+                        modifier = Modifier.width(240.dp),
+                        color = Color.DarkGray,
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -305,12 +501,13 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 그룹에 속한 연락처 목록
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    group.members.take(3).forEach {
-                        MemberCircle(it.name.first().toString(), groupColor)
+                    sortedMembers.take(3).forEach {
+                        MemberCircle(it.name.first().toString(), StableColor.forId(it.id))
                     }
-                    if (group.members.size > 3) {
-                        MemberCircle("+${group.members.size - 3}", Color.LightGray)
+                    if (sortedMembers.size > 3) {
+                        MemberCircle("+${sortedMembers.size - 3}", Color.Gray)
                     }
                 }
 
@@ -332,16 +529,22 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
+//                        DropdownMenuItem(
+//                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+//                            text = { Text("수정") },
+//                            onClick = {
+//                                menuExpanded = false
+//                                onEdit(group)
+//                            }
+//                        )
                         DropdownMenuItem(
-                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                            text = { Text("수정") },
-                            onClick = {
-                                menuExpanded = false
-                                onEdit(group)
-                            }
-                        )
-                        DropdownMenuItem(
-                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Outlined.Delete,
+                                    contentDescription = null,
+                                    tint = colorScheme.error
+                                )
+                            },
                             text = { Text("삭제", color = Red60) },
                             onClick = {
                                 menuExpanded = false
@@ -395,7 +598,10 @@ fun QuickActions(onAddGroupClick: () -> Unit) {
                 onClick = onAddGroupClick,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
-            ) { Text("+ 새 그룹") }
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "새 그룹")
+                Text(" 새 그룹")
+            }
         }
     }
 }
@@ -405,8 +611,8 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(67.dp)
             .background(Color.White)
+            .navigationBarsPadding()
     ) {
         HorizontalDivider(
             modifier = Modifier,
@@ -417,7 +623,7 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(67.dp)
                 .padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -425,17 +631,17 @@ fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.clickable { onSelect("inbox") }
+                modifier = Modifier.clickable { onSelect("mail") }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Email,
-                    contentDescription = "받은메일함",
-                    tint = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    contentDescription = "메일함",
+                    tint = if (selected == "mail") Color(0xFF1A73E8) else Color(0xFF1E293B),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "받은메일",
-                    color = if (selected == "inbox") Color(0xFF1A73E8) else Color(0xFF1E293B),
+                    text = "메일함",
+                    color = if (selected == "mail") Color(0xFF1A73E8) else Color(0xFF1E293B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -552,16 +758,22 @@ private fun ContactRow(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
             ) {
+//                DropdownMenuItem(
+//                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+//                    text = { Text("수정") },
+//                    onClick = {
+//                        menuExpanded = false
+//                        onEdit(contact)
+//                    }
+//                )
                 DropdownMenuItem(
-                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                    text = { Text("수정") },
-                    onClick = {
-                        menuExpanded = false
-                        onEdit(contact)
-                    }
-                )
-                DropdownMenuItem(
-                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = null,
+                            tint = colorScheme.error
+                        )
+                    },
                     text = { Text("삭제", color = Red60) },
                     onClick = {
                         menuExpanded = false
@@ -610,28 +822,30 @@ private fun MonogramAvatar(letter: String, bg: Color) {
 fun ContactScreenPreview() {
     val sampleGroups = listOf(
         Group(
-            1,
-            "VIP",
-            "중요한 고객과 상급자들",
-            emptyList(),
-            listOf(
+            id = 1,
+            name = "VIP",
+            description = "중요한 고객과 상급자들",
+            emoji = "⭐",
+            options = emptyList(),
+            members = listOf(
                 Contact(0, null, name = "김철수", email = "kim@snu.ac.kr"),
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
-            null,
-            null
+            createdAt = null,
+            updatedAt = null
         ),
         Group(
-            2,
-            "업무 동료",
-            "같은 회사 팀원들과 협업 파트너",
-            emptyList(),
-            listOf(
+            id = 2,
+            name = "업무 동료",
+            description = "같은 회사 팀원들과 협업 파트너",
+            emoji = "💼",
+            options = emptyList(),
+            members = listOf(
                 Contact(0, null, name = "김철수", email = "kim@snu.ac.kr"),
                 Contact(0, null, name = "최철수", email = "choi@snu.ac.kr")
             ),
-            null,
-            null
+            createdAt = null,
+            updatedAt = null
         )
     )
     ContactBookScreen(

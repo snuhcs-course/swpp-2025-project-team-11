@@ -7,5 +7,6 @@ import kotlinx.serialization.Serializable
 data class AddGroupRequest(
     val name: String,
     val description: String,
+    val emoji: String? = null,
     @SerialName("option_ids") val optionIds: List<Long> = emptyList()
 )

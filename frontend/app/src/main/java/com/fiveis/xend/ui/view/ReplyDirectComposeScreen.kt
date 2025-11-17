@@ -6,16 +6,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,25 +28,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
-import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatColorText
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.FormatStrikethrough
-import androidx.compose.material.icons.filled.FormatUnderlined
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,29 +55,32 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.ui.compose.TemplateTIcon
+import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
+import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.XendRichEditorState
+import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
@@ -96,8 +91,7 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.UndoBorder
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,34 +104,36 @@ fun ReplyDirectComposeScreen(
     onSend: (String) -> Unit,
     onTemplateClick: () -> Unit = {},
     onSubjectChange: (String) -> Unit = {},
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState = rememberRichTextState(),
+    editorState: XendRichEditorState = rememberXendRichEditorState(),
     senderEmail: String = "",
     date: String = "",
     originalBody: String = "",
-    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState()
+    sendUiState: com.fiveis.xend.ui.compose.SendUiState = com.fiveis.xend.ui.compose.SendUiState(),
+    // AI 관련 파라미터
+    isStreaming: Boolean = false,
+    suggestionText: String = "",
+    aiRealtime: Boolean = true,
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
+    onAiComplete: () -> Unit = {},
+    onStopStreaming: () -> Unit = {},
+    onAcceptSuggestion: () -> Unit = {},
+    onAiRealtimeToggle: (Boolean) -> Unit = {},
+    bannerState: com.fiveis.xend.ui.compose.BannerState? = null,
+    onDismissBanner: () -> Unit = {},
+    showInlineSwipeBar: Boolean = true,
+    canUndo: Boolean = false,
+    canRedo: Boolean = false,
+    showAddContactButton: Boolean = false,
+    onAddContactClick: (() -> Unit)? = null
 ) {
-    var isRealtimeAiOn by rememberSaveable { mutableStateOf(true) }
-    var isStreaming by rememberSaveable { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
     var isMailContentExpanded by remember { mutableStateOf(false) }
-
-    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
-
-    // 전송 상태 처리
-    LaunchedEffect(sendUiState) {
-        when {
-            sendUiState.lastSuccessMsg != null -> {
-                snackbarHostState.showSnackbar(sendUiState.lastSuccessMsg)
-            }
-            sendUiState.error != null -> {
-                snackbarHostState.showSnackbar("전송 실패: ${sendUiState.error}")
-            }
-        }
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = ComposeBackground,
-        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
             TopAppBar(
@@ -174,7 +170,7 @@ fun ReplyDirectComposeScreen(
                         border = null,
                         modifier = Modifier.padding(end = 2.dp)
                     ) {
-                        Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
+                        Icon(TemplateTIcon, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     DirectComposeToolbarIconButton(
@@ -188,7 +184,7 @@ fun ReplyDirectComposeScreen(
                     DirectComposeToolbarIconButton(
                         onClick = {
                             // HTML body를 전달하여 전송
-                            onSend(richTextState.toHtml())
+                            onSend(editorState.getHtml())
                         },
                         border = null,
                         contentTint = Blue60,
@@ -215,18 +211,29 @@ fun ReplyDirectComposeScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
                 .background(ComposeBackground)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .imePadding()
         ) {
-            // Action Row (실행취소 + AI 완성)
-            DirectComposeActionRow(
-                isStreaming = isStreaming,
-                onUndo = { /* TODO */ },
-                onAiComplete = { /* TODO */ },
-                onStopStreaming = { isStreaming = false }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
+            // Banner for send results
+            androidx.compose.animation.AnimatedVisibility(visible = bannerState != null) {
+                bannerState?.let {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        com.fiveis.xend.ui.compose.Banner(
+                            message = it.message,
+                            type = it.type,
+                            onDismiss = onDismissBanner,
+                            actionText = it.actionText,
+                            onActionClick = it.onActionClick,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(bottom = 8.dp)
+                        )
+                    }
+                }
+            }
 
             // 발신자 정보 섹션 (접기/펼치기)
             if (senderEmail.isNotEmpty()) {
@@ -253,33 +260,56 @@ fun ReplyDirectComposeScreen(
             RecipientInfoSection(
                 recipientName = recipientName,
                 recipientEmail = recipientEmail,
-                hasGroups = groups.isNotEmpty()
+                groupNames = groups,
+                showAddContactButton = showAddContactButton,
+                onAddContactClick = onAddContactClick
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // 제목 섹션
-            SubjectSectionHeader()
+            SubjectControlRow(
+                canUndo = canUndo,
+                canRedo = canRedo,
+                undoRedoVisible = !isStreaming && (canUndo || canRedo),
+                onUndo = onUndo,
+                onRedo = onRedo,
+                isStreaming = isStreaming,
+                aiCompleteEnabled = recipientEmail.isNotEmpty(),
+                onAiComplete = onAiComplete,
+                onStopStreaming = onStopStreaming
+            )
             DirectComposeSubjectField(
                 value = subject,
                 onValueChange = onSubjectChange,
                 enabled = !isStreaming
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // 본문 헤더 + 실시간 AI 토글
-            DirectComposeBodyHeader(
-                isRealtimeOn = isRealtimeAiOn,
-                onToggle = { isRealtimeAiOn = it }
+            BodyHeader(
+                isRealtimeOn = aiRealtime,
+                onToggle = onAiRealtimeToggle
             )
 
-            // Rich Text Editor
-            DirectComposeRichTextEditorCard(
-                richTextState = richTextState,
+            // Rich Text Editor with AI
+            AIEnhancedRichTextEditor(
+                editorState = editorState,
                 isStreaming = isStreaming,
-                onTapComplete = { /* TODO */ }
+                suggestionText = suggestionText,
+                onAcceptSuggestion = onAcceptSuggestion,
+                showInlineSwipeBar = showInlineSwipeBar,
+                onEditorFocused = {
+                    coroutineScope.launch {
+                        val immediateOffset = (scrollState.maxValue - 300).coerceAtLeast(0)
+                        scrollState.scrollTo(immediateOffset)
+                        val target = (scrollState.maxValue - 300).coerceAtLeast(0)
+                        scrollState.animateScrollTo(target)
+                    }
+                }
             )
+
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }
@@ -388,56 +418,51 @@ private fun DirectComposeActionRow(
 }
 
 @Composable
-private fun RecipientInfoSection(recipientName: String, recipientEmail: String, hasGroups: Boolean) {
-    Surface(
+private fun RecipientInfoSection(
+    recipientName: String,
+    recipientEmail: String,
+    groupNames: List<String>,
+    showAddContactButton: Boolean = false,
+    onAddContactClick: (() -> Unit)? = null
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.White
+            .padding(horizontal = 20.dp, vertical = 8.dp)
     ) {
+        Text(
+            text = "받는 사람",
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = Color(0xFF64748B),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        )
+        Spacer(modifier = Modifier.height(4.dp))
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 받는 사람 텍스트 - Row로 한 줄에 표시
-            Column(
-                modifier = Modifier.weight(1f, fill = false)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "받는 사람: ",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            color = Color(0xFF64748B),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                    Text(
-                        text = extractName(recipientName),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            color = Color(0xFF64748B),
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "<${extractEmailAddress(recipientName)}>",
+                    text = extractName(recipientName),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 14.sp,
-                        color = Color(0xFF9AA0A6),
-                        fontWeight = FontWeight.Medium
-                    ),
-                    modifier = Modifier.padding(start = 8.dp)
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+                Text(
+                    text = extractEmailAddress(recipientName),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
                 )
             }
 
-            // 그룹 칩
-            if (hasGroups) {
+            if (groupNames.isNotEmpty()) {
+                val label = groupNames.joinToString(", ")
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = Color(0xFFEFF6FF),
@@ -455,7 +480,7 @@ private fun RecipientInfoSection(recipientName: String, recipientEmail: String, 
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
-                            text = "그룹",
+                            text = label,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 12.sp,
                                 color = Color(0xFF6366F1)
@@ -464,23 +489,166 @@ private fun RecipientInfoSection(recipientName: String, recipientEmail: String, 
                     }
                 }
             }
+
+            if (showAddContactButton && onAddContactClick != null) {
+                TextButton(onClick = onAddContactClick) {
+                    Icon(
+                        imageVector = Icons.Filled.PersonAdd,
+                        contentDescription = "연락처 추가",
+                        tint = Blue60,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "연락처 추가",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Blue60,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SubjectSectionHeader() {
-    Text(
-        text = "제목",
-        style = MaterialTheme.typography.titleSmall.copy(
-            color = Color(0xFF64748B),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        ),
+private fun SubjectControlRow(
+    canUndo: Boolean,
+    canRedo: Boolean,
+    undoRedoVisible: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    isStreaming: Boolean,
+    aiCompleteEnabled: Boolean,
+    onAiComplete: () -> Unit,
+    onStopStreaming: () -> Unit
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    )
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "제목",
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = Color(0xFF64748B),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedVisibility(visible = undoRedoVisible) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UndoRedoButton(
+                        icon = Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "실행취소",
+                        enabled = canUndo,
+                        onClick = onUndo
+                    )
+                    UndoRedoButton(
+                        icon = Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "다시 실행",
+                        enabled = canRedo,
+                        onClick = onRedo
+                    )
+                }
+            }
+
+            if (isStreaming) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onStopStreaming,
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Stop,
+                            contentDescription = "AI 중지",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "중지",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFEF4444)
+                            )
+                        )
+                    }
+                    Text(
+                        text = "AI 플래너가 메일 구조를 설계 중입니다",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = Blue60
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onAiComplete,
+                    enabled = aiCompleteEnabled,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (aiCompleteEnabled) Blue60 else Blue60.copy(alpha = 0.3f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Blue60,
+                        disabledContentColor = Blue60.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = "AI 완성",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "AI 완성",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UndoRedoButton(icon: ImageVector, contentDescription: String, enabled: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, ComposeOutline),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier.height(32.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) ToolbarIconTint else ToolbarIconTint.copy(alpha = 0.3f),
+            modifier = Modifier.size(18.dp)
+        )
+    }
 }
 
 @Composable
@@ -517,13 +685,11 @@ private fun DirectComposeSubjectField(value: String, onValueChange: (String) -> 
             unfocusedPlaceholderColor = TextSecondary,
             disabledPlaceholderColor = TextSecondary.copy(alpha = 0.4f)
         ),
-        textStyle = MaterialTheme.typography.bodyMedium.copy(
-            fontSize = 13.sp,
-            color = Color(0xFF1E293B)
-        ),
+        textStyle = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF1E293B)),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            .height(48.dp)
     )
 }
 
@@ -587,146 +753,6 @@ private fun DirectComposeRealtimeToggleChip(isChecked: Boolean, onToggle: (Boole
 }
 
 @Composable
-private fun DirectComposeRichTextEditorCard(
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
-    isStreaming: Boolean,
-    onTapComplete: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeBackground
-    ) {
-        Column {
-            DirectComposeRichTextEditorControls(state = richTextState)
-            RichTextEditor(
-                state = richTextState,
-                enabled = !isStreaming,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                modifier = Modifier.background(Color.White)
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp),
-                placeholder = {
-                    Text(
-                        text = "내용을 입력하세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                    )
-                }
-            )
-
-            // 탭 완성 버튼
-            TapCompleteButton(onClick = onTapComplete)
-        }
-    }
-}
-
-@Composable
-private fun DirectComposeRichTextEditorControls(
-    state: com.mohamedrejeb.richeditor.model.RichTextState,
-    modifier: Modifier = Modifier
-) {
-    var showSizeDropdown by remember { mutableStateOf(false) }
-    val fontSizes = listOf(14.sp, 18.sp, 22.sp)
-
-    var showColorDropdown by remember { mutableStateOf(false) }
-    val colors = listOf(Color.Black, Color.Red, Color.Blue, Color.Green)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Bold button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatBold,
-                contentDescription = "Bold",
-                tint = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) Blue60 else TextSecondary
-            )
-        }
-        // Italic button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatItalic,
-                contentDescription = "Italic",
-                tint = if (state.currentSpanStyle.fontStyle == FontStyle.Italic) Blue60 else TextSecondary
-            )
-        }
-        // Underline button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatUnderlined,
-                contentDescription = "Underline",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.Underline) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-        // Strikethrough button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatStrikethrough,
-                contentDescription = "Strikethrough",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.LineThrough) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-
-        // Font size selector
-        Box {
-            IconButton(onClick = { showSizeDropdown = true }) {
-                Icon(Icons.Default.FormatSize, contentDescription = "Font Size")
-            }
-            DropdownMenu(expanded = showSizeDropdown, onDismissRequest = { showSizeDropdown = false }) {
-                fontSizes.forEach { size ->
-                    DropdownMenuItem(text = { Text("${size.value}") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(fontSize = size))
-                        showSizeDropdown = false
-                    })
-                }
-            }
-        }
-
-        // Font color selector
-        Box {
-            IconButton(onClick = { showColorDropdown = true }) {
-                Icon(
-                    imageVector = Icons.Default.FormatColorText,
-                    contentDescription = "Font Color",
-                    tint = state.currentSpanStyle.color
-                )
-            }
-            DropdownMenu(expanded = showColorDropdown, onDismissRequest = { showColorDropdown = false }) {
-                colors.forEach { color ->
-                    DropdownMenuItem(text = { Text("Color") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(color = color))
-                        showColorDropdown = false
-                    }, leadingIcon = {
-                        Icon(Icons.Default.Circle, contentDescription = null, tint = color)
-                    })
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun TapCompleteButton(onClick: () -> Unit) {
     Row(
         modifier = Modifier
@@ -778,7 +804,7 @@ private fun ReplyDirectComposeScreenPreview() {
             recipientEmail = "ceo@company.com",
             recipientName = "김대표",
             subject = "Re: Q4 실적 보고서 검토 부탁드립니다",
-            groups = listOf("대이사", "업무"),
+            groups = listOf("임원진", "업무"),
             onBack = {},
             onSend = { _ -> },
             senderEmail = "김대표 <ceo@company.com>",
@@ -795,7 +821,9 @@ private fun RecipientInfoSectionPreview() {
         RecipientInfoSection(
             recipientName = "김대표",
             recipientEmail = "ceo@company.com",
-            hasGroups = true
+            groupNames = listOf("임원진", "업무"),
+            showAddContactButton = true,
+            onAddContactClick = {}
         )
     }
 }

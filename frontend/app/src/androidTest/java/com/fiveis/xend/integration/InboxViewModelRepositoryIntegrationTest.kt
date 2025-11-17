@@ -9,6 +9,7 @@ import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailListResponse
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.ui.inbox.InboxViewModel
@@ -16,6 +17,7 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -46,6 +48,7 @@ class InboxViewModelRepositoryIntegrationTest {
     private lateinit var emailDao: EmailDao
     private lateinit var mailApiService: MailApiService
     private lateinit var repository: InboxRepository
+    private lateinit var contactRepository: ContactBookRepository
     private lateinit var viewModel: InboxViewModel
 
     @Before
@@ -56,10 +59,15 @@ class InboxViewModelRepositoryIntegrationTest {
         database = Room.inMemoryDatabaseBuilder(
             context,
             AppDatabase::class.java
-        ).build()
+        ).allowMainThreadQueries()
+            .build()
 
         emailDao = database.emailDao()
+
         mailApiService = mockk()
+        contactRepository = mockk()
+        coEvery { contactRepository.observeGroups() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.observeContacts() } returns MutableStateFlow(emptyList())
 
         repository = InboxRepository(mailApiService, emailDao)
     }
@@ -72,6 +80,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun viewModel_loads_emails_from_repository_and_displays_them() = runTest {
+        emailDao.deleteAllEmails()
+
         val mockEmails = listOf(
             createMockEmailItem("1"),
             createMockEmailItem("2")
@@ -88,7 +98,7 @@ class InboxViewModelRepositoryIntegrationTest {
         )
         coEvery { mailApiService.getEmails(any(), any(), any()) } returns mockResponse
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         val emails = viewModel.uiState.value.emails
@@ -99,6 +109,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun viewModel_refresh_fetches_new_emails_and_saves_to_database() = runTest {
+        emailDao.deleteAllEmails()
+
         val newEmails = listOf(
             createMockEmailItem("3"),
             createMockEmailItem("4")
@@ -113,7 +125,7 @@ class InboxViewModelRepositoryIntegrationTest {
         )
         coEvery { mailApiService.getEmails(any(), any(), any()) } returns mockResponse
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         val dbEmails = emailDao.getAllEmails().first()
@@ -124,6 +136,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun viewModel_loadMore_appends_emails_to_existing_list() = runTest {
+        emailDao.deleteAllEmails()
+
         val firstResponse = Response.success(
             MailListResponse(
                 messages = listOf(createMockEmailItem("1")),
@@ -142,7 +156,7 @@ class InboxViewModelRepositoryIntegrationTest {
         coEvery { mailApiService.getEmails("INBOX", 20, null) } returns firstResponse
         coEvery { mailApiService.getEmails("INBOX", 20, "token123") } returns secondResponse
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -156,6 +170,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun repository_caches_emails_and_viewModel_displays_cached_data() = runTest {
+        emailDao.deleteAllEmails()
+
         val cachedEmails = listOf(
             createMockEmailItem("1"),
             createMockEmailItem("2")
@@ -172,7 +188,7 @@ class InboxViewModelRepositoryIntegrationTest {
         )
         coEvery { mailApiService.getEmails(any(), any(), any()) } returns mockResponse
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         val uiEmails = viewModel.uiState.value.emails
@@ -183,6 +199,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun viewModel_handles_empty_cache_and_successful_api_response() = runTest {
+        emailDao.deleteAllEmails()
+
         val newEmails = listOf(createMockEmailItem("1"))
 
         val mockResponse = Response.success(
@@ -194,7 +212,7 @@ class InboxViewModelRepositoryIntegrationTest {
         )
         coEvery { mailApiService.getEmails(any(), any(), any()) } returns mockResponse
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         val uiEmails = viewModel.uiState.value.emails
@@ -208,6 +226,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun viewModel_stops_refreshing_after_completing() = runTest {
+        emailDao.deleteAllEmails()
+
         val mockResponse = Response.success(
             MailListResponse(
                 messages = emptyList(),
@@ -217,7 +237,7 @@ class InboxViewModelRepositoryIntegrationTest {
         )
         coEvery { mailApiService.getEmails(any(), any(), any()) } returns mockResponse
 
-        viewModel = InboxViewModel(repository)
+        viewModel = InboxViewModel(repository, contactRepository)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isRefreshing)
@@ -225,6 +245,8 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun repository_updates_read_status_in_database() = runTest {
+        emailDao.deleteAllEmails()
+
         val email = createMockEmailItem("1", isUnread = true)
         emailDao.insertEmail(email)
 
@@ -236,10 +258,12 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun database_orders_emails_by_date_descending() = runTest {
+        emailDao.deleteAllEmails()
+
         val emails = listOf(
-            createMockEmailItem("1", date = "2025-01-01T10:00:00Z"),
-            createMockEmailItem("2", date = "2025-01-03T10:00:00Z"),
-            createMockEmailItem("3", date = "2025-01-02T10:00:00Z")
+            createMockEmailItem("1", date = "2025-01-01T10:00:00Z", cachedAt = 1L),
+            createMockEmailItem("2", date = "2025-01-03T10:00:00Z", cachedAt = 3L),
+            createMockEmailItem("3", date = "2025-01-02T10:00:00Z", cachedAt = 2L)
         )
 
         emailDao.insertEmails(emails)
@@ -251,7 +275,7 @@ class InboxViewModelRepositoryIntegrationTest {
         assertEquals("1", orderedEmails[2].id)
     }
 
-    private fun createMockEmailItem(id: String, date: String = "2025-01-01T00:00:00Z", isUnread: Boolean = true) =
+    private fun createMockEmailItem(id: String, date: String = "2025-01-01T00:00:00Z", isUnread: Boolean = true, cachedAt: Long = System.currentTimeMillis()) =
         EmailItem(
             id = id,
             threadId = "thread_$id",
@@ -262,6 +286,6 @@ class InboxViewModelRepositoryIntegrationTest {
             dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
             isUnread = isUnread,
             labelIds = listOf("INBOX"),
-            cachedAt = System.currentTimeMillis()
+            cachedAt = cachedAt
         )
 }

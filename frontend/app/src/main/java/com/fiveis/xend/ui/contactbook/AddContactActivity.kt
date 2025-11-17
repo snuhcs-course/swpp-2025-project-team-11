@@ -85,6 +85,10 @@ class AddContactActivity : ComponentActivity() {
                         // TODO
                         Toast.makeText(this, "Gmail 동기화 준비중...", Toast.LENGTH_SHORT).show()
                     },
+                    onAddGroupClick = {
+                        startActivity(Intent(this, AddGroupActivity::class.java))
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    },
                     onBottomNavChange = { tab ->
                         if (tab == "inbox") {
                             startActivity(Intent(this, InboxActivity::class.java))

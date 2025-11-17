@@ -21,8 +21,10 @@ data class AddGroupUiState(
     val error: String? = null
 )
 
-class AddGroupViewModel(application: Application) : AndroidViewModel(application) {
+class AddGroupViewModel(
+    application: Application,
     private val repository: ContactBookRepository = ContactBookRepository(application.applicationContext)
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AddGroupUiState())
     val uiState: StateFlow<AddGroupUiState> = _uiState.asStateFlow()
@@ -48,6 +50,7 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
     fun addGroup(
         name: String,
         description: String,
+        emoji: String? = null,
         options: List<PromptOption>,
         members: List<com.fiveis.xend.data.model.Contact> = emptyList()
     ) {
@@ -61,8 +64,8 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 // 1. 그룹 생성
-                android.util.Log.d("AddGroupViewModel", "Creating group: $name")
-                val res = repository.addGroup(name, description, options)
+                android.util.Log.d("AddGroupViewModel", "Creating group: $name with emoji: $emoji")
+                val res = repository.addGroup(name, description, emoji, options)
                 android.util.Log.d("AddGroupViewModel", "Group created with ID: ${res.id}")
 
                 // 2. 멤버들의 group_id 업데이트
@@ -120,6 +123,38 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updatePromptOption(
+        optionId: Long,
+        name: String,
+        prompt: String,
+        onSuccess: (PromptOption) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val updated = repository.updatePromptOption(optionId, name, prompt)
+                onSuccess(updated)
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 수정에 실패했습니다"
+                _uiState.update { it.copy(error = msg) }
+                onError(msg)
+            }
+        }
+    }
+
+    fun deletePromptOption(optionId: Long, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                repository.deletePromptOption(optionId)
+                onSuccess()
+            } catch (e: Exception) {
+                val msg = e.message ?: "프롬프트 삭제에 실패했습니다"
+                _uiState.update { it.copy(error = msg) }
+                onError(msg)
+            }
+        }
+    }
+
     fun getAllPromptOptions() {
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingOptions = true, error = null) }
@@ -144,10 +179,13 @@ class AddGroupViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
+    class Factory(
+        private val application: Application
+    ) : androidx.lifecycle.ViewModelProvider.Factory {
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(AddGroupViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
+                // Default parameter로 repository가 생성됨
                 return AddGroupViewModel(application) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")

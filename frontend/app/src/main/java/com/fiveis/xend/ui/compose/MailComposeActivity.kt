@@ -1,7 +1,10 @@
 package com.fiveis.xend.ui.compose
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
@@ -9,15 +12,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,26 +40,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatColorText
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.FormatStrikethrough
-import androidx.compose.material.icons.filled.FormatUnderlined
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,12 +59,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -77,26 +71,29 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -105,29 +102,46 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.BuildConfig
+import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.data.model.DraftItem
+import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.data.model.toDomain
+import com.fiveis.xend.data.repository.ContactBookRepository
+import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
-import com.fiveis.xend.ui.theme.AddButtonBackground
+import com.fiveis.xend.network.RetrofitClient
+import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
+import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
+import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
+import com.fiveis.xend.ui.inbox.AddContactDialog
+import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.AddButtonText
-import com.fiveis.xend.ui.theme.BannerBackground
-import com.fiveis.xend.ui.theme.BannerBorder
-import com.fiveis.xend.ui.theme.BannerText
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
 import com.fiveis.xend.ui.theme.StableColor
-import com.fiveis.xend.ui.theme.SuccessSurface
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
-import com.fiveis.xend.ui.theme.UndoBorder
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
+import com.fiveis.xend.ui.theme.XendTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+
+data class BannerState(
+    val message: String,
+    val type: BannerType,
+    val autoDismiss: Boolean = false,
+    val actionText: String? = null,
+    val onActionClick: (() -> Unit)? = null
+)
 
 // ========================================================
 // Screen
@@ -137,7 +151,7 @@ import org.json.JSONObject
 fun EmailComposeScreen(
     subject: String,
     onSubjectChange: (String) -> Unit,
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
+    editorState: com.fiveis.xend.ui.compose.common.XendRichEditorState,
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
@@ -156,11 +170,21 @@ fun EmailComposeScreen(
     suggestionText: String = "",
     onAcceptSuggestion: () -> Unit = {},
     aiRealtime: Boolean = true,
-    onAiRealtimeToggle: (Boolean) -> Unit = {}
+    onAiRealtimeToggle: (Boolean) -> Unit = {},
+    onAddContactClick: ((Contact) -> Unit)? = null,
+    bannerState: BannerState?,
+    onDismissBanner: () -> Unit,
+    showInlineSwipeBar: Boolean = true,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onRedo: () -> Unit,
+    contactSuggestions: List<Contact>,
+    onSuggestionClick: (Contact) -> Unit,
+    onShowPrompt: () -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val scrollState = rememberScrollState()
-    var showBanner by rememberSaveable { mutableStateOf(true) }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         modifier = modifier
@@ -187,54 +211,93 @@ fun EmailComposeScreen(
                 .verticalScroll(scrollState)
                 .imePadding()
         ) {
-            if (showBanner) {
-                ComposeInfoBanner(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .align(Alignment.CenterHorizontally),
-                    onDismiss = { showBanner = false }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+            AnimatedVisibility(visible = bannerState != null) {
+                bannerState?.let {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = it.message,
+                            type = it.type,
+                            onDismiss = onDismissBanner,
+                            actionText = null,
+                            onActionClick = null,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(bottom = 8.dp)
+                                .then(
+                                    if (it.onActionClick != null) {
+                                        Modifier.clickable { it.onActionClick.invoke() }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                        )
+                    }
+                }
             }
 
-            ComposeActionRow(
-                isStreaming = isStreaming,
-                onUndo = onUndo,
-                onAiComplete = onAiComplete,
-                onStopStreaming = onStopStreaming
+            SectionHeaderWithAction(
+                title = "받는 사람",
+                actionLabel = null,
+                actionEnabled = false,
+                onActionClick = null
             )
-
-            SectionHeader("받는 사람")
+            Spacer(modifier = Modifier.height(4.dp))
             RecipientSection(
                 contacts = contacts,
                 onContactsChange = onContactsChange,
                 newContact = newContact,
                 onNewContactChange = onNewContactChange,
-                knownContactsByEmail = knownContactsByEmail
+                knownContactsByEmail = knownContactsByEmail,
+                onAddContactClick = onAddContactClick,
+                contactSuggestions = contactSuggestions,
+                onSuggestionClick = onSuggestionClick
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            SectionHeader("제목")
+            SubjectControlRow(
+                label = "제목",
+                canUndo = canUndo,
+                canRedo = canRedo,
+                onUndo = onUndo,
+                onRedo = onRedo,
+                undoRedoVisible = !isStreaming && (canUndo || canRedo),
+                isStreaming = isStreaming,
+                aiCompleteEnabled = contacts.isNotEmpty(),
+                onAiComplete = onAiComplete,
+                onStopStreaming = onStopStreaming
+            )
+
             SubjectField(
                 value = subject,
                 enabled = !isStreaming,
                 onValueChange = onSubjectChange
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             BodyHeader(
                 isRealtimeOn = aiRealtime,
                 onToggle = onAiRealtimeToggle
             )
-            RichTextEditorCard(
-                richTextState = richTextState,
+            AIEnhancedRichTextEditor(
+                editorState = editorState,
                 isStreaming = isStreaming,
-                onTapComplete = onAiComplete,
                 suggestionText = suggestionText,
-                onAcceptSuggestion = onAcceptSuggestion
+                onAcceptSuggestion = onAcceptSuggestion,
+                showInlineSwipeBar = showInlineSwipeBar,
+                onEditorFocused = {
+                    coroutineScope.launch {
+                        val target = (scrollState.maxValue - 400).coerceAtLeast(0)
+                        scrollState.animateScrollTo(target)
+                    }
+                }
             )
+
+            Spacer(modifier = Modifier.height(1.dp))
 
             error?.let { ErrorMessage(it) }
         }
@@ -285,7 +348,7 @@ private fun ComposeTopBar(
                 border = null,
                 modifier = Modifier.padding(end = 2.dp)
             ) {
-                Icon(Icons.Default.GridView, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
+                Icon(TemplateTIcon, contentDescription = "템플릿", tint = Color(0xFFF59E0B))
             }
             Spacer(modifier = Modifier.width(8.dp))
             ToolbarIconButton(
@@ -356,140 +419,42 @@ private fun ToolbarIconButton(
 }
 
 @Composable
-private fun ComposeInfoBanner(modifier: Modifier = Modifier, onDismiss: () -> Unit) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, BannerBorder),
-        color = BannerBackground
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = null,
-                tint = BannerText,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "연락처를 저장하면 향상된 AI 메일 작성이 가능합니다.",
-                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(28.dp),
-                colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = TextSecondary
-                )
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "닫기",
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
+private fun SectionHeader(text: String) {
+    SectionHeaderWithAction(title = text, actionLabel = null, actionEnabled = true, onActionClick = null)
 }
 
 @Composable
-private fun ComposeActionRow(
-    isStreaming: Boolean,
-    onUndo: () -> Unit,
-    onAiComplete: () -> Unit,
-    onStopStreaming: () -> Unit
+private fun SectionHeaderWithAction(
+    title: String,
+    actionLabel: String?,
+    actionEnabled: Boolean,
+    onActionClick: (() -> Unit)?
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 15.dp),
+            .padding(horizontal = 20.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedButton(
-            onClick = onUndo,
-            modifier = Modifier.size(width = 94.dp, height = 35.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, UndoBorder),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = UndoBorder,
-                disabledContentColor = UndoBorder.copy(alpha = 0.2f)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = ToolbarIconTint,
+                fontWeight = FontWeight.SemiBold
             )
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Undo,
-                    contentDescription = "실행취소",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "실행취소",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF64748B)
-                    )
-                )
-            }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedVisibility(visible = isStreaming) {
-                OutlinedButton(
-                    onClick = onStopStreaming,
+        )
 
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, BannerBorder),
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    modifier = Modifier.size(width = 104.dp, height = 35.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = BannerText,
-                        disabledContentColor = BannerText.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = "중지", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "중지",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-            }
-            OutlinedButton(
-                onClick = onAiComplete,
-                modifier = Modifier.size(width = 96.dp, height = 35.dp),
-                enabled = !isStreaming,
-                contentPadding = PaddingValues(horizontal = 15.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Blue60),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Blue60,
-                    disabledContentColor = Blue60.copy(alpha = 0.4f)
-                )
+        if (!actionLabel.isNullOrEmpty() && onActionClick != null) {
+            TextButton(
+                onClick = onActionClick,
+                enabled = actionEnabled,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    "AI 완성",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 12.sp,
+                    text = actionLabel,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = if (actionEnabled) Blue60 else Blue60.copy(alpha = 0.4f),
                         fontWeight = FontWeight.Medium
                     )
                 )
@@ -499,49 +464,154 @@ private fun ComposeActionRow(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall.copy(
-            color = ToolbarIconTint,
-            fontWeight = FontWeight.SemiBold
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    )
-}
-
-@Composable
-private fun BodyHeader(isRealtimeOn: Boolean, onToggle: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun UndoRedoButton(icon: ImageVector, contentDescription: String, enabled: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, ComposeOutline),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier.height(32.dp)
     ) {
-        Text(
-            text = "본문",
-            style = MaterialTheme.typography.titleSmall.copy(
-                color = ToolbarIconTint,
-                fontWeight = FontWeight.SemiBold
-            )
-        )
-        RealtimeToggleChip(
-            isChecked = isRealtimeOn,
-            onToggle = onToggle
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) ToolbarIconTint else ToolbarIconTint.copy(alpha = 0.3f),
+            modifier = Modifier.size(18.dp)
         )
     }
 }
 
 @Composable
+private fun SubjectControlRow(
+    label: String,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    undoRedoVisible: Boolean,
+    isStreaming: Boolean,
+    onAiComplete: () -> Unit,
+    onStopStreaming: () -> Unit,
+    aiCompleteEnabled: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = ToolbarIconTint,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedVisibility(visible = undoRedoVisible) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UndoRedoButton(
+                        icon = Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "실행취소",
+                        enabled = canUndo,
+                        onClick = onUndo
+                    )
+                    UndoRedoButton(
+                        icon = Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "다시 실행",
+                        enabled = canRedo,
+                        onClick = onRedo
+                    )
+                }
+            }
+            if (isStreaming) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onStopStreaming,
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Stop,
+                            contentDescription = "AI 중지",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "중지",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFEF4444)
+                            )
+                        )
+                    }
+                    Text(
+                        text = "AI 플래너가 메일 구조를 설계 중입니다",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = Blue60
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onAiComplete,
+                    enabled = aiCompleteEnabled,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (aiCompleteEnabled) Blue60 else Blue60.copy(alpha = 0.3f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Blue60,
+                        disabledContentColor = Blue60.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = "AI 완성",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "AI 완성",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun RecipientSection(
     contacts: List<Contact>,
     onContactsChange: (List<Contact>) -> Unit,
     newContact: TextFieldValue,
     onNewContactChange: (TextFieldValue) -> Unit,
-    knownContactsByEmail: Map<String, Contact>
+    knownContactsByEmail: Map<String, Contact>,
+    onAddContactClick: ((Contact) -> Unit)? = null,
+    contactSuggestions: List<Contact> = emptyList(),
+    onSuggestionClick: (Contact) -> Unit = {}
 ) {
     fun normalizeEmail(s: String) = s.trim().lowercase()
 
@@ -566,62 +636,264 @@ private fun RecipientSection(
         onNewContactChange(TextFieldValue(""))
     }
 
-    val scrollState = rememberScrollState()
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, AddButtonText.copy(alpha = 0.15f)),
-        color = ComposeSurface
-    ) {
-        Row(
+    var isInputFocused by remember { mutableStateOf(false) }
+    var forceExpanded by remember { mutableStateOf(false) }
+    var isExpanding by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    val shouldShowInput = contacts.isEmpty() ||
+        isInputFocused ||
+        newContact.text.isNotEmpty() ||
+        forceExpanded ||
+        isExpanding
+
+    LaunchedEffect(forceExpanded) {
+        if (forceExpanded && !isExpanding) {
+            Log.d("RecipientSection", "LaunchedEffect: Starting expansion process")
+            isExpanding = true
+            Log.d("RecipientSection", "LaunchedEffect: Requesting focus")
+            focusRequester.requestFocus()
+            Log.d("RecipientSection", "LaunchedEffect: Expansion complete")
+            isExpanding = false
+        }
+    }
+
+    Column {
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
-                .padding(horizontal = 12.dp)
-                .horizontalScroll(scrollState),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 20.dp)
+                .clickable(enabled = !shouldShowInput) {
+                    Log.d(
+                        "RecipientSection",
+                        "Surface clicked: shouldShowInput=$shouldShowInput, setting forceExpanded=true"
+                    )
+                    isExpanding = true
+                    forceExpanded = true
+                },
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, ComposeOutline),
+            color = ComposeSurface
         ) {
-            contacts.forEachIndexed { index, contact ->
-                ContactChip(
-                    contact = contact,
-                    onRemove = {
-                        onContactsChange(contacts.filterNot { it.email == contact.email })
-                    }
-                )
-                if (index != contacts.lastIndex) {
-                    Spacer(modifier = Modifier.width(8.dp))
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                contacts.forEach { contact ->
+                    ContactChip(
+                        contact = contact,
+                        onRemove = {
+                            onContactsChange(contacts.filterNot { it.email == contact.email })
+                        },
+                        onEdit = {
+                            onNewContactChange(TextFieldValue(contact.email))
+                            onContactsChange(contacts.filterNot { it.email == contact.email })
+                        },
+                        onAddToContacts = if (contact.id < 0L && onAddContactClick != null) {
+                            { onAddContactClick(contact) }
+                        } else {
+                            null
+                        }
+                    )
+                }
+                if (shouldShowInput) {
+                    val inputModifier =
+                        if (!isInputFocused && contacts.isNotEmpty() && newContact.text.isEmpty()) {
+                            Modifier.wrapContentWidth(unbounded = true)
+                                .widthIn(min = 80.dp)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        }
+                    RecipientInputField(
+                        value = newContact,
+                        onValueChange = {
+                            onNewContactChange(it)
+                            forceExpanded = true
+                        },
+                        onAdd = {
+                            addContact()
+                            forceExpanded = false
+                        },
+                        modifier = inputModifier.focusRequester(focusRequester),
+                        onFocusChanged = { focused ->
+                            Log.d(
+                                "RecipientSection",
+                                "onFocusChanged: focused=$focused, isExpanding=$isExpanding, " +
+                                    "isInputFocused=$isInputFocused, forceExpanded=$forceExpanded, " +
+                                    "contacts.size=${contacts.size}, " +
+                                    "newContact.isEmpty=${newContact.text.isEmpty()}"
+                            )
+
+                            // Only collapse if we were previously focused
+                            if (!focused && isInputFocused && newContact.text.isEmpty() &&
+                                contacts.isNotEmpty() && !isExpanding
+                            ) {
+                                Log.d(
+                                    "RecipientSection",
+                                    "onFocusChanged: Setting forceExpanded=false (lost focus, collapsing)"
+                                )
+                                forceExpanded = false
+                            }
+
+                            isInputFocused = focused
+                            if (focused) {
+                                Log.d(
+                                    "RecipientSection",
+                                    "onFocusChanged: Setting forceExpanded=true and isExpanding=false (gained focus)"
+                                )
+                                forceExpanded = true
+                                isExpanding = false
+                            }
+                        }
+                    )
                 }
             }
-            if (contacts.isNotEmpty()) {
-                Spacer(modifier = Modifier.width(8.dp))
+        }
+
+        AnimatedVisibility(
+            visible = contactSuggestions.isNotEmpty() || (newContact.text.length >= 2 && onAddContactClick != null)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (contactSuggestions.isNotEmpty()) {
+                    Text(
+                        text = "연락처 추천",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = ToolbarIconTint,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                    contactSuggestions.forEach { suggestion ->
+                        RecipientSuggestionRow(
+                            contact = suggestion,
+                            onClick = { onSuggestionClick(suggestion) }
+                        )
+                    }
+                }
+
+                // 연락처 추가 버튼
+                if (newContact.text.length >= 2 && onAddContactClick != null) {
+                    val pendingEmail = newContact.text.trim()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Blue80.copy(alpha = 0.05f))
+                            .border(BorderStroke(1.dp, Blue80.copy(alpha = 0.3f)), RoundedCornerShape(10.dp))
+                            .clickable {
+                                onAddContactClick(
+                                    Contact(id = -1L, name = pendingEmail, email = pendingEmail, group = null)
+                                )
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Blue80.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PersonAdd,
+                                contentDescription = "연락처 추가",
+                                tint = Blue80,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "연락처 추가",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Blue80,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                            Text(
+                                text = pendingEmail,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+                }
             }
-            RecipientInputField(
-                value = newContact,
-                onValueChange = onNewContactChange,
-                onAdd = addContact
-            )
-            Spacer(modifier = Modifier.width(8.dp))
         }
     }
 }
 
 @Composable
-private fun RecipientInputField(value: TextFieldValue, onValueChange: (TextFieldValue) -> Unit, onAdd: () -> Unit) {
+private fun RecipientSuggestionRow(contact: Contact, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(ComposeSurface)
+            .border(BorderStroke(1.dp, ComposeOutline), RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val displayName = contact.name?.takeIf { it.isNotBlank() } ?: contact.email
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Blue80.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                style = MaterialTheme.typography.labelLarge.copy(color = Blue80)
+            )
+        }
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = contact.email,
+                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecipientInputField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocusChanged: (Boolean) -> Unit = {}
+) {
     val borderModifier = if (value.text.isNotEmpty()) {
         Modifier.border(BorderStroke(1.dp, AddButtonText), RoundedCornerShape(6.dp))
     } else {
         Modifier
     }
     Box(
-        modifier = Modifier
-            .height(24.dp)
-            .widthIn(min = 80.dp, max = 200.dp)
-            .padding(vertical = 4.dp)
+        modifier = modifier
+            .heightIn(min = 32.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color.White)
-            .then(borderModifier),
+            .background(ComposeSurface)
+            .then(borderModifier)
+            .padding(vertical = 4.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         BasicTextField(
@@ -633,7 +905,8 @@ private fun RecipientInputField(value: TextFieldValue, onValueChange: (TextField
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Done
             ),
-            keyboardActions = KeyboardActions(onDone = { onAdd() })
+            keyboardActions = KeyboardActions(onDone = { onAdd() }),
+            modifier = Modifier.onFocusChanged { onFocusChanged(it.isFocused) }
         ) { inner ->
             Box(
                 contentAlignment = Alignment.CenterStart,
@@ -660,7 +933,13 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("제목을 입력하세요", color = TextSecondary) },
+        placeholder = {
+            Text(
+                "제목을 입력하세요",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp)
+            )
+        },
         singleLine = true,
         enabled = enabled,
         shape = RoundedCornerShape(18.dp),
@@ -668,6 +947,8 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            .height(48.dp),
+        textStyle = MaterialTheme.typography.bodySmall
     )
 }
 
@@ -696,26 +977,31 @@ private fun composeOutlinedTextFieldColors() = TextFieldDefaults.colors(
 @Composable
 private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = SuccessSurface
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xFFDCFCE7),
+        modifier = Modifier.height(30.dp)
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "실시간 AI",
                 style = MaterialTheme.typography.labelMedium.copy(
                     color = Color(0xFF166534),
-                    fontWeight = FontWeight.Bold
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             )
             Switch(
                 checked = isChecked,
                 onCheckedChange = onToggle,
-                modifier = Modifier.scale(0.6f),
+                modifier = Modifier
+                    .scale(0.6f)
+                    .width(20.dp)
+                    .height(20.dp),
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
                     checkedTrackColor = Color(0xFF166534),
@@ -723,195 +1009,6 @@ private fun RealtimeToggleChip(isChecked: Boolean, onToggle: (Boolean) -> Unit) 
                     uncheckedTrackColor = ComposeOutline
                 )
             )
-        }
-    }
-}
-
-@Composable
-private fun RichTextEditorControls(
-    state: com.mohamedrejeb.richeditor.model.RichTextState,
-    modifier: Modifier = Modifier
-) {
-    var showSizeDropdown by remember { mutableStateOf(false) }
-    val fontSizes = listOf(14.sp, 18.sp, 22.sp)
-
-    var showColorDropdown by remember { mutableStateOf(false) }
-    val colors = listOf(Color.Black, Color.Red, Color.Blue, Color.Green)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Bold button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatBold,
-                contentDescription = "Bold",
-                tint = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) Blue60 else TextSecondary
-            )
-        }
-        // Italic button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatItalic,
-                contentDescription = "Italic",
-                tint = if (state.currentSpanStyle.fontStyle == FontStyle.Italic) Blue60 else TextSecondary
-            )
-        }
-        // Underline button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatUnderlined,
-                contentDescription = "Underline",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.Underline) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-        // Strikethrough button
-        IconButton(onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) }) {
-            Icon(
-                imageVector = Icons.Default.FormatStrikethrough,
-                contentDescription = "Strikethrough",
-                tint = if (state.currentSpanStyle.textDecoration
-                        ?.contains(TextDecoration.LineThrough) == true
-                ) {
-                    Blue60
-                } else {
-                    TextSecondary
-                }
-            )
-        }
-
-        // Font size selector
-        Box {
-            IconButton(onClick = { showSizeDropdown = true }) {
-                Icon(Icons.Default.FormatSize, contentDescription = "Font Size")
-            }
-            DropdownMenu(expanded = showSizeDropdown, onDismissRequest = { showSizeDropdown = false }) {
-                fontSizes.forEach { size ->
-                    DropdownMenuItem(text = { Text("${size.value}") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(fontSize = size))
-                        showSizeDropdown = false
-                    })
-                }
-            }
-        }
-
-        // Font color selector
-        Box {
-            IconButton(onClick = { showColorDropdown = true }) {
-                Icon(
-                    imageVector = Icons.Default.FormatColorText,
-                    contentDescription = "Font Color",
-                    tint = state.currentSpanStyle.color
-                )
-            }
-            DropdownMenu(expanded = showColorDropdown, onDismissRequest = { showColorDropdown = false }) {
-                colors.forEach { color ->
-                    DropdownMenuItem(text = { Text("Color") }, onClick = {
-                        state.toggleSpanStyle(SpanStyle(color = color))
-                        showColorDropdown = false
-                    }, leadingIcon = {
-                        Icon(Icons.Default.Circle, contentDescription = null, tint = color)
-                    })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RichTextEditorCard(
-    richTextState: com.mohamedrejeb.richeditor.model.RichTextState,
-    isStreaming: Boolean,
-    onTapComplete: () -> Unit,
-    suggestionText: String = "",
-    onAcceptSuggestion: () -> Unit = {}
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, ComposeOutline),
-        color = ComposeSurface
-    ) {
-        Column {
-            RichTextEditorControls(state = richTextState)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 240.dp)
-                    .padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 20.dp)
-            ) {
-                RichTextEditor(
-                    state = richTextState,
-                    enabled = !isStreaming,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = "내용을 입력하세요",
-                            style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
-                        )
-                    }
-                )
-
-                if (suggestionText.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = TextSecondary.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.2f))
-                    ) {
-                        Text(
-                            text = suggestionText,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = TextSecondary.copy(alpha = 0.7f),
-                                fontStyle = FontStyle.Italic
-                            ),
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    androidx.compose.material3.FloatingActionButton(
-                        onClick = onAcceptSuggestion,
-                        modifier = Modifier.align(Alignment.End),
-                        containerColor = Blue60,
-                        contentColor = Color.White,
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "제안 수락",
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "탭 완성",
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -929,15 +1026,22 @@ private fun ErrorMessage(message: String) {
 }
 
 @Composable
-fun ContactChip(contact: Contact, onRemove: () -> Unit) {
+fun ContactChip(
+    contact: Contact,
+    onRemove: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onAddToContacts: (() -> Unit)? = null
+) {
     val isKnown = contact.id >= 0L
     val borderColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
     val dotColor = if (!isKnown) Color.Black else StableColor.forId(contact.id)
 
     Surface(
-        modifier = Modifier.height(24.dp),
+        modifier = Modifier
+            .height(24.dp)
+            .clickable(enabled = onEdit != null) { onEdit?.invoke() },
         shape = RoundedCornerShape(12.dp),
-        color = AddButtonBackground,
+        color = ComposeSurface,
         border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
@@ -961,7 +1065,13 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "${contact.name} (${contact.email})",
+                text = if (contact.id < 0L) {
+                    // 연락처가 없으면 이메일만 표시
+                    contact.email
+                } else {
+                    // 연락처가 있으면 이름 (이메일) 형식
+                    "${contact.name} (${contact.email})"
+                },
                 style =
                 if (contact.id < 0L) {
                     MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
@@ -972,6 +1082,20 @@ fun ContactChip(contact: Contact, onRemove: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.width(6.dp))
+
+            // Add contact button for unknown contacts
+            if (!isKnown && onAddToContacts != null) {
+                Icon(
+                    imageVector = Icons.Outlined.PersonAdd,
+                    contentDescription = "연락처 추가",
+                    tint = Blue80,
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clickable { onAddToContacts() }
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = "삭제",
@@ -998,12 +1122,36 @@ class ComposeVmFactory(
 // Activity: wire screen <-> ViewModel <-> SSE
 // ========================================================
 class MailComposeActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_PREFILL_CONTACT_ID = "extra_prefill_contact_id"
+        const val EXTRA_PREFILL_CONTACT_NAME = "extra_prefill_contact_name"
+        const val EXTRA_PREFILL_CONTACT_EMAIL = "extra_prefill_contact_email"
+
+        const val REQUEST_CODE_COMPOSE = 1001
+        const val RESULT_DRAFT_SAVED = RESULT_FIRST_USER + 1
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val prefilledContact = intent?.let { incomingIntent ->
+            val email = incomingIntent.getStringExtra(EXTRA_PREFILL_CONTACT_EMAIL)?.trim().orEmpty()
+            if (email.isBlank()) {
+                null
+            } else {
+                val contactId = incomingIntent.getLongExtra(EXTRA_PREFILL_CONTACT_ID, -1L)
+                val contactName = incomingIntent.getStringExtra(EXTRA_PREFILL_CONTACT_NAME)
+                Contact(
+                    id = if (contactId >= 0) contactId else -1L,
+                    name = contactName?.takeIf { it.isNotBlank() } ?: email,
+                    email = email
+                )
+            }
+        }
+
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            XendTheme {
                 // 1) AI Compose VM
                 val composeVm: MailComposeViewModel = viewModel(
                     factory = ComposeVmFactory(
@@ -1037,123 +1185,461 @@ class MailComposeActivity : ComponentActivity() {
 
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
-                val richTextState = rememberRichTextState()
+                val editorState = rememberXendRichEditorState()
 
-                var contacts by remember { mutableStateOf(emptyList<Contact>()) }
+                // Draft loading states
+                var showLoadDraftDialog by remember { mutableStateOf(false) }
+                var loadedDraft: DraftItem? by remember { mutableStateOf(null) }
+
+                var contacts by remember { mutableStateOf(prefilledContact?.let(::listOf) ?: emptyList<Contact>()) }
                 var newContact by remember { mutableStateOf(TextFieldValue("")) }
+                var contactSuggestions by remember { mutableStateOf<List<Contact>>(emptyList()) }
+
                 var showTemplateScreen by remember { mutableStateOf(false) }
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
+                var canUndo by rememberSaveable { mutableStateOf(false) }
+                var canRedo by rememberSaveable { mutableStateOf(false) }
+
+                // Banner state
+                var bannerState by remember { mutableStateOf<BannerState?>(null) }
+                // Auto-dismiss logic for banners
+                LaunchedEffect(bannerState) {
+                    if (bannerState?.autoDismiss == true) {
+                        kotlinx.coroutines.delay(3000)
+                        bannerState = null
+                    }
+                }
+
+                // AI Prompt Dialog state
+                var showAiPromptDialog by remember { mutableStateOf(false) }
+
+                // Show banner based on contact status
+                LaunchedEffect(contacts, knownByEmail) {
+                    val hasUnknown = contacts.any { contact ->
+                        contact.id < 0L && contact.email.lowercase() !in knownByEmail
+                    }
+                    val hasKnownContacts = contacts.any { contact ->
+                        contact.id >= 0L
+                    }
+
+                    bannerState = when {
+                        hasUnknown -> {
+                            // 미등록 연락처가 있는 경우
+                            BannerState(
+                                message = "저장되지 않은 연락처가 있습니다. 저장하면 더 향상된 AI 메일 작성이 가능해요.",
+                                type = BannerType.INFO
+                            )
+                        }
+                        hasKnownContacts -> {
+                            // 등록된 연락처만 있는 경우 - AI 작성 방식 안내
+                            BannerState(
+                                message = "AI가 연락처 정보를 활용해 메일을 작성해요. 자세히 보기",
+                                type = BannerType.INFO,
+                                onActionClick = { showAiPromptDialog = true }
+                            )
+                        }
+                        else -> null
+                    }
+                }
+
+                // Add Contact Dialog states
+                var showAddContactDialog by remember { mutableStateOf(false) }
+                var selectedContactForDialog by remember { mutableStateOf<Contact?>(null) }
+                var groups by remember { mutableStateOf<List<Group>>(emptyList()) }
+                val coroutineScope = rememberCoroutineScope()
+
+                // Save Draft Dialog states
+                var showSaveDraftDialog by remember { mutableStateOf(false) }
+                var draftSubjectToSave by remember { mutableStateOf("") }
+                var draftBodyToSave by remember { mutableStateOf("") }
+
+                // Repositories
+                val contactRepository = remember { ContactBookRepository(application.applicationContext) }
+                val inboxRepository = remember {
+                    InboxRepository(
+                        mailApiService = RetrofitClient.getMailApiService(application.applicationContext),
+                        emailDao = AppDatabase.getDatabase(application.applicationContext).emailDao()
+                    )
+                }
+                LaunchedEffect(Unit) {
+                    contactRepository.observeGroups().collect { loadedGroups ->
+                        groups = loadedGroups
+                    }
+                }
+
+                // Check for existing draft for the first recipient
+                LaunchedEffect(contacts) {
+                    val firstRecipientEmail = contacts.firstOrNull()?.email
+                    if (firstRecipientEmail != null) {
+                        val draft = inboxRepository.getDraftByRecipient(firstRecipientEmail)
+                        if (draft != null) {
+                            loadedDraft = draft
+                            showLoadDraftDialog = true
+                        }
+                    }
+                }
+
+                LaunchedEffect(newContact.text) {
+                    val query = newContact.text.trim()
+                    if (query.length < 2) {
+                        contactSuggestions = emptyList()
+                    } else {
+                        delay(250)
+                        val results = runCatching {
+                            contactRepository.searchContacts(query).first()
+                        }.getOrDefault(emptyList())
+                        contactSuggestions = results
+                            .filterNot { candidate ->
+                                contacts.any { it.email.equals(candidate.email, ignoreCase = true) }
+                            }
+                            .take(5)
+                    }
+                }
+
+                // Handle back press to show save draft dialog
+                val onBackPressedCallback = remember {
+                    object : OnBackPressedCallback(true) {
+                        override fun handleOnBackPressed() {
+                            Log.d("SaveDraftDebug", "Back button pressed in MailComposeActivity.")
+                            // Check if there's content to save
+                            val hasContent = subject.isNotBlank() || editorState.getText().isNotBlank()
+                            val hasRecipient = contacts.isNotEmpty() // Check for recipients
+                            Log.d("SaveDraftDebug", "hasContent: $hasContent, hasRecipient: $hasRecipient")
+                            if (hasContent && hasRecipient) { // Only show dialog if there's content AND a recipient
+                                draftSubjectToSave = subject
+                                draftBodyToSave = editorState.getHtml()
+                                showSaveDraftDialog = true
+                                Log.d("SaveDraftDebug", "showSaveDraftDialog set to true.")
+                            } else {
+                                Log.d("SaveDraftDebug", "No content or no recipient, finishing activity.")
+                                finish()
+                            }
+                        }
+                    }
+                }
+                DisposableEffect(onBackPressedCallback) {
+                    onBackPressedDispatcher.addCallback(onBackPressedCallback)
+                    onDispose {
+                        onBackPressedCallback.remove()
+                    }
+                }
 
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
 
+                val undoAction: () -> Unit = {
+                    composeVm.undo(subject, editorState.getHtml())?.let { snapshot ->
+                        subject = snapshot.subject
+                        editorState.setHtml(snapshot.bodyHtml)
+                        canUndo = false
+                        canRedo = true
+                    }
+                }
+
+                val redoAction: () -> Unit = {
+                    composeVm.redo(subject, editorState.getHtml())?.let { snapshot ->
+                        subject = snapshot.subject
+                        editorState.setHtml(snapshot.bodyHtml)
+                        canUndo = true
+                        canRedo = false
+                    }
+                }
+
                 // Enable/disable realtime mode when toggle changes
-                LaunchedEffect(aiRealtime) {
+                DisposableEffect(aiRealtime) {
                     composeVm.enableRealtimeMode(aiRealtime)
+
+                    onDispose {
+                        // Composable이 사라질 때 무조건 WebSocket 끊기
+                        if (aiRealtime) {
+                            composeVm.enableRealtimeMode(false)
+                        }
+                    }
                 }
 
                 // Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
-                        richTextState.setHtml(composeUi.bodyRendered)
+                        editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
 
                 // Monitor text changes for realtime suggestions
-                LaunchedEffect(richTextState.annotatedString.text) {
-                    if (aiRealtime) {
-                        composeVm.onTextChanged(richTextState.toHtml())
+                LaunchedEffect(editorState.editor) {
+                    editorState.editor?.setOnTextChangeListener { html ->
+                        if (aiRealtime) {
+                            composeVm.onTextChanged(html)
+                        }
                     }
                 }
 
-                // Show snackbar for send results
-                val snackHost = remember { SnackbarHostState() }
-                LaunchedEffect(sendUi.lastSuccessMsg, sendUi.error) {
-                    sendUi.lastSuccessMsg?.let { snackHost.showSnackbar(it) }
-                    sendUi.error?.let { snackHost.showSnackbar("전송 실패: $it") }
+                // Update banner state for send results
+                LaunchedEffect(sendUi.lastSuccessMsg) {
+                    sendUi.lastSuccessMsg?.let {
+                        bannerState = BannerState(
+                            message = "메일 전송에 성공했습니다.",
+                            type = BannerType.SUCCESS,
+                            actionText = "홈 화면 이동하기",
+                            onActionClick = {
+                                // Navigate to MailActivity
+                                val intent = Intent(this@MailComposeActivity, MailActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                startActivity(intent)
+                                finish()
+                            }
+                        )
+                    }
                 }
 
-                Scaffold(snackbarHost = { SnackbarHost(snackHost) }) { innerPadding ->
-                    if (showTemplateScreen) {
-                        // 템플릿 선택 화면
-                        TemplateSelectionScreen(
-                            onBack = { showTemplateScreen = false },
-                            onTemplateSelected = { template ->
-                                subject = template.subject
-                                richTextState.setHtml(template.body)
-                                showTemplateScreen = false
-                            },
-                            modifier = Modifier.padding(innerPadding)
+                LaunchedEffect(sendUi.error) {
+                    sendUi.error?.let {
+                        bannerState = BannerState(
+                            message = "메일 전송에 실패했습니다. 다시 시도해주세요.",
+                            type = BannerType.ERROR
                         )
-                    } else {
-                        // 메일 작성 화면
-                        EmailComposeScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            subject = subject,
-                            onSubjectChange = { subject = it },
-                            richTextState = richTextState,
-                            contacts = contacts,
-                            onContactsChange = { contacts = it },
-                            newContact = newContact,
-                            onNewContactChange = { newContact = it },
-                            knownContactsByEmail = knownByEmail,
-                            isStreaming = composeUi.isStreaming,
-                            error = composeUi.error,
-                            sendUiState = sendUi,
-                            onBack = { finish() },
-                            onTemplateClick = { showTemplateScreen = true },
-                            onUndo = { /* TODO */ },
-                            suggestionText = composeUi.suggestionText,
-                            onAcceptSuggestion = {
-                                // 전체 추천 문장 적용
-                                val suggestion = composeUi.suggestionText
-                                if (suggestion.isNotEmpty()) {
-                                    val currentText = richTextState.annotatedString.text
-                                    val separator = if (currentText.endsWith(" ") || currentText.isEmpty()) "" else " "
+                    }
+                }
 
-                                    // 기존 HTML + 전체 추천 문장
-                                    val currentHtml = richTextState.toHtml()
-                                    richTextState.setHtml(currentHtml + separator + suggestion)
+                val acceptSuggestion: () -> Unit = {
+                    editorState.acceptSuggestion()
+                    editorState.requestFocusAndShowKeyboard()
+                    composeVm.acceptSuggestion()
+                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                }
 
-                                    // 추천 완료 후 클리어
-                                    composeVm.acceptSuggestion()
-                                }
-                            },
-                            aiRealtime = aiRealtime,
-                            onAiRealtimeToggle = { aiRealtime = it },
-                            onAiComplete = {
-                                val payload = JSONObject().apply {
-                                    put("subject", subject.ifBlank { "제목 생성" })
-                                    // Use HTML content for AI prompt
-                                    put("body", richTextState.toHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
-                                    put("to_emails", JSONArray(contacts.map { it.email }))
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Scaffold { innerPadding ->
+                        if (showTemplateScreen) {
+                            // 템플릿 선택 화면
+                            TemplateSelectionScreen(
+                                onBack = { showTemplateScreen = false },
+                                onTemplateSelected = { template ->
+                                    subject = template.subject
+                                    editorState.setHtml(template.body)
+                                    showTemplateScreen = false
+                                },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        } else {
+                            // 메일 작성 화면
+                            EmailComposeScreen(
+                                modifier = Modifier.padding(innerPadding),
+                                subject = subject,
+                                onSubjectChange = { subject = it },
+                                editorState = editorState,
+                                contacts = contacts,
+                                onContactsChange = { contacts = it },
+                                newContact = newContact,
+                                onNewContactChange = { newContact = it },
+                                knownContactsByEmail = knownByEmail,
+                                isStreaming = composeUi.isStreaming,
+                                error = composeUi.error,
+                                sendUiState = sendUi,
+                                // Trigger our custom back press handling
+                                onBack = { onBackPressedDispatcher.onBackPressed() },
+                                onTemplateClick = { showTemplateScreen = true },
+                                onUndo = undoAction,
+                                suggestionText = composeUi.suggestionText,
+                                onAcceptSuggestion = acceptSuggestion,
+                                aiRealtime = aiRealtime,
+                                onAiRealtimeToggle = { aiRealtime = it },
+                                onAiComplete = {
+                                    // Save current state before AI generation
+                                    composeVm.saveUndoSnapshot(
+                                        subject = subject,
+                                        bodyHtml = editorState.getHtml()
+                                    )
+                                    canUndo = true
+                                    canRedo = false
+
+                                    val payload = JSONObject().apply {
+                                        put("subject", subject.ifBlank { "제목 생성" })
+                                        // Use HTML content for AI prompt
+                                        put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
+                                        put("to_emails", JSONArray(contacts.map { it.email }))
 //                                    put("relationship", "업무 관련")
 //                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
 //                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
 //                                    put("format_prompt", "문단 구분, 끝인사 포함")
 //                                    put("language", "Korean")
+                                    }
+                                    composeVm.startStreaming(payload)
+                                },
+                                onStopStreaming = { composeVm.stopStreaming() },
+                                onSend = {
+                                    val recipient = contacts.firstOrNull()?.email
+                                    if (recipient == null) {
+                                        // This case is handled by button's enabled state, but as a safeguard:
+                                        return@EmailComposeScreen
+                                    }
+                                    // Send HTML content
+                                    sendVm.sendEmail(
+                                        to = contacts.map { it.email },
+                                        subject = subject.ifBlank { "(제목 없음)" },
+                                        body = editorState.getHtml()
+                                    )
+                                },
+                                onAddContactClick = { contact ->
+                                    selectedContactForDialog = contact
+                                    showAddContactDialog = true
+                                },
+                                bannerState = bannerState,
+                                onDismissBanner = { bannerState = null },
+                                showInlineSwipeBar = false,
+                                canUndo = canUndo,
+                                canRedo = canRedo,
+                                onRedo = redoAction,
+                                contactSuggestions = contactSuggestions,
+                                onSuggestionClick = { suggestion ->
+                                    if (contacts.none { it.email.equals(suggestion.email, ignoreCase = true) }) {
+                                        contacts = contacts + suggestion
+                                    }
+                                    newContact = TextFieldValue("")
+                                    contactSuggestions = emptyList()
+                                },
+                                onShowPrompt = {
+                                    // TODO: Hook up prompt viewer once backend API is ready
                                 }
-                                composeVm.startStreaming(payload)
-                            },
-                            onStopStreaming = { composeVm.stopStreaming() },
-                            onSend = {
-                                val recipient = contacts.firstOrNull()?.email
-                                if (recipient == null) {
-                                    // This case is handled by button's enabled state, but as a safeguard:
-                                    return@EmailComposeScreen
+                            )
+
+                            // Show Add Contact Dialog
+                            if (showAddContactDialog) {
+                                selectedContactForDialog?.let { contact ->
+                                    AddContactDialog(
+                                        senderName = "",
+                                        senderEmail = contact.email,
+                                        groups = groups,
+                                        onDismiss = {
+                                            showAddContactDialog = false
+                                            selectedContactForDialog = null
+                                        },
+                                        onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                                            coroutineScope.launch {
+                                                try {
+                                                    val added = contactRepository.addContact(
+                                                        name = name,
+                                                        email = email,
+                                                        groupId = groupId,
+                                                        senderRole = senderRole,
+                                                        recipientRole = recipientRole,
+                                                        personalPrompt = personalPrompt
+                                                    ).toDomain()
+                                                    contacts = if (contacts.any
+                                                            { it.email.equals(added.email, ignoreCase = true) }
+                                                    ) {
+                                                        contacts.map { existing ->
+                                                            if (existing.email.equals(added.email, ignoreCase = true)) {
+                                                                added
+                                                            } else {
+                                                                existing
+                                                            }
+                                                        }
+                                                    } else {
+                                                        contacts + added
+                                                    }
+                                                    newContact = TextFieldValue("")
+                                                    contactSuggestions = emptyList()
+                                                    showAddContactDialog = false
+                                                    selectedContactForDialog = null
+                                                    // Show success banner
+                                                    bannerState = BannerState(
+                                                        message = "연락처가 추가되었습니다.",
+                                                        type = BannerType.SUCCESS,
+                                                        autoDismiss = true
+                                                    )
+                                                } catch (e: Exception) {
+                                                    // Handle error
+                                                    bannerState = BannerState(
+                                                        message = "오류: ${e.message}",
+                                                        type = BannerType.ERROR,
+                                                        autoDismiss = true
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    )
                                 }
-                                // Send HTML content
-                                sendVm.sendEmail(
-                                    to = contacts.map { it.email },
-                                    subject = subject.ifBlank { "(제목 없음)" },
-                                    body = richTextState.toHtml()
+                            }
+
+                            // Show Save Draft Confirmation Dialog
+                            if (showSaveDraftDialog) {
+                                SaveDraftConfirmationDialog(
+                                    onDismiss = { showSaveDraftDialog = false },
+                                    onSave = {
+                                        coroutineScope.launch {
+                                            val draftId = inboxRepository.saveDraft(
+                                                DraftItem(
+                                                    subject = draftSubjectToSave,
+                                                    body = draftBodyToSave,
+                                                    recipients = contacts.map { it.email }
+                                                )
+                                            )
+                                            // Optionally show a banner for draft saved
+                                            bannerState = BannerState(
+                                                message = "임시 저장되었습니다. (ID: $draftId)",
+                                                type = BannerType.INFO,
+                                                autoDismiss = true
+                                            )
+                                            showSaveDraftDialog = false
+                                            setResult(RESULT_DRAFT_SAVED, Intent()) // Set result for parent activity
+                                            finish()
+                                        }
+                                    },
+                                    onDiscard = {
+                                        showSaveDraftDialog = false
+                                        finish()
+                                    }
                                 )
                             }
-                        )
+
+                            // Show Load Draft Confirmation Dialog
+                            if (showLoadDraftDialog) {
+                                LoadDraftConfirmationDialog(
+                                    onDismiss = { showLoadDraftDialog = false },
+                                    onLoad = {
+                                        loadedDraft?.let { draft ->
+                                            subject = draft.subject
+                                            editorState.setHtml(draft.body)
+                                            // Populate contacts from draft recipients
+                                            contacts = draft.recipients.map { email ->
+                                                val normalized = email.trim().lowercase()
+                                                knownByEmail[normalized]
+                                                    ?: Contact(id = -1L, name = email, email = email, group = null)
+                                            }
+                                            coroutineScope.launch {
+                                                inboxRepository.deleteDraft(draft.id) // Delete loaded draft
+                                            }
+                                        }
+                                        showLoadDraftDialog = false
+                                    },
+                                    onDiscard = {
+                                        coroutineScope.launch {
+                                            loadedDraft?.let { draft ->
+                                                inboxRepository.deleteDraft(draft.id) // Delete discarded draft
+                                            }
+                                        }
+                                        showLoadDraftDialog = false
+                                    }
+                                )
+                            }
+
+                            // Show AI Prompt Preview Dialog
+                            if (showAiPromptDialog) {
+                                AiPromptPreviewDialog(
+                                    contacts = contacts,
+                                    onDismiss = { showAiPromptDialog = false }
+                                )
+                            }
+                        }
                     }
                 }
+
+                SwipeSuggestionOverlay(
+                    visible = composeUi.suggestionText.isNotEmpty(),
+                    onSwipe = acceptSuggestion
+                )
             }
         }
     }
@@ -1166,11 +1652,11 @@ class MailComposeActivity : ComponentActivity() {
 @Composable
 private fun EmailComposePreview() {
     MaterialTheme(colorScheme = lightColorScheme()) {
-        val richTextState = rememberRichTextState()
+        val editorState = rememberXendRichEditorState()
         EmailComposeScreen(
             subject = "초안 제목",
             onSubjectChange = {},
-            richTextState = richTextState,
+            editorState = editorState,
             contacts = listOf(Contact(0L, null, "홍길동", "test@example.com")),
 
             onContactsChange = {},
@@ -1184,7 +1670,227 @@ private fun EmailComposePreview() {
             suggestionText = "",
             onAcceptSuggestion = {},
             aiRealtime = true,
-            onAiRealtimeToggle = {}
+            onAiRealtimeToggle = {},
+            bannerState = null,
+            onDismissBanner = {},
+            canUndo = false,
+            canRedo = false,
+            onRedo = {},
+            contactSuggestions = emptyList(),
+            onSuggestionClick = {},
+            onShowPrompt = {}
         )
     }
+}
+
+@Composable
+private fun SaveDraftConfirmationDialog(onDismiss: () -> Unit, onSave: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("메일 임시 저장") },
+        text = { Text("작성 중인 메일 내용이 있습니다. 임시 저장하시겠습니까?") },
+        confirmButton = {
+            TextButton(onClick = onSave) {
+                Text("임시 저장")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDiscard) {
+                    Text("삭제")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("취소")
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun LoadDraftConfirmationDialog(onDismiss: () -> Unit, onLoad: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("임시 저장된 메일 불러오기") },
+        text = { Text("이전에 작성하던 메일이 있습니다. 불러오시겠습니까?") },
+        confirmButton = {
+            TextButton(onClick = onLoad) {
+                Text("불러오기")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소")
+            }
+        }
+    )
+}
+
+@Composable
+private fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var promptData by remember { mutableStateOf<com.fiveis.xend.network.PromptPreviewResponse?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Fetch prompt preview data
+    LaunchedEffect(contacts) {
+        isLoading = true
+        errorMessage = null
+        try {
+            val aiApiService = RetrofitClient.getAiApiService(context)
+            val requestEmails = contacts.map { it.email }
+            Log.d("AiPromptPreview", "Requesting prompt preview for emails: $requestEmails")
+
+            val response = aiApiService.getPromptPreview(
+                com.fiveis.xend.network.PromptPreviewRequest(
+                    to = requestEmails
+                )
+            )
+
+            Log.d("AiPromptPreview", "Response code: ${response.code()}")
+
+            if (response.isSuccessful) {
+                promptData = response.body()
+                Log.d("AiPromptPreview", "Success! Data: $promptData")
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e("AiPromptPreview", "Error ${response.code()}: $errorBody")
+                errorMessage = "프롬프트 정보를 불러오는데 실패했습니다.\n코드: ${response.code()}\n${errorBody?.take(200) ?: ""}"
+            }
+        } catch (e: Exception) {
+            Log.e("AiPromptPreview", "Exception: ${e.message}", e)
+            errorMessage = "네트워크 오류: ${e.message}"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "AI 작성 방식",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Recipient info
+                Text(
+                    text = "받는 사람",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = ToolbarIconTint
+                    )
+                )
+                contacts.forEach { contact ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ComposeSurface)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(StableColor.forId(contact.id)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = (contact.name.firstOrNull() ?: '?').uppercaseChar().toString(),
+                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = contact.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextPrimary
+                                )
+                            )
+                            Text(
+                                text = contact.email,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+                }
+
+                // Loading/Error/Data state
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Blue60)
+                        }
+                    }
+                    errorMessage != null -> {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = errorMessage ?: "오류가 발생했습니다",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                    promptData != null -> {
+                        Text(
+                            text = "AI는 다음 정보를 활용해요",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = ToolbarIconTint
+                            )
+                        )
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Blue80.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, Blue80.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = promptData?.previewText?.takeIf { it.isNotBlank() }
+                                    ?: "해당 수신자에 대한 프롬프트 정보를 아직 준비하지 못했습니다.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "확인",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = Blue60,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+    )
 }

@@ -8,6 +8,7 @@ data class GroupResponse(
     val id: Long,
     val name: String,
     val description: String? = null,
+    val emoji: String? = null,
     val options: List<PromptOption> = emptyList(),
     val contacts: List<ContactResponse>? = null,
     @SerialName("created_at") val createdAt: String? = null,
@@ -18,6 +19,7 @@ fun GroupResponse.toDomain(): Group = Group(
     id = id,
     name = name,
     description = description,
+    emoji = emoji,
     options = options,
     members = contacts?.map { contactResponse ->
         Contact(

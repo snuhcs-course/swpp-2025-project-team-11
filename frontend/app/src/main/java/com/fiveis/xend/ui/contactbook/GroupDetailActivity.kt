@@ -12,10 +12,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.R
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.ui.theme.StableColor
 
 class GroupDetailActivity : ComponentActivity() {
@@ -48,7 +52,19 @@ class GroupDetailActivity : ComponentActivity() {
             MaterialTheme {
                 val groupColor = StableColor.forId(groupId)
 
-                val vm: GroupDetailViewModel = viewModel()
+                val factory = remember {
+                    object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return GroupDetailViewModel(
+                                application,
+                                ContactBookRepository(applicationContext)
+                            ) as T
+                        }
+                    }
+                }
+
+                val vm: GroupDetailViewModel = viewModel(factory = factory)
                 LaunchedEffect(groupId) { vm.load(groupId, force = true) }
                 val state by vm.uiState.collectAsStateWithLifecycle()
 
@@ -66,7 +82,23 @@ class GroupDetailActivity : ComponentActivity() {
                             Intent(this, ContactDetailActivity::class.java)
                                 .putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, contact.id)
                         )
-                    }
+                    },
+                    onRemoveMember = { member -> vm.removeMemberFromGroup(member.id) },
+                    onAddMembers = { ids -> vm.addMembersToGroup(ids) },
+                    onRenameGroup = { newName, newDesc -> vm.renameGroup(newName, newDesc) },
+                    onClearRenameError = { vm.clearRenameError() },
+                    onRefreshPromptOptions = { vm.refreshPromptOptions() },
+                    onSavePromptOptions = { ids -> vm.updateGroupPromptOptions(ids) },
+                    onAddPromptOption = { key, name, prompt, onSuccess, onError ->
+                        vm.addPromptOption(key, name, prompt, onSuccess, onError)
+                    },
+                    onUpdatePromptOption = { id, name, prompt, onSuccess, onError ->
+                        vm.updatePromptOption(id, name, prompt, onSuccess, onError)
+                    },
+                    onDeletePromptOption = { id, onSuccess, onError ->
+                        vm.deletePromptOption(id, onSuccess, onError)
+                    },
+                    onClearPromptError = { vm.clearPromptOptionsError() }
                 )
 
                 if (state.isLoading && state.group == null) {

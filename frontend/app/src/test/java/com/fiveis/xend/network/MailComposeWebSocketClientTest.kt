@@ -3,6 +3,7 @@ package com.fiveis.xend.network
 import android.content.Context
 import io.mockk.*
 import okhttp3.*
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
@@ -28,7 +29,11 @@ class MailComposeWebSocketClientTest {
         mockWebSocket = mockk(relaxed = true)
 
         mockkObject(RetrofitClient)
-        every { RetrofitClient.getClient(any()) } returns mockClient
+        every { RetrofitClient.getWebSocketClient(any()) } returns mockClient
+
+        // Mock TokenManager to return empty tokens (will trigger error)
+        mockkConstructor(com.fiveis.xend.data.source.TokenManager::class)
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns null
 
         client = MailComposeWebSocketClient(mockContext, wsUrl)
     }
@@ -51,6 +56,9 @@ class MailComposeWebSocketClientTest {
 
     @Test
     fun connect_creates_new_websocket() {
+        // Mock TokenManager to return a valid token
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns "valid-token"
+
         val listenerSlot = slot<WebSocketListener>()
         every { mockClient.newWebSocket(any(), capture(listenerSlot)) } returns mockWebSocket
 
@@ -66,7 +74,7 @@ class MailComposeWebSocketClientTest {
         var error: String? = null
         client.connect({}, { e -> error = e }, {})
 
-        client.sendMessage("system", "text")
+        client.sendMessage(text = "text", toEmails = emptyList())
 
         assertNotNull(error)
         // Check if error message contains "WebSocket" or "연결"
@@ -75,6 +83,9 @@ class MailComposeWebSocketClientTest {
 
     @Test
     fun send_message_when_connected_sends_json() {
+        // Mock TokenManager to return a valid token
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns "valid-token"
+
         val listenerSlot = slot<WebSocketListener>()
         every { mockClient.newWebSocket(any(), capture(listenerSlot)) } returns mockWebSocket
         every { mockWebSocket.send(any<String>()) } returns true
@@ -82,12 +93,12 @@ class MailComposeWebSocketClientTest {
         client.connect({}, {}, {})
         listenerSlot.captured.onOpen(mockWebSocket, mockk(relaxed = true))
 
-        client.sendMessage("system prompt", "user text")
+        val recipients = listOf("recipient@example.com")
+        client.sendMessage(text = "user text", toEmails = recipients)
 
         val expectedJson = JSONObject()
-            .put("system_prompt", "system prompt")
             .put("text", "user text")
-            .put("max_tokens", 50)
+            .put("to_emails", JSONArray(recipients))
             .toString()
 
         verify { mockWebSocket.send(expectedJson) }
@@ -95,6 +106,9 @@ class MailComposeWebSocketClientTest {
 
     @Test
     fun disconnect_closes_websocket() {
+        // Mock TokenManager to return a valid token
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns "valid-token"
+
         every { mockClient.newWebSocket(any(), any()) } returns mockWebSocket
         client.connect({}, {}, {})
 
@@ -105,6 +119,9 @@ class MailComposeWebSocketClientTest {
 
     @Test
     fun listener_on_message_invokes_callback() {
+        // Mock TokenManager to return a valid token
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns "valid-token"
+
         val listenerSlot = slot<WebSocketListener>()
         every { mockClient.newWebSocket(any(), capture(listenerSlot)) } returns mockWebSocket
 
@@ -118,6 +135,9 @@ class MailComposeWebSocketClientTest {
 
     @Test
     fun listener_on_failure_invokes_error_callback() {
+        // Mock TokenManager to return a valid token
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns "valid-token"
+
         val listenerSlot = slot<WebSocketListener>()
         every { mockClient.newWebSocket(any(), capture(listenerSlot)) } returns mockWebSocket
 
@@ -126,11 +146,16 @@ class MailComposeWebSocketClientTest {
 
         listenerSlot.captured.onFailure(mockWebSocket, Exception("Connection failed"), null)
 
-        assertEquals("Connection failed", error)
+        // The error callback should be invoked with the failure message
+        assertNotNull(error)
+        assertTrue(error!!.contains("Connection failed"))
     }
 
     @Test
     fun listener_on_closed_invokes_close_callback() {
+        // Mock TokenManager to return a valid token
+        every { anyConstructed<com.fiveis.xend.data.source.TokenManager>().getAccessToken() } returns "valid-token"
+
         val listenerSlot = slot<WebSocketListener>()
         every { mockClient.newWebSocket(any(), capture(listenerSlot)) } returns mockWebSocket
 

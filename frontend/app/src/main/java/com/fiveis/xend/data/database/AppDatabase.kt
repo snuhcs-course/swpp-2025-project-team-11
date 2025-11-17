@@ -12,22 +12,26 @@ import com.fiveis.xend.data.database.entity.ContactEntity
 import com.fiveis.xend.data.database.entity.GroupEntity
 import com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef
 import com.fiveis.xend.data.database.entity.PromptOptionEntity
+import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
 
 /**
  * v1 -> v2: Contact/Group 관련 테이블 추가, EmailItem에 body 필드 추가
  * v2 -> v3: body 필드 DEFAULT 값 추가 (스키마만 변경, 마이그레이션 불필요)
+ * v3 -> v4: drafts 테이블 추가
+ * v4 -> v5: groups 테이블에 emoji 필드 추가, EmailItem에 toEmail/attachments 컬럼 추가
  */
 @Database(
     entities = [
         EmailItem::class,
+        DraftItem::class,
         GroupEntity::class,
         ContactEntity::class,
         ContactContextEntity::class,
         PromptOptionEntity::class,
         GroupPromptOptionCrossRef::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -143,6 +147,44 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from v3 to v4:
+         * - Create drafts table with recipients column
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `drafts` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `subject` TEXT NOT NULL,
+                        `body` TEXT NOT NULL,
+                        `recipients` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL
+                    )"""
+                )
+            }
+        }
+
+        /**
+         * Migration from v4 to v5:
+         * - Add toEmail + attachments columns to emails table (stores metadata references)
+         * - Add emoji column to groups table
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add toEmail and attachments to emails table
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN toEmail TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'"
+                )
+
+                // Add emoji to groups table
+                database.execSQL("ALTER TABLE `groups` ADD COLUMN `emoji` TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 val newInstance = Room.databaseBuilder(
@@ -150,7 +192,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "xend_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .fallbackToDestructiveMigration() // Add this line
                     .build()
                 instance = newInstance
                 newInstance

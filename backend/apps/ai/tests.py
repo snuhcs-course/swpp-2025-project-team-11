@@ -5,23 +5,23 @@ from unittest.mock import Mock, patch
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.ai.services import langchain as lc
+from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.ai.services import pii_masker as pm
+from apps.ai.services.mail_generation import stream_mail_generation
+from apps.ai.services.reply import stream_reply_options_llm
 from apps.ai.services.utils import (
-    _fetch_fewshot_bodies_for_group,
-    _fetch_fewshot_bodies_for_single,
+    _fetch_analysis_for_group,
+    _fetch_analysis_for_single,
     build_prompt_inputs,
     collect_prompt_context,
     heartbeat,
     sse_event,
 )
 from apps.contact.models import Contact, ContactContext, Group, PromptOption
-from apps.mail.models import SentMail
 
 User = get_user_model()
 
@@ -327,7 +327,6 @@ class ReplyOptionsStreamViewTest(TestCase):
 
 
 def _drain(gen):
-    """generator → list로 한 번에 뽑아주는 헬퍼"""
     return list(gen)
 
 
@@ -339,16 +338,17 @@ class StreamMailGenerationTest(SimpleTestCase):
     - SSE 이벤트 시퀀스가 ready → subject → body.delta* → done 형태로 나오는지
     """
 
-    @patch("apps.ai.services.langchain.time.monotonic", side_effect=[0, 0, 0])
-    @patch("apps.ai.services.langchain.heartbeat", return_value="HEARTBEAT_EVT")
-    @patch("apps.ai.services.langchain.sse_event")
-    @patch.object(lc, "_body_chain")
-    @patch.object(lc, "_subject_chain")
-    @patch("apps.ai.services.langchain.PiiMasker")
-    @patch("apps.ai.services.langchain.build_prompt_inputs")
-    @patch("apps.ai.services.langchain.collect_prompt_context")
-    @patch("apps.ai.services.langchain.unmask_stream")
-    @patch("apps.ai.services.langchain.make_req_id", return_value="req123")
+    @patch("apps.ai.services.mail_generation.time.monotonic", side_effect=[0, 0, 0])
+    @patch("apps.ai.services.utils.heartbeat", return_value="HEARTBEAT_EVT")
+    @patch("apps.ai.services.mail_generation.sse_event")
+    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.plan_chain")
+    @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.build_prompt_inputs")
+    @patch("apps.ai.services.mail_generation.collect_prompt_context")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="req123")
     def test_stream_mail_generation_happy_path(
         self,
         mock_make_req_id,
@@ -356,20 +356,18 @@ class StreamMailGenerationTest(SimpleTestCase):
         mock_collect_ctx,
         mock_build_inputs,
         MockPiiMasker,
-        mock_subject_chain,
+        mock_plan_chain,
         mock_body_chain,
+        mock_subject_chain,
         mock_sse_event,
         mock_heartbeat,
-        _,
+        mock_monotonic,
     ):
-        # 가짜 유저 / 수신자
         user = Mock()
         to_emails = ["a@example.com", "b@example.com"]
 
-        # collect_prompt_context -> ctx 리턴
         mock_collect_ctx.return_value = {"ctx_key": "ctx_val"}
 
-        # build_prompt_inputs -> raw_inputs 리턴
         mock_build_inputs.return_value = {
             "language": "ko",
             "recipients": ["a@example.com", "b@example.com"],
@@ -378,10 +376,9 @@ class StreamMailGenerationTest(SimpleTestCase):
             "prompt_text": "be polite",
             "sender_role": "me",
             "recipient_role": "them",
-            "fewshots": ["f1", "f2"],
+            "analysis": None,
         }
 
-        # 마스커 모킹
         masker_instance = Mock()
         masker_instance.mask_inputs.return_value = (
             {
@@ -394,21 +391,16 @@ class StreamMailGenerationTest(SimpleTestCase):
                 "prompt_text": "be polite",
                 "sender_role": "me",
                 "recipient_role": "them",
-                "fewshots": ["f1", "f2"],
+                "analysis": None,
             },
             {1: "secret-a"},
         )
         MockPiiMasker.return_value = masker_instance
 
-        # 제목 체인 -> "SUBJECT_OUT   "
         mock_subject_chain.invoke.return_value = "SUBJECT_OUT   "
-
-        # 본문 체인 -> stream() 이터레이터
         mock_body_chain.stream.return_value = iter(["BODY_CHUNK_1", "BODY_CHUNK_2"])
 
-        # unmask_stream 동작 통일
         def _unmask_side_effect(chunks, req_id, mapping):
-            # 제목 쪽은 list로 들어옴, 본문 쪽은 iterator로 들어옴
             if isinstance(chunks, list):
                 for piece in chunks:
                     yield f"UNMASKED_{piece.strip()}"
@@ -418,7 +410,6 @@ class StreamMailGenerationTest(SimpleTestCase):
 
         mock_unmask_stream.side_effect = _unmask_side_effect
 
-        # sse_event → 사람이 읽기 쉽게 dict로
         def _sse_side_effect(event_type, payload, eid=None, retry_ms=None):
             data = {"event": event_type, "payload": payload}
             if eid is not None:
@@ -429,7 +420,7 @@ class StreamMailGenerationTest(SimpleTestCase):
 
         mock_sse_event.side_effect = _sse_side_effect
 
-        gen = lc.stream_mail_generation(
+        gen = stream_mail_generation(
             user=user,
             subject="hi there",
             body="this is body",
@@ -437,27 +428,18 @@ class StreamMailGenerationTest(SimpleTestCase):
         )
         out_events = _drain(gen)
 
-        # collect_prompt_context / build_prompt_inputs 호출 확인
         mock_collect_ctx.assert_called_once_with(user, to_emails)
         mock_build_inputs.assert_called_once_with({"ctx_key": "ctx_val"})
-
-        # PiiMasker 호출 확인
         MockPiiMasker.assert_called_once_with("req123")
         masker_instance.mask_inputs.assert_called_once()
 
-        # subject_chain.invoke 에 마스킹된 subject가 들어갔는지
-        mock_subject_chain.invoke.assert_called_once()
         called_inputs_for_subject = mock_subject_chain.invoke.call_args[0][0]
         self.assertEqual(called_inputs_for_subject["subject"], "MASKED_SUBJ")
 
-        # body_chain.stream 호출 확인 (locked_subject 등)
-        mock_body_chain.stream.assert_called_once()
         locked_inputs = mock_body_chain.stream.call_args[0][0]
         self.assertEqual(locked_inputs["locked_subject"], "SUBJECT_OUT")
         self.assertEqual(locked_inputs["body"], "MASKED_BODY")
 
-        # 이벤트 순서 / 구조
-        # 0 ready / 1 subject / 2.. body.delta / last done
         self.assertGreaterEqual(len(out_events), 4)
         self.assertEqual(out_events[0]["event"], "ready")
         self.assertIn("ts", out_events[0]["payload"])
@@ -483,14 +465,15 @@ class StreamReplyOptionsLLMTest(SimpleTestCase):
     - 우리는 reply_body_chain, plan_chain 등을 mock 해서 결정적인 흐름만 확인
     """
 
-    @patch("apps.ai.services.langchain.time.monotonic", return_value=0)
-    @patch("apps.ai.services.langchain.sse_event")
-    @patch("apps.ai.services.langchain.PiiMasker")
-    @patch("apps.ai.services.langchain.build_prompt_inputs")
-    @patch("apps.ai.services.langchain.collect_prompt_context")
-    @patch("apps.ai.services.langchain.plan_chain")
-    @patch("apps.ai.services.langchain.reply_body_chain")
-    @patch("apps.ai.services.langchain.make_req_id", return_value="req777")
+    @patch("apps.ai.services.reply.time.monotonic", return_value=0)
+    @patch("apps.ai.services.reply.unmask_stream")
+    @patch("apps.ai.services.reply.sse_event")
+    @patch("apps.ai.services.reply.PiiMasker")
+    @patch("apps.ai.services.reply.build_prompt_inputs")
+    @patch("apps.ai.services.reply.collect_prompt_context")
+    @patch("apps.ai.services.reply.plan_chain")
+    @patch("apps.ai.services.reply.reply_body_chain")
+    @patch("apps.ai.services.reply.make_req_id", return_value="req777")
     def test_stream_reply_options_llm_basic(
         self,
         mock_make_req_id,
@@ -500,12 +483,12 @@ class StreamReplyOptionsLLMTest(SimpleTestCase):
         mock_build_inputs,
         MockPiiMasker,
         mock_sse_event,
+        mock_unmask_stream,
         mock_monotonic,
     ):
         user = Mock()
         to_email = "boss@example.com"
 
-        # collect_prompt_context / build_prompt_inputs mock
         mock_collect_ctx.return_value = {"ctx": "val"}
         mock_build_inputs.return_value = {
             "language": "ko",
@@ -516,7 +499,6 @@ class StreamReplyOptionsLLMTest(SimpleTestCase):
             "recipient_role": "boss",
         }
 
-        # 마스커 mock
         masker_instance = Mock()
         masker_instance.mask_inputs.return_value = (
             {
@@ -533,7 +515,6 @@ class StreamReplyOptionsLLMTest(SimpleTestCase):
         )
         MockPiiMasker.return_value = masker_instance
 
-        # plan_chain.invoke -> ReplyPlan 유사 객체
         class FakeOpt:
             def __init__(self, t, title):
                 self.type = t
@@ -549,15 +530,12 @@ class StreamReplyOptionsLLMTest(SimpleTestCase):
 
         mock_plan_chain.invoke.return_value = FakePlan()
 
-        # reply_body_chain.astream -> async generator
         async def fake_astream(_inputs):
-            # delta 2조각 생성
             yield "BODY_PART_A"
             yield "BODY_PART_B"
 
         mock_reply_body_chain.astream.side_effect = fake_astream
 
-        # sse_event -> dict
         def _sse_side_effect(event_type, payload, eid=None, retry_ms=None):
             data = {"event": event_type, "payload": payload}
             if eid is not None:
@@ -568,54 +546,43 @@ class StreamReplyOptionsLLMTest(SimpleTestCase):
 
         mock_sse_event.side_effect = _sse_side_effect
 
-        # unmask_stream mock
-        with patch("apps.ai.services.langchain.unmask_stream") as mock_unmask_stream:
+        def _unmask_side_effect(chunks, req_id, mapping):
+            for c in chunks:
+                yield f"UNMASKED_{c}"
 
-            def _unmask_side_effect(chunks, req_id, mapping):
-                # chunks는 list[str] 또는 async 생성된 본문 조각들에서 온 list[str]
-                for c in chunks:
-                    yield f"UNMASKED_{c}"
+        mock_unmask_stream.side_effect = _unmask_side_effect
 
-            mock_unmask_stream.side_effect = _unmask_side_effect
+        gen = stream_reply_options_llm(
+            user=user,
+            subject="orig sub",
+            body="orig body",
+            to_email=to_email,
+        )
+        out_events = _drain(gen)
 
-            gen = lc.stream_reply_options_llm(
-                user=user,
-                subject="orig sub",
-                body="orig body",
-                to_email=to_email,
-            )
-            out_events = _drain(gen)
+        assert len(out_events) >= 4
+        assert out_events[0]["event"] == "ready"
+        assert "ts" in out_events[0]["payload"]
 
-        # ready 먼저 나와야 함
-        self.assertGreaterEqual(len(out_events), 4)
-        self.assertEqual(out_events[0]["event"], "ready")
-        self.assertIn("ts", out_events[0]["payload"])
-
-        # options 이벤트 확인
         options_events = [e for e in out_events if e["event"] == "options"]
-        self.assertEqual(len(options_events), 1)
+        assert len(options_events) == 1
         opt_payload = options_events[0]["payload"]
-        self.assertEqual(opt_payload["count"], 2)
-        self.assertEqual(len(opt_payload["items"]), 2)
+        assert opt_payload["count"] == 2
+        assert len(opt_payload["items"]) == 2
 
-        # unmask된 title/타입이 들어왔는지
         first_item = opt_payload["items"][0]
-        self.assertEqual(first_item["id"], 0)
-        # `네, 가능합니다` -> "UNMASKED_네, 가능합니다"
-        self.assertTrue(first_item["title"].startswith("UNMASKED_"))
-        self.assertTrue(first_item["type"].startswith("UNMASKED_"))
+        assert first_item["id"] == 0
+        assert first_item["title"].startswith("UNMASKED_")
+        assert first_item["type"].startswith("UNMASKED_")
 
-        # option.delta 들이 존재해야 함 (LLM 본문 생성 스트림)
         delta_events = [e for e in out_events if e["event"] == "option.delta"]
-        self.assertTrue(len(delta_events) > 0)
+        assert len(delta_events) > 0
 
-        # 각 옵션마다 option.done 이 한 번씩 나와야 함
         done_events = [e for e in out_events if e["event"] == "option.done"]
-        self.assertEqual(len(done_events), 2)
+        assert len(done_events) == 2
 
-        # 마지막 done 은 reason=all_options_finished
-        self.assertEqual(out_events[-1]["event"], "done")
-        self.assertEqual(out_events[-1]["payload"]["reason"], "all_options_finished")
+        assert out_events[-1]["event"] == "done"
+        assert out_events[-1]["payload"]["reason"] == "all_options_finished"
 
 
 class PiiMaskerAndUnmaskTest(SimpleTestCase):
@@ -708,7 +675,39 @@ class BuildPromptInputsTest(SimpleTestCase):
             "sender_role": "  Manager ",
             "recipient_role": "  Client ",
             "language": "ko-KR",
-            "fewshots": ["body1", "body2"],
+            "analysis": dict(
+                lexical_style={
+                    "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                    "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                    "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등이 반복적으로 등장합니다.",
+                    "slang_or_chat_markers": "구어체나 이모지는 거의 사용되지 않습니다.",
+                    "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’ 등의 공손 표현을 자주 사용합니다.",
+                },
+                grammar_patterns={
+                    "summary": "존댓말 중심으로 간결하게 구성됩니다.",
+                    "ender_distribution": "‘-습니다’, ‘-드립니다’ 중심.",
+                    "sentence_length": "짧고 명료한 문장이 많음.",
+                    "sentence_type_ratio": "서술문 위주, 간접 명령형 일부 포함.",
+                    "structure_pattern": "인사 → 요청 → 확인 요청 → 마무리 구조.",
+                    "paragraph_stats": "짧은 단락 위주.",
+                },
+                emotional_tone={
+                    "summary": "중립적이고 전문적인 톤.",
+                    "overall": "neutral_formal",
+                    "formality_level": "높음",
+                    "politeness_level": "높음",
+                    "directness_score": "중간",
+                    "warmth_score": "중간",
+                    "speech_act_distribution": "요청·정보 제공 중심",
+                    "request_style": "간접적 요청",
+                    "notes": "정중하고 실무적인 문체.",
+                },
+                representative_sentences=[
+                    "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                    "검토 후 회신 부탁드립니다.",
+                    "관련 자료를 확인하신 후 공유 요청드립니다.",
+                ],
+            ),
         }
 
         out = build_prompt_inputs(ctx)
@@ -735,7 +734,42 @@ class BuildPromptInputsTest(SimpleTestCase):
         )
 
         # fewshots 그대로 패스
-        self.assertEqual(out["fewshots"], ["body1", "body2"])
+        self.assertEqual(
+            out["analysis"],
+            dict(
+                lexical_style={
+                    "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                    "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                    "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등이 반복적으로 등장합니다.",
+                    "slang_or_chat_markers": "구어체나 이모지는 거의 사용되지 않습니다.",
+                    "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’ 등의 공손 표현을 자주 사용합니다.",
+                },
+                grammar_patterns={
+                    "summary": "존댓말 중심으로 간결하게 구성됩니다.",
+                    "ender_distribution": "‘-습니다’, ‘-드립니다’ 중심.",
+                    "sentence_length": "짧고 명료한 문장이 많음.",
+                    "sentence_type_ratio": "서술문 위주, 간접 명령형 일부 포함.",
+                    "structure_pattern": "인사 → 요청 → 확인 요청 → 마무리 구조.",
+                    "paragraph_stats": "짧은 단락 위주.",
+                },
+                emotional_tone={
+                    "summary": "중립적이고 전문적인 톤.",
+                    "overall": "neutral_formal",
+                    "formality_level": "높음",
+                    "politeness_level": "높음",
+                    "directness_score": "중간",
+                    "warmth_score": "중간",
+                    "speech_act_distribution": "요청·정보 제공 중심",
+                    "request_style": "간접적 요청",
+                    "notes": "정중하고 실무적인 문체.",
+                },
+                representative_sentences=[
+                    "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                    "검토 후 회신 부탁드립니다.",
+                    "관련 자료를 확인하신 후 공유 요청드립니다.",
+                ],
+            ),
+        )
 
     def test_build_prompt_inputs_no_language_uses_default(self):
         ctx = {
@@ -769,24 +803,16 @@ class BuildPromptInputsTest(SimpleTestCase):
         self.assertEqual(out["language"], "en")
 
 
-# =========================
-# fewshot fetch helpers
-# =========================
-class FewshotFetchTest(TestCase):
-    """
-    _fetch_fewshot_bodies_for_single / _fetch_fewshot_bodies_for_group
-    의 DB 쿼리 동작을 직접 검증한다.
-    """
+class FetchAnalysisForSingleTest(TestCase):
+    """_fetch_analysis_for_single 함수 테스트"""
 
     def setUp(self):
         self.user = User.objects.create(email="u@example.com", name="U1")
-
         self.group = Group.objects.create(
             user=self.user,
             name="Partners",
             description="Long-term partners",
         )
-
         self.contact = Contact.objects.create(
             user=self.user,
             group=self.group,
@@ -794,138 +820,719 @@ class FewshotFetchTest(TestCase):
             email="alice@example.com",
         )
 
-        # mail 3개: body 길이 다르게
-        self.mail1 = SentMail.objects.create(
+    def test_fetch_analysis_exists(self):
+        """ContactAnalysisResult가 존재할 때 정상 반환"""
+        ContactAnalysisResult.objects.create(
             user=self.user,
             contact=self.contact,
-            body="Short body.",
-            sent_at=timezone.now(),
-        )
-        self.mail2 = SentMail.objects.create(
-            user=self.user,
-            contact=self.contact,
-            body="This is a much longer email body that should qualify as long content.",
-            sent_at=timezone.now(),
-        )
-        self.mail3 = SentMail.objects.create(
-            user=self.user,
-            contact=self.contact,
-            body="Another long-ish body for testing purposes.",
-            sent_at=timezone.now(),
-        )
-
-    def test_fetch_fewshot_bodies_for_single_no_min_len(self):
-        out = _fetch_fewshot_bodies_for_single(
-            user=self.user,
-            contact=self.contact,
-            k=2,
-            min_body_len=0,
-        )
-        # 최신순 정렬("-sent_at")이므로 mail3, mail2 가 앞에 올 것이라고 가정
-        self.assertEqual(len(out), 2)
-        self.assertIn(out[0], [self.mail2.body, self.mail3.body, self.mail1.body])
-        self.assertIn(out[1], [self.mail2.body, self.mail3.body, self.mail1.body])
-
-    def test_fetch_fewshot_bodies_for_single_with_min_len(self):
-        # min_body_len 크게 잡으면 짧은 body는 빠짐
-        out = _fetch_fewshot_bodies_for_single(
-            user=self.user,
-            contact=self.contact,
-            k=5,
-            min_body_len=40,
-        )
-        self.assertTrue(all(len(b) >= 40 for b in out))
-        # mail2, mail3 는 길이가 충분히 김
-        self.assertIn(self.mail2.body, out)
-        self.assertIn(self.mail3.body, out)
-        # mail1 은 짧아서 없어야 함
-        self.assertNotIn(self.mail1.body, out)
-
-    def test_fetch_fewshot_bodies_for_group(self):
-        """
-        group 단위 fewshot 추출:
-        - 동일 group 에 속한 모든 SentMail 중 최신순으로 k개 반환
-        - k=2 이므로 가장 최근 2개만 와도 OK
-        """
-        out = _fetch_fewshot_bodies_for_group(
-            user=self.user,
-            group=self.group,
-            k=2,
-            min_body_len=0,
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등 업무 요청 시 자주 사용되는 정중한 관용구가 반복적으로 등장합니다.",  # noqa: E501
+                "slang_or_chat_markers": "이모지나 구어체, 인터넷식 표현은 거의 사용하지 않아 전체적으로 격식 있는 톤을 유지합니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’, ‘죄송하지만’과 같은 공손 표현을 활용해 완곡하고 예의를 갖춘 어조를 형성합니다.",
+            },
+            grammar_patterns={
+                "summary": "문장은 존댓말 종결형이 중심이며 비교적 간결하고 목적 중심적으로 구성됩니다. 요청과 설명이 명확히 구분되어 있어 읽기 편합니다.",  # noqa: E501
+                "ender_distribution": "‘-습니다’, ‘-드립니다’와 같은 격식체 종결형이 주로 사용됩니다.",
+                "sentence_length": "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.",
+                "sentence_type_ratio": "서술문이 대부분이며, 요청성 문장(간접 명령형)이 일정 비중을 차지합니다.",
+                "structure_pattern": "인사 → 요청 또는 정보 전달 → 필요 시 추가 설명 → 마무리 인사 순으로 안정적인 패턴을 유지합니다.",
+                "paragraph_stats": "짧은 단문 중심의 단락으로 구성되며, 단락 간 흐름이 명확해 가독성이 높습니다.",
+            },
+            emotional_tone={
+                "summary": "전체적으로 중립적이고 전문적인 톤이며, 공손함과 명료함을 균형 있게 유지합니다.",
+                "overall": "neutral_formal",
+                "formality_level": "높음 — 존댓말과 격식체 어휘 사용이 두드러짐",
+                "politeness_level": "높음 — 완곡한 표현 사용과 공손한 요청 방식",
+                "directness_score": "중간 — 요청은 분명하지만 형태는 간접적",
+                "warmth_score": "중간 — 딱딱하지 않지만 감정 표현은 적음",
+                "speech_act_distribution": "요청, 정보 제공, 확인 요청이 중심이며 감사 표현이 보조적으로 나타남",
+                "request_style": "간접적 요청 방식으로, ‘~부탁드립니다’ 형태가 많음",
+                "notes": "정중하고 절제된 문체를 유지하면서도 필요한 요청 사항을 명확하게 전달하는 실무형 소통 스타일입니다.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
         )
 
-        # 최소 1개 이상은 나와야 한다
-        self.assertGreaterEqual(len(out), 1)
+        result = _fetch_analysis_for_single(self.user, self.contact)
 
-        # 최신 메일들이 반환된다는 점만 검증 (mail2/mail3 내용 중 하나 이상은 있어야 함)
-        self.assertTrue(
-            any(
-                candidate in out
-                for candidate in [
-                    self.mail2.body,
-                    self.mail3.body,
-                ]
-            ),
-            msg=f"Expected one of the newer bodies in out, got {out}",
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, dict)
+
+        # JSON 전체 구조 검증
+        self.assertIn("summary", result["lexical_style"])
+        self.assertEqual(
+            result["lexical_style"]["summary"],
+            "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
         )
 
-    def test_fetch_fewshot_bodies_for_single_fallback_to_group(self):
-        """
-        contact3 자체로는 SentMail 이 없어도,
-        같은 그룹(self.group)에 속한 다른 contact 들의 메일로 fallback 되는지 확인.
-        """
-        # 새 그룹/연락처/메일 구성
-        group2 = Group.objects.create(
+        self.assertIn("ender_distribution", result["grammar_patterns"])
+        self.assertEqual(result["grammar_patterns"]["sentence_length"], "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.")
+
+        self.assertIn("overall", result["emotional_tone"])
+        self.assertEqual(result["emotional_tone"]["overall"], "neutral_formal")
+        self.assertEqual(len(result["representative_sentences"]), 3)
+
+    def test_fetch_analysis_not_exists_no_group(self):
+        """ContactAnalysisResult 없고, group도 없을 때 None 반환"""
+        # group이 없는 contact 생성
+        contact_no_group = Contact.objects.create(
             user=self.user,
-            name="Vendors",
-            description="Suppliers etc.",
-        )
-        contact2 = Contact.objects.create(
-            user=self.user,
-            group=group2,
             name="Bob",
             email="bob@example.com",
         )
 
-        # contact2 는 메일 없음 → group2 도 메일 없음 → 빈 리스트여야 함
-        out_empty = _fetch_fewshot_bodies_for_single(
+        result = _fetch_analysis_for_single(self.user, contact_no_group)
+        self.assertIsNone(result)
+
+    def test_fetch_analysis_not_exists_with_group(self):
+        """ContactAnalysisResult 없지만 group이 있을 때 그룹 분석 반환"""
+        GroupAnalysisResult.objects.create(
             user=self.user,
+            group=self.group,
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현을 주로 사용합니다.",
+            },
+            grammar_patterns={
+                "summary": "격식체 중심 문장 구조입니다.",
+            },
+            emotional_tone={
+                "summary": "중립적이며 전문적인 톤입니다.",
+                "overall": "neutral_formal",
+            },
+            representative_sentences=["안녕하세요.", "확인 부탁드립니다."],
+        )
+
+        result = _fetch_analysis_for_single(self.user, self.contact)
+
+        self.assertIsNotNone(result)
+
+        # JSON 구조 검증
+        self.assertEqual(result["lexical_style"]["summary"], "정중하고 격식 있는 표현을 주로 사용합니다.")
+        self.assertEqual(result["emotional_tone"]["overall"], "neutral_formal")
+
+    def test_fetch_analysis_contact_priority_over_group(self):
+        """Contact 분석이 있으면 Group 분석보다 우선"""
+
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style={"summary": "그룹 스타일"},
+            grammar_patterns={"summary": "그룹 패턴"},
+            emotional_tone={"summary": "그룹 톤"},
+            representative_sentences=["그룹 문장"],
+        )
+
+        ContactAnalysisResult.objects.create(
+            user=self.user,
+            contact=self.contact,
+            lexical_style={"summary": "개인 스타일"},
+            grammar_patterns={"summary": "개인 패턴"},
+            emotional_tone={"summary": "개인 톤"},
+            representative_sentences=["개인 문장"],
+        )
+
+        result = _fetch_analysis_for_single(self.user, self.contact)
+
+        self.assertEqual(result["lexical_style"]["summary"], "개인 스타일")
+        self.assertEqual(result["grammar_patterns"]["summary"], "개인 패턴")
+        self.assertEqual(result["emotional_tone"]["summary"], "개인 톤")
+
+    def test_fetch_analysis_different_user(self):
+        """다른 사용자의 분석 결과는 반환되지 않음"""
+        other_user = User.objects.create(email="other@example.com", name="Other User")
+        other_group = Group.objects.create(  # noqa: F841
+            user=other_user,
+            name="Other Group",
+        )
+
+        ContactAnalysisResult.objects.create(
+            user=other_user,
+            contact=self.contact,
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등이 반복적으로 등장합니다.",
+                "slang_or_chat_markers": "구어체나 이모지는 거의 사용되지 않습니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’ 등의 공손 표현을 자주 사용합니다.",
+            },
+            grammar_patterns={
+                "summary": "존댓말 중심으로 간결하게 구성됩니다.",
+                "ender_distribution": "‘-습니다’, ‘-드립니다’ 중심.",
+                "sentence_length": "짧고 명료한 문장이 많음.",
+                "sentence_type_ratio": "서술문 위주, 간접 명령형 일부 포함.",
+                "structure_pattern": "인사 → 요청 → 확인 요청 → 마무리 구조.",
+                "paragraph_stats": "짧은 단락 위주.",
+            },
+            emotional_tone={
+                "summary": "중립적이고 전문적인 톤.",
+                "overall": "neutral_formal",
+                "formality_level": "높음",
+                "politeness_level": "높음",
+                "directness_score": "중간",
+                "warmth_score": "중간",
+                "speech_act_distribution": "요청·정보 제공 중심",
+                "request_style": "간접적 요청",
+                "notes": "정중하고 실무적인 문체.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        result = _fetch_analysis_for_single(self.user, self.contact)
+        self.assertIsNone(result)
+
+    def test_fetch_analysis_with_empty_representative_sentences(self):
+        """representative_sentences가 빈 리스트일 때"""
+        ContactAnalysisResult.objects.create(
+            user=self.user,
+            contact=self.contact,
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현 중심.",
+                "top_connectives": "‘그리고’, ‘또한’ 등 기본 연결어 사용.",
+                "frequent_phrases": "‘부탁드립니다’ 등이 반복됨.",
+                "slang_or_chat_markers": "구어체 없음.",
+                "politeness_lexemes": "공손 표현 다수 포함.",
+            },
+            grammar_patterns={
+                "summary": "존댓말 중심의 간결한 문장.",
+                "ender_distribution": "‘-습니다’ 중심.",
+                "sentence_length": "짧고 명료함.",
+                "sentence_type_ratio": "서술문 위주.",
+                "structure_pattern": "인사 → 요청 → 마무리 구조.",
+                "paragraph_stats": "짧은 단락 구성.",
+            },
+            emotional_tone={
+                "summary": "중립적이고 전문적.",
+                "overall": "neutral_formal",
+                "formality_level": "높음",
+                "politeness_level": "높음",
+                "directness_score": "중간",
+                "warmth_score": "중간",
+                "speech_act_distribution": "요청 중심",
+                "request_style": "간접적 요청",
+                "notes": "정중하고 절제된 문체.",
+            },
+            representative_sentences=[],
+        )
+
+        result = _fetch_analysis_for_single(self.user, self.contact)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["representative_sentences"], [])
+
+    def test_fetch_analysis_multiple_contacts_same_group(self):
+        """같은 그룹에 속한 여러 연락처가 있을 때,
+        첫 번째 연락처는 개인 분석을, 두 번째 연락처는 그룹 분석을 반환해야 한다."""
+
+        # 같은 그룹에 두 번째 연락처 생성
+        contact2 = Contact.objects.create(
+            user=self.user,
+            group=self.group,
+            name="Charlie",
+            email="charlie@example.com",
+        )
+
+        # --- 개인 분석 (self.contact) 저장 ---
+        personal_lexical = {
+            "summary": "개인 분석 - 정중하고 격식 있는 표현 중심",
+            "top_connectives": "개인: 그리고, 또한",
+            "frequent_phrases": "개인: 부탁드립니다",
+            "slang_or_chat_markers": "없음",
+            "politeness_lexemes": "감사합니다, 부탁드립니다",
+        }
+
+        ContactAnalysisResult.objects.create(
+            user=self.user,
+            contact=self.contact,
+            lexical_style=personal_lexical,
+            grammar_patterns={
+                "summary": "개인 분석 문장 구조",
+                "ender_distribution": "습니다 중심",
+                "sentence_length": "짧음",
+                "sentence_type_ratio": "서술문 위주",
+                "structure_pattern": "인사 → 요청 → 마무리",
+                "paragraph_stats": "단락 짧음",
+            },
+            emotional_tone={
+                "summary": "개인 분석 - 중립·정중",
+                "overall": "neutral_formal",
+                "formality_level": "높음",
+                "politeness_level": "높음",
+                "directness_score": "중간",
+                "warmth_score": "중간",
+                "speech_act_distribution": "요청, 확인",
+                "request_style": "간접적",
+                "notes": "개인 요약",
+            },
+            representative_sentences=["개인: 검토 후 회신 부탁드립니다."],
+        )
+
+        # --- 그룹 분석 저장 ---
+        group_lexical = {
+            "summary": "그룹 분석 - 공통적으로 정중한 표현 사용",
+            "top_connectives": "그룹: 그리고, 따라서",
+            "frequent_phrases": "그룹: 요청드립니다",
+            "slang_or_chat_markers": "없음",
+            "politeness_lexemes": "감사합니다 등",
+        }
+
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style=group_lexical,
+            grammar_patterns={
+                "summary": "그룹 분석 문장 구조",
+                "ender_distribution": "드립니다 중심",
+                "sentence_length": "중간",
+                "sentence_type_ratio": "서술문 위주",
+                "structure_pattern": "인사 → 설명 → 요청",
+                "paragraph_stats": "일반적인 길이",
+            },
+            emotional_tone={
+                "summary": "그룹 분석 - 중립·전문적",
+                "overall": "neutral_formal",
+                "formality_level": "높음",
+                "politeness_level": "높음",
+                "directness_score": "중간",
+                "warmth_score": "낮음",
+                "speech_act_distribution": "요청, 정보 제공",
+                "request_style": "간접적",
+                "notes": "그룹 요약",
+            },
+            representative_sentences=["그룹: 검토 후 회신 요청드립니다."],
+        )
+
+        # --- 첫 번째 연락처는 개인 분석 반환 ---
+        result1 = _fetch_analysis_for_single(self.user, self.contact)
+        self.assertIsNotNone(result1)
+        self.assertEqual(result1["lexical_style"]["summary"], personal_lexical["summary"])
+
+        # --- 두 번째 연락처는 그룹 분석 반환 ---
+        result2 = _fetch_analysis_for_single(self.user, contact2)
+        self.assertIsNotNone(result2)
+        self.assertEqual(result2["lexical_style"]["summary"], group_lexical["summary"])
+
+
+class FetchAnalysisForGroupTest(TestCase):
+    """_fetch_analysis_for_group 함수 테스트"""
+
+    def setUp(self):
+        self.user = User.objects.create(email="u@example.com", name="U1")
+        self.group = Group.objects.create(
+            user=self.user,
+            name="Development Team",
+            description="Dev team members",
+        )
+        # contact 필수 생성
+        self.contact = Contact.objects.create(
+            user=self.user,
+            group=self.group,
+            name="Alice",
+            email="alice@example.com",
+        )
+
+    def test_fetch_group_analysis_exists(self):
+        """GroupAnalysisResult가 존재할 때 정상 반환"""
+
+        group_result = GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등 업무 요청 시 자주 사용되는 정중한 관용구가 반복적으로 등장합니다.",  # noqa: E501
+                "slang_or_chat_markers": "이모지나 구어체, 인터넷식 표현은 거의 사용하지 않아 전체적으로 격식 있는 톤을 유지합니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’, ‘죄송하지만’과 같은 공손 표현을 활용해 완곡하고 예의를 갖춘 어조를 형성합니다.",
+            },
+            grammar_patterns={
+                "summary": "문장은 존댓말 종결형이 중심이며 비교적 간결하고 목적 중심적으로 구성됩니다. 요청과 설명이 명확히 구분되어 있어 읽기 편합니다.",  # noqa: E501
+                "ender_distribution": "‘-습니다’, ‘-드립니다’와 같은 격식체 종결형이 주로 사용됩니다.",
+                "sentence_length": "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.",
+                "sentence_type_ratio": "서술문이 대부분이며, 요청성 문장(간접 명령형)이 일정 비중을 차지합니다.",
+                "structure_pattern": "인사 → 요청 또는 정보 전달 → 필요 시 추가 설명 → 마무리 인사 순으로 안정적인 패턴을 유지합니다.",
+                "paragraph_stats": "짧은 단문 중심의 단락으로 구성되며, 단락 간 흐름이 명확해 가독성이 높습니다.",
+            },
+            emotional_tone={
+                "summary": "전체적으로 중립적이고 전문적인 톤이며, 공손함과 명료함을 균형 있게 유지합니다.",
+                "overall": "neutral_formal",
+                "formality_level": "높음 — 존댓말과 격식체 어휘 사용이 두드러짐",
+                "politeness_level": "높음 — 완곡한 표현 사용과 공손한 요청 방식",
+                "directness_score": "중간 — 요청은 분명하지만 형태는 간접적",
+                "warmth_score": "중간 — 딱딱하지 않지만 감정 표현은 적음",
+                "speech_act_distribution": "요청, 정보 제공, 확인 요청이 중심이며 감사 표현이 보조적으로 나타남",
+                "request_style": "간접적 요청 방식으로, ‘~부탁드립니다’ 형태가 많음",
+                "notes": "정중하고 절제된 문체를 유지하면서도 필요한 요청 사항을 명확하게 전달하는 실무형 소통 스타일입니다.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        result = _fetch_analysis_for_group(self.user, self.group)
+
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, dict)
+
+        self.assertEqual(result["lexical_style"], group_result.lexical_style)
+        self.assertEqual(result["grammar_patterns"], group_result.grammar_patterns)
+        self.assertEqual(result["emotional_tone"], group_result.emotional_tone)
+        self.assertEqual(result["representative_sentences"], group_result.representative_sentences)
+
+    def test_fetch_group_analysis_not_exists(self):
+        """GroupAnalysisResult가 존재하지 않을 때 None 반환"""
+        result = _fetch_analysis_for_group(self.user, self.group)
+        self.assertIsNone(result)
+
+    def test_fetch_group_analysis_different_user(self):
+        """다른 사용자의 그룹 분석 결과는 반환되지 않음"""
+
+        other_user = User.objects.create(email="other@example.com", name="Other User")
+
+        # 다른 사용자의 그룹 분석 생성
+        GroupAnalysisResult.objects.create(
+            user=other_user,  # ← 다른 유저
+            group=self.group,  # group은 상관 없음
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등이 반복적으로 등장합니다.",
+                "slang_or_chat_markers": "구어체나 이모지는 거의 사용되지 않습니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’ 등의 공손 표현을 자주 사용합니다.",
+            },
+            grammar_patterns={
+                "summary": "존댓말 중심으로 간결하게 구성됩니다.",
+                "ender_distribution": "‘-습니다’, ‘-드립니다’ 중심.",
+                "sentence_length": "짧고 명료한 문장이 많음.",
+                "sentence_type_ratio": "서술문 위주, 간접 명령형 일부 포함.",
+                "structure_pattern": "인사 → 요청 → 확인 요청 → 마무리 구조.",
+                "paragraph_stats": "짧은 단락 위주.",
+            },
+            emotional_tone={
+                "summary": "중립적이고 전문적인 톤.",
+                "overall": "neutral_formal",
+                "formality_level": "높음",
+                "politeness_level": "높음",
+                "directness_score": "중간",
+                "warmth_score": "중간",
+                "speech_act_distribution": "요청·정보 제공 중심",
+                "request_style": "간접적 요청",
+                "notes": "정중하고 실무적인 문체.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        result = _fetch_analysis_for_group(self.user, self.group)
+
+        # 현재 로그인한 self.user 의 분석 결과는 없으므로 None
+        self.assertIsNone(result)
+
+    def test_fetch_group_analysis_all_fields_present(self):
+        """모든 필드가 딕셔너리에 포함되는지 검증"""
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style={
+                "summary": "정중하고 격식 있는 표현을 주로 사용하며, 연결어와 완곡한 어휘를 적절히 사용해 안정적인 어조를 유지하는 편입니다.",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등 업무 요청 시 자주 사용되는 정중한 관용구가 반복적으로 등장합니다.",  # noqa: E501
+                "slang_or_chat_markers": "이모지나 구어체, 인터넷식 표현은 거의 사용하지 않아 전체적으로 격식 있는 톤을 유지합니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’, ‘죄송하지만’과 같은 공손 표현을 활용해 완곡하고 예의를 갖춘 어조를 형성합니다.",
+            },
+            grammar_patterns={
+                "summary": "문장은 존댓말 종결형이 중심이며 비교적 간결하고 목적 중심적으로 구성됩니다. 요청과 설명이 명확히 구분되어 있어 읽기 편합니다.",  # noqa: E501
+                "ender_distribution": "‘-습니다’, ‘-드립니다’와 같은 격식체 종결형이 주로 사용됩니다.",
+                "sentence_length": "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.",
+                "sentence_type_ratio": "서술문이 대부분이며, 요청성 문장(간접 명령형)이 일정 비중을 차지합니다.",
+                "structure_pattern": "인사 → 요청 또는 정보 전달 → 필요 시 추가 설명 → 마무리 인사 순으로 안정적인 패턴을 유지합니다.",
+                "paragraph_stats": "짧은 단문 중심의 단락으로 구성되며, 단락 간 흐름이 명확해 가독성이 높습니다.",
+            },
+            emotional_tone={
+                "summary": "전체적으로 중립적이고 전문적인 톤이며, 공손함과 명료함을 균형 있게 유지합니다.",
+                "overall": "neutral_formal",
+                "formality_level": "높음 — 존댓말과 격식체 어휘 사용이 두드러짐",
+                "politeness_level": "높음 — 완곡한 표현 사용과 공손한 요청 방식",
+                "directness_score": "중간 — 요청은 분명하지만 형태는 간접적",
+                "warmth_score": "중간 — 딱딱하지 않지만 감정 표현은 적음",
+                "speech_act_distribution": "요청, 정보 제공, 확인 요청이 중심이며 감사 표현이 보조적으로 나타남",
+                "request_style": "간접적 요청 방식으로, ‘~부탁드립니다’ 형태가 많음",
+                "notes": "정중하고 절제된 문체를 유지하면서도 필요한 요청 사항을 명확하게 전달하는 실무형 소통 스타일입니다.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        result = _fetch_analysis_for_group(self.user, self.group)
+
+        # 모든 예상 키가 존재하는지 검증
+        expected_keys = {"lexical_style", "grammar_patterns", "emotional_tone", "representative_sentences"}
+        self.assertEqual(set(result.keys()), expected_keys)
+
+    def test_fetch_group_analysis_multiple_groups(self):
+        """여러 그룹이 있을 때 올바른 그룹 분석 반환"""
+        # 두 번째 그룹 생성
+        group2 = Group.objects.create(
+            user=self.user,
+            name="Marketing Team",
+            description="Marketing members",
+        )
+
+        # 각 그룹에 분석 결과 생성
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style={
+                "summary": "개발팀 스타일",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등 업무 요청 시 자주 사용되는 정중한 관용구가 반복적으로 등장합니다.",  # noqa: E501
+                "slang_or_chat_markers": "이모지나 구어체, 인터넷식 표현은 거의 사용하지 않아 전체적으로 격식 있는 톤을 유지합니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’, ‘죄송하지만’과 같은 공손 표현을 활용해 완곡하고 예의를 갖춘 어조를 형성합니다.",
+            },
+            grammar_patterns={
+                "summary": "문장은 존댓말 종결형이 중심이며 비교적 간결하고 목적 중심적으로 구성됩니다. 요청과 설명이 명확히 구분되어 있어 읽기 편합니다.",  # noqa: E501
+                "ender_distribution": "‘-습니다’, ‘-드립니다’와 같은 격식체 종결형이 주로 사용됩니다.",
+                "sentence_length": "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.",
+                "sentence_type_ratio": "서술문이 대부분이며, 요청성 문장(간접 명령형)이 일정 비중을 차지합니다.",
+                "structure_pattern": "인사 → 요청 또는 정보 전달 → 필요 시 추가 설명 → 마무리 인사 순으로 안정적인 패턴을 유지합니다.",
+                "paragraph_stats": "짧은 단문 중심의 단락으로 구성되며, 단락 간 흐름이 명확해 가독성이 높습니다.",
+            },
+            emotional_tone={
+                "summary": "전체적으로 중립적이고 전문적인 톤이며, 공손함과 명료함을 균형 있게 유지합니다.",
+                "overall": "neutral_formal",
+                "formality_level": "높음 — 존댓말과 격식체 어휘 사용이 두드러짐",
+                "politeness_level": "높음 — 완곡한 표현 사용과 공손한 요청 방식",
+                "directness_score": "중간 — 요청은 분명하지만 형태는 간접적",
+                "warmth_score": "중간 — 딱딱하지 않지만 감정 표현은 적음",
+                "speech_act_distribution": "요청, 정보 제공, 확인 요청이 중심이며 감사 표현이 보조적으로 나타남",
+                "request_style": "간접적 요청 방식으로, ‘~부탁드립니다’ 형태가 많음",
+                "notes": "정중하고 절제된 문체를 유지하면서도 필요한 요청 사항을 명확하게 전달하는 실무형 소통 스타일입니다.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=group2,
+            lexical_style={
+                "summary": "마케팅팀 스타일",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등 업무 요청 시 자주 사용되는 정중한 관용구가 반복적으로 등장합니다.",  # noqa: E501
+                "slang_or_chat_markers": "이모지나 구어체, 인터넷식 표현은 거의 사용하지 않아 전체적으로 격식 있는 톤을 유지합니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’, ‘죄송하지만’과 같은 공손 표현을 활용해 완곡하고 예의를 갖춘 어조를 형성합니다.",
+            },
+            grammar_patterns={
+                "summary": "문장은 존댓말 종결형이 중심이며 비교적 간결하고 목적 중심적으로 구성됩니다. 요청과 설명이 명확히 구분되어 있어 읽기 편합니다.",  # noqa: E501
+                "ender_distribution": "‘-습니다’, ‘-드립니다’와 같은 격식체 종결형이 주로 사용됩니다.",
+                "sentence_length": "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.",
+                "sentence_type_ratio": "서술문이 대부분이며, 요청성 문장(간접 명령형)이 일정 비중을 차지합니다.",
+                "structure_pattern": "인사 → 요청 또는 정보 전달 → 필요 시 추가 설명 → 마무리 인사 순으로 안정적인 패턴을 유지합니다.",
+                "paragraph_stats": "짧은 단문 중심의 단락으로 구성되며, 단락 간 흐름이 명확해 가독성이 높습니다.",
+            },
+            emotional_tone={
+                "summary": "전체적으로 중립적이고 전문적인 톤이며, 공손함과 명료함을 균형 있게 유지합니다.",
+                "overall": "neutral_formal",
+                "formality_level": "높음 — 존댓말과 격식체 어휘 사용이 두드러짐",
+                "politeness_level": "높음 — 완곡한 표현 사용과 공손한 요청 방식",
+                "directness_score": "중간 — 요청은 분명하지만 형태는 간접적",
+                "warmth_score": "중간 — 딱딱하지 않지만 감정 표현은 적음",
+                "speech_act_distribution": "요청, 정보 제공, 확인 요청이 중심이며 감사 표현이 보조적으로 나타남",
+                "request_style": "간접적 요청 방식으로, ‘~부탁드립니다’ 형태가 많음",
+                "notes": "정중하고 절제된 문체를 유지하면서도 필요한 요청 사항을 명확하게 전달하는 실무형 소통 스타일입니다.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        # 각 그룹의 분석 결과 확인
+        result1 = _fetch_analysis_for_group(self.user, self.group)
+        result2 = _fetch_analysis_for_group(self.user, group2)
+
+        self.assertEqual(result1["lexical_style"]["summary"], "개발팀 스타일")
+        self.assertEqual(result2["lexical_style"]["summary"], "마케팅팀 스타일")
+
+
+class IntegrationTest(TestCase):
+    """_fetch_analysis_for_single과 _fetch_analysis_for_group의 통합 테스트"""
+
+    def setUp(self):
+        self.user = User.objects.create(email="u@example.com", name="U1")
+        self.group = Group.objects.create(
+            user=self.user,
+            name="Test Group",
+            description="Test group description",
+        )
+        self.contact = Contact.objects.create(
+            user=self.user,
+            group=self.group,
+            name="Alice",
+            email="alice@example.com",
+        )
+
+    def test_fallback_chain_contact_to_group(self):
+        """Contact 분석 없을 때 Group 분석으로 fallback"""
+        # Group 분석만 생성
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style={
+                "summary": "그룹 스타일",
+                "top_connectives": "‘그리고’, ‘또한’, ‘따라서’와 같은 기본 연결어를 활용해 문장을 자연스럽게 이어갑니다.",
+                "frequent_phrases": "‘부탁드립니다’, ‘검토 후 회신 요청드립니다’ 등 업무 요청 시 자주 사용되는 정중한 관용구가 반복적으로 등장합니다.",  # noqa: E501
+                "slang_or_chat_markers": "이모지나 구어체, 인터넷식 표현은 거의 사용하지 않아 전체적으로 격식 있는 톤을 유지합니다.",
+                "politeness_lexemes": "‘부탁드립니다’, ‘감사합니다’, ‘죄송하지만’과 같은 공손 표현을 활용해 완곡하고 예의를 갖춘 어조를 형성합니다.",
+            },
+            grammar_patterns={
+                "summary": "문장은 존댓말 종결형이 중심이며 비교적 간결하고 목적 중심적으로 구성됩니다. 요청과 설명이 명확히 구분되어 있어 읽기 편합니다.",  # noqa: E501
+                "ender_distribution": "‘-습니다’, ‘-드립니다’와 같은 격식체 종결형이 주로 사용됩니다.",
+                "sentence_length": "짧고 명료한 문장을 선호하며, 한 문장 내 복잡한 종속절은 적은 편입니다.",
+                "sentence_type_ratio": "서술문이 대부분이며, 요청성 문장(간접 명령형)이 일정 비중을 차지합니다.",
+                "structure_pattern": "인사 → 요청 또는 정보 전달 → 필요 시 추가 설명 → 마무리 인사 순으로 안정적인 패턴을 유지합니다.",
+                "paragraph_stats": "짧은 단문 중심의 단락으로 구성되며, 단락 간 흐름이 명확해 가독성이 높습니다.",
+            },
+            emotional_tone={
+                "summary": "전체적으로 중립적이고 전문적인 톤이며, 공손함과 명료함을 균형 있게 유지합니다.",
+                "overall": "neutral_formal",
+                "formality_level": "높음 — 존댓말과 격식체 어휘 사용이 두드러짐",
+                "politeness_level": "높음 — 완곡한 표현 사용과 공손한 요청 방식",
+                "directness_score": "중간 — 요청은 분명하지만 형태는 간접적",
+                "warmth_score": "중간 — 딱딱하지 않지만 감정 표현은 적음",
+                "speech_act_distribution": "요청, 정보 제공, 확인 요청이 중심이며 감사 표현이 보조적으로 나타남",
+                "request_style": "간접적 요청 방식으로, ‘~부탁드립니다’ 형태가 많음",
+                "notes": "정중하고 절제된 문체를 유지하면서도 필요한 요청 사항을 명확하게 전달하는 실무형 소통 스타일입니다.",
+            },
+            representative_sentences=[
+                "안녕하세요, 회의 일정 조율 부탁드립니다.",
+                "검토 후 회신 부탁드립니다.",
+                "관련 자료를 확인하신 후 공유 요청드립니다.",
+            ],
+        )
+
+        result = _fetch_analysis_for_single(self.user, self.contact)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["lexical_style"]["summary"], "그룹 스타일")
+
+    def test_contact_without_group_id_attribute(self):
+        """group_id 속성이 없는 contact 객체 처리"""
+        # group이 없는 contact 생성
+        contact_no_group = Contact.objects.create(
+            user=self.user,
+            name="Bob",
+            email="bob@example.com",
+        )
+
+        result = _fetch_analysis_for_single(self.user, contact_no_group)
+
+        self.assertIsNone(result)
+
+    def test_consistency_of_returned_dict_structure(self):
+        """Contact와 Group 분석 결과의 딕셔너리 구조 일관성 검증"""
+        # Contact 분석 생성
+        ContactAnalysisResult.objects.create(
+            user=self.user,
+            contact=self.contact,
+            lexical_style={"summary": "contact"},
+            grammar_patterns={"summary": "contact"},
+            emotional_tone={"summary": "contact"},
+            representative_sentences=["contact"],
+        )
+
+        # Group 분석 생성
+        GroupAnalysisResult.objects.create(
+            user=self.user,
+            group=self.group,
+            lexical_style={"summary": "group"},
+            grammar_patterns={"summary": "group"},
+            emotional_tone={"summary": "group"},
+            representative_sentences=["group"],
+        )
+
+        contact_result = _fetch_analysis_for_single(self.user, self.contact)
+
+        # 새로운 contact (group만 해당)
+        other_contact = Contact.objects.create(
+            user=self.user,
+            group=self.group,
+            name="Charlie",
+            email="charlie@example.com",
+        )
+        group_result = _fetch_analysis_for_single(self.user, other_contact)
+
+        # 두 결과의 키 구조가 동일한지 검증
+        self.assertEqual(set(contact_result.keys()), set(group_result.keys()))
+
+    def test_complete_scenario_with_multiple_users_and_groups(self):
+        """복잡한 시나리오: 여러 사용자, 그룹, 연락처"""
+        # 두 번째 사용자 생성
+        user2 = User.objects.create(email="user2@example.com", name="U2")
+
+        # 두 번째 사용자의 그룹
+        group2 = Group.objects.create(
+            user=user2,
+            name="User2 Group",
+            description="Second user's group",
+        )
+
+        # 두 번째 사용자의 연락처
+        contact2 = Contact.objects.create(
+            user=user2,
+            group=group2,
+            name="David",
+            email="david@example.com",
+        )
+
+        # 각 사용자의 분석 결과 생성
+        ContactAnalysisResult.objects.create(
+            user=self.user,
+            contact=self.contact,
+            lexical_style={"summary": "User1-Contact 스타일"},
+            grammar_patterns={"summary": "패턴1"},
+            emotional_tone={"summary": "톤1"},
+            representative_sentences=["예문1"],
+        )
+
+        ContactAnalysisResult.objects.create(
+            user=user2,
             contact=contact2,
-            k=3,
-            min_body_len=0,
-        )
-        self.assertEqual(out_empty, [])
-
-        # contact3: self.group에만 속하지만 본인 메일은 없음
-        contact3 = Contact.objects.create(
-            user=self.user,
-            group=self.group,  # self.group 은 mail1/mail2/mail3 가지고 있음
-            name="Carol",
-            email="carol@example.com",
+            lexical_style={"summary": "User2-Contact 스타일"},
+            grammar_patterns={"summary": "패턴2"},
+            emotional_tone={"summary": "톤2"},
+            representative_sentences=["예문2"],
         )
 
-        out_fallback = _fetch_fewshot_bodies_for_single(
-            user=self.user,
-            contact=contact3,
-            k=2,
-            min_body_len=0,
-        )
+        # 각 사용자는 자신의 결과만 조회 가능
+        result1 = _fetch_analysis_for_single(self.user, self.contact)
+        result2 = _fetch_analysis_for_single(user2, contact2)
 
-        # fallback이 동작해서 최소 한 개 이상은 받아야 한다
-        self.assertNotEqual(out_fallback, [])
+        self.assertEqual(result1["lexical_style"]["summary"], "User1-Contact 스타일")
+        self.assertEqual(result2["lexical_style"]["summary"], "User2-Contact 스타일")
 
-        # fallback 결과에 최신 메일 본문들(mail2/mail3 등)이 포함돼 있는지 검사
-        self.assertTrue(
-            any(
-                candidate in out_fallback
-                for candidate in [
-                    self.mail2.body,
-                    self.mail3.body,
-                    self.mail1.body,
-                ]
-            ),
-            msg=f"Expected some group-sourced body in out_fallback, got {out_fallback}",
-        )
+        # 교차 조회는 None 반환
+        cross_result = _fetch_analysis_for_single(self.user, contact2)
+        self.assertIsNone(cross_result)
 
 
 # =========================
@@ -1022,7 +1629,7 @@ class CollectPromptContextTest(TestCase):
             language_preference="ko",
         )
 
-    @patch("apps.ai.services.utils._fetch_fewshot_bodies_for_single", return_value=["FS1", "FS2"])
+    @patch("apps.ai.services.utils._fetch_analysis_for_single", return_value=["FS1", "FS2"])
     def test_single_recipient_full_context(self, mock_fetch_single):
         """
         - 수신자 1명, 등록된 Contact 1명 -> 개인 컨텍스트/그룹 정보/개인 프롬프트/언어까지 다 들어간다.
@@ -1031,9 +1638,7 @@ class CollectPromptContextTest(TestCase):
         out = collect_prompt_context(
             self.user,
             to_emails=[self.c1.email],
-            include_fewshots=True,
-            fewshot_k=3,
-            min_body_len=0,
+            include_analysis=True,
         )
 
         # recipients: 실제 이름을 사용
@@ -1054,10 +1659,10 @@ class CollectPromptContextTest(TestCase):
         self.assertEqual(out["language"], "en")
 
         # fewshots
-        self.assertEqual(out["fewshots"], ["FS1", "FS2"])
+        self.assertEqual(out["analysis"], ["FS1", "FS2"])
         mock_fetch_single.assert_called_once()
 
-    @patch("apps.ai.services.utils._fetch_fewshot_bodies_for_group", return_value=["GFS1"])
+    @patch("apps.ai.services.utils._fetch_analysis_for_group", return_value=["GFS1"])
     def test_multiple_same_group(self, mock_fetch_group):
         """
         - 동일 그룹 소속 두 명을 동시에 보내는 경우
@@ -1067,8 +1672,7 @@ class CollectPromptContextTest(TestCase):
         out = collect_prompt_context(
             self.user,
             to_emails=[self.c1.email, self.c2.email],
-            include_fewshots=True,
-            fewshot_k=2,
+            include_analysis=True,
         )
 
         # recipients: 각각 이름
@@ -1089,7 +1693,7 @@ class CollectPromptContextTest(TestCase):
         self.assertIsNone(out["language"])
 
         # fewshots 는 group 기반 fetch 호출
-        self.assertEqual(out["fewshots"], ["GFS1"])
+        self.assertEqual(out["analysis"], ["GFS1"])
         mock_fetch_group.assert_called_once()
 
     def test_multiple_diff_groups_intersection(self):
@@ -1102,7 +1706,7 @@ class CollectPromptContextTest(TestCase):
         out = collect_prompt_context(
             self.user,
             to_emails=[self.c1.email, self.c3.email],
-            include_fewshots=False,
+            include_analysis=False,
         )
 
         # recipients: 이름 두 개
@@ -1124,8 +1728,8 @@ class CollectPromptContextTest(TestCase):
         self.assertIsNone(out["personal_prompt"])
         self.assertIsNone(out["language"])
 
-        # include_fewshots=False → fewshots 는 기본 [] 유지
-        self.assertEqual(out["fewshots"], [])
+        # include_analysis=False → analysis 는 None 유지
+        self.assertEqual(out["analysis"], None)
 
     def test_unregistered_email_fallback_label(self):
         """
@@ -1135,7 +1739,7 @@ class CollectPromptContextTest(TestCase):
         out = collect_prompt_context(
             self.user,
             to_emails=["nobody@example.com"],
-            include_fewshots=True,
+            include_analysis=True,
         )
 
         # 이름 몰라서 Recipient 1
@@ -1149,5 +1753,5 @@ class CollectPromptContextTest(TestCase):
         self.assertIsNone(out["sender_role"])
         self.assertIsNone(out["recipient_role"])
         self.assertIsNone(out["language"])
-        # fewshots 기본 [] (single인데도 contact가 없으므로 _fetch_fewshot... 호출 안 함)
-        self.assertEqual(out["fewshots"], [])
+        # anlaysis 기본 None
+        self.assertEqual(out["analysis"], None)

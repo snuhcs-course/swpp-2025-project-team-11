@@ -14,6 +14,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Xend">
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
 
         <activity
             android:name=".ui.login.MainActivity"
@@ -36,16 +46,23 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.inbox.InboxActivity" />
-        <activity android:name=".ui.compose.MailComposeActivity" />
+        <activity android:name=".ui.sent.SentActivity" />
+        <activity android:name=".ui.mail.MailActivity" />
+        <activity
+            android:name=".ui.compose.MailComposeActivity"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.view.MailDetailActivity" />
         <activity android:name=".ui.view.ReplyComposeActivity" />
-        <activity android:name=".ui.view.ReplyDirectComposeActivity" />
+        <activity
+            android:name=".ui.view.ReplyDirectComposeActivity"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.contactbook.ContactBookActivity" />
         <activity android:name=".ui.search.SearchActivity" />
         <activity android:name=".ui.contactbook.AddContactActivity" />
         <activity android:name=".ui.contactbook.AddGroupActivity" />
         <activity android:name=".ui.contactbook.GroupDetailActivity" />
         <activity android:name=".ui.contactbook.ContactDetailActivity" />
+        <activity android:name=".ui.profile.ProfileActivity" />
 
 
 

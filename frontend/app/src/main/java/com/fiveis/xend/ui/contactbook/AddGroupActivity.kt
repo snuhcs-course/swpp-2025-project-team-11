@@ -59,38 +59,72 @@ class AddGroupActivity : ComponentActivity() {
                 // AddGroupScreen 입력값들 보관
                 var name by rememberSaveable { mutableStateOf("") }
                 var description by rememberSaveable { mutableStateOf("") }
+                var emoji by rememberSaveable { mutableStateOf<String?>(null) }
                 var options by rememberSaveable { mutableStateOf(emptyList<PromptOption>()) }
                 var members by remember { mutableStateOf(emptyList<com.fiveis.xend.data.model.Contact>()) }
                 var showContactSelectDialog by remember { mutableStateOf(false) }
 
+                val promptingState = remember(options) {
+                    val tones = options.filter {
+                        it.key.equals("tone", ignoreCase = true)
+                    }.toSet()
+                    val formats = options.filter {
+                        it.key.equals("format", ignoreCase = true)
+                    }.toSet()
+                    PromptingUiState(selectedTone = tones, selectedFormat = formats)
+                }
+
                 AddGroupScreen(
                     uiState = addUiState,
+                    promptingState = promptingState,
                     onBack = {
                         finish()
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                        overridePendingTransition(
+                            R.anim.slide_in_left,
+                            R.anim.slide_out_right
+                        )
                     },
                     onAdd = {
-                        android.util.Log.d(
-                            "AddGroupActivity",
-                            "Saving group - name: $name, options: ${options.size}, members: ${members.size}"
-                        )
+                        val msg = "Save: $name, emoji: $emoji, " +
+                            "opts: ${options.size}, " +
+                            "members: ${members.size}"
+                        android.util.Log.d("AddGroupActivity", msg)
                         addViewModel.addGroup(
                             name = name,
                             description = description,
+                            emoji = emoji,
                             options = options,
                             members = members
                         )
                     },
                     onGroupNameChange = { name = it },
                     onGroupDescriptionChange = { description = it },
+                    onGroupEmojiChange = { emoji = it },
                     onPromptOptionsChange = {
-                        options = it.selectedTone.toList() + it.selectedFormat.toList()
+                        options = it.selectedTone.toList() +
+                            it.selectedFormat.toList()
                     },
                     onAddPromptOption = { key, nm, pr, onSuccess, onError ->
                         addViewModel.addPromptOption(
                             key = key,
                             name = nm,
                             prompt = pr,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
+                    },
+                    onUpdatePromptOption = { id, nm, pr, onSuccess, onError ->
+                        addViewModel.updatePromptOption(
+                            optionId = id,
+                            name = nm,
+                            prompt = pr,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
+                    },
+                    onDeletePromptOption = { id, onSuccess, onError ->
+                        addViewModel.deletePromptOption(
+                            optionId = id,
                             onSuccess = onSuccess,
                             onError = onError
                         )
@@ -104,23 +138,37 @@ class AddGroupActivity : ComponentActivity() {
                     },
                     onBottomNavChange = { tab ->
                         if (tab == "inbox") {
-                            startActivity(Intent(this, InboxActivity::class.java))
-                            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                            startActivity(
+                                Intent(this, InboxActivity::class.java)
+                            )
+                            overridePendingTransition(
+                                R.anim.slide_in_left,
+                                R.anim.slide_out_right
+                            )
                         }
                     }
                 )
 
                 // 연락처 선택 다이얼로그
                 if (showContactSelectDialog) {
-                    android.util.Log.d("AddGroupActivity", "Showing dialog with ${bookUiState.contacts.size} contacts")
+                    android.util.Log.d(
+                        "AddGroupActivity",
+                        "Showing dialog with ${bookUiState.contacts.size} contacts"
+                    )
                     ContactSelectDialog(
                         contacts = bookUiState.contacts,
                         selectedContacts = members,
                         onDismiss = { showContactSelectDialog = false },
                         onConfirm = { selected ->
-                            android.util.Log.d("AddGroupActivity", "Selected contacts: ${selected.size}")
+                            android.util.Log.d(
+                                "AddGroupActivity",
+                                "Selected contacts: ${selected.size}"
+                            )
                             members = selected
-                            android.util.Log.d("AddGroupActivity", "Members after update: ${members.size}")
+                            android.util.Log.d(
+                                "AddGroupActivity",
+                                "Members after update: ${members.size}"
+                            )
                             showContactSelectDialog = false
                         }
                     )
@@ -129,13 +177,24 @@ class AddGroupActivity : ComponentActivity() {
                 // 결과 피드백
                 LaunchedEffect(addUiState.error, addUiState.lastSuccessMsg) {
                     addUiState.error?.let {
-                        Toast.makeText(this@AddGroupActivity, it, Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            this@AddGroupActivity,
+                            it,
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                     addUiState.lastSuccessMsg?.let {
-                        Toast.makeText(this@AddGroupActivity, it, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this@AddGroupActivity,
+                            it,
+                            Toast.LENGTH_SHORT
+                        ).show()
                         setResult(RESULT_OK)
                         finish()
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                        overridePendingTransition(
+                            R.anim.slide_in_left,
+                            R.anim.slide_out_right
+                        )
                     }
                 }
 

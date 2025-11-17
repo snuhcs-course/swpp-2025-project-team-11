@@ -115,9 +115,9 @@ jacoco {
 }
 
 tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn("testDebugUnitTest")
+    dependsOn("testDebugUnitTest", "connectedDebugAndroidTest")
     group = "Reporting"
-    description = "Generate Jacoco coverage reports"
+    description = "Generate Jacoco coverage reports including unit and integration tests"
 
     reports {
         xml.required.set(true)
@@ -184,66 +184,68 @@ dependencies {
     androidTestImplementation("androidx.test:core:1.5.0")
     androidTestImplementation("androidx.test:core-ktx:1.5.0")
     androidTestImplementation("androidx.test:runner:1.5.2")
-    androidTestImplementation("androidx.test:rules:1.5.0")
-    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
-
-    // Credential Manager + Google Sign-In (최신 방식)
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0") // Play 서비스와 Credential Manager 연동
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-    implementation("com.google.android.gms:play-services-auth:21.2.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
-
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
-
-    implementation("androidx.activity:activity-compose:1.10.1")
-
-    // Navigation (Compose)
-    implementation(libs.androidx.navigation.compose)
-
-    // DataStore
-    implementation(libs.androidx.datastore.preferences)
-
-    // Room (with KSP)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
-    // WorkManager
-    implementation(libs.androidx.work.runtime.ktx)
-
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
-
-    // Coil
-    implementation(libs.coil.compose)
-
-    // Retrofit + OkHttp + kotlinx-serialization
-    implementation(libs.retrofit.core)
-    implementation(libs.retrofit.kotlinx.serialization)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(platform(libs.okhttp.bom))
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.sse)
-    implementation(libs.okhttp.logging)
-
-    // Paging3
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.compose)
-
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.material:material:1.7.7")
-
-    // Compose Rich Editor
-    implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")
-
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    testImplementation(kotlin("test"))
-}
+        androidTestImplementation("androidx.test:rules:1.5.0")
+        androidTestImplementation("androidx.test.espresso:espresso-intents:3.5.1")
+        androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+        debugImplementation(libs.androidx.ui.tooling)
+        debugImplementation(libs.androidx.ui.test.manifest)
+    
+        // Credential Manager + Google Sign-In (최신 방식)
+        implementation("androidx.credentials:credentials:1.3.0")
+        implementation("androidx.credentials:credentials-play-services-auth:1.3.0") // Play 서비스와 Credential Manager 연동
+        implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+        implementation("com.google.android.gms:play-services-auth:21.2.0")
+        implementation("androidx.security:security-crypto:1.1.0-alpha06")
+        implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+    
+        implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+        implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    
+        implementation("androidx.activity:activity-compose:1.10.1")
+    
+        // Navigation (Compose)
+        implementation(libs.androidx.navigation.compose)
+    
+        // DataStore
+        implementation(libs.androidx.datastore.preferences)
+    
+        // Room (with KSP)
+        implementation(libs.androidx.room.runtime)
+        implementation(libs.androidx.room.ktx)
+        ksp(libs.androidx.room.compiler)
+    
+        // WorkManager
+        implementation(libs.androidx.work.runtime.ktx)
+    
+        // Coroutines
+        implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.kotlinx.coroutines.android)
+    
+        // Coil
+        implementation(libs.coil.compose)
+    
+        // Retrofit + OkHttp + kotlinx-serialization
+        implementation(libs.retrofit.core)
+        implementation(libs.retrofit.kotlinx.serialization)
+        implementation(libs.kotlinx.serialization.json)
+        implementation(platform(libs.okhttp.bom))
+        implementation(libs.okhttp)
+        implementation(libs.okhttp.sse)
+        implementation(libs.okhttp.logging)
+    
+        // Paging3
+        implementation(libs.androidx.paging.runtime)
+        implementation(libs.androidx.paging.compose)
+    
+        implementation("androidx.compose.material:material-icons-extended")
+        implementation("androidx.compose.material:material:1.7.7")
+    
+        // Rich Editor
+        implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-beta02")
+        implementation(libs.wasabeef.richeditor)
+    
+        implementation("com.squareup.retrofit2:retrofit:2.11.0")
+        implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+        implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+        testImplementation(kotlin("test"))
+    }

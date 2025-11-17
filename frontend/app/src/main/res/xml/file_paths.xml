@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path
+        name="attachment_previews"
+        path="attachment_previews/" />
+    <cache-path
+        name="attachment_external"
+        path="attachment_external/" />
+    <cache-path
+        name="cache_root"
+        path="." />
+</paths>
