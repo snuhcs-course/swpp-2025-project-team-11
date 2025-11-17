@@ -86,7 +86,9 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.ui.theme.BackgroundLight
+import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.Red60
 import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextSecondary
@@ -101,7 +103,7 @@ fun GroupDetailScreen(
     onMemberClick: (Contact) -> Unit,
     onRemoveMember: (Contact) -> Unit,
     onAddMembers: (List<Long>) -> Unit,
-    onRenameGroup: (String, String) -> Unit,
+    onRenameGroup: (String, String, String) -> Unit,
     onClearRenameError: () -> Unit,
     onRefreshPromptOptions: () -> Unit,
     onSavePromptOptions: (List<Long>) -> Unit,
@@ -114,6 +116,7 @@ fun GroupDetailScreen(
     var showRenameDialog by rememberSaveable { mutableStateOf(false) }
     var renameField by rememberSaveable { mutableStateOf("") }
     var renameDescriptionField by rememberSaveable { mutableStateOf("") }
+    var renameEmojiField by rememberSaveable { mutableStateOf("") }
     var renameSubmitted by rememberSaveable { mutableStateOf(false) }
     val memberIds = remember(group?.members) { group?.members?.map { it.id }?.toSet() ?: emptySet() }
     val availableContacts = remember(group?.id, uiState.contacts, memberIds) {
@@ -135,6 +138,7 @@ fun GroupDetailScreen(
     var newPromptDescription by rememberSaveable { mutableStateOf("") }
     var addPromptError by rememberSaveable { mutableStateOf<String?>(null) }
     var isAddingPrompt by rememberSaveable { mutableStateOf(false) }
+    var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
 
     var editingPromptOption by rememberSaveable { mutableStateOf<PromptOption?>(null) }
     var editPromptName by rememberSaveable { mutableStateOf("") }
@@ -246,8 +250,8 @@ fun GroupDetailScreen(
                                     .background(themeColor),
                                 contentAlignment = Alignment.Center
                             ) {
-                                group.emoji?.let {
-                                    Text(text = it, fontSize = 20.sp)
+                                if (!group.emoji.isNullOrEmpty()) {
+                                    Text(text = group.emoji!!, fontSize = 20.sp)
                                 }
                             }
                             Spacer(Modifier.size(12.dp))
@@ -262,6 +266,7 @@ fun GroupDetailScreen(
                                 onClick = {
                                     renameField = group.name
                                     renameDescriptionField = group.description.orEmpty()
+                                    renameEmojiField = group.emoji.orEmpty()
                                     renameSubmitted = false
                                     onClearRenameError()
                                     showRenameDialog = true
@@ -402,6 +407,7 @@ fun GroupDetailScreen(
         RenameGroupDialog(
             value = renameField,
             description = renameDescriptionField,
+            emoji = renameEmojiField,
             errorMessage = uiState.renameError,
             isProcessing = uiState.isRenaming,
             isConfirmEnabled = trimmedName.isNotBlank(),
@@ -410,10 +416,13 @@ fun GroupDetailScreen(
                 if (uiState.renameError != null) onClearRenameError()
             },
             onDescriptionChange = { renameDescriptionField = it },
+            onEmojiClick = { if (!uiState.isRenaming) showEmojiPicker = true },
+            onEmojiClear = { renameEmojiField = "" },
             onDismiss = {
                 showRenameDialog = false
                 renameSubmitted = false
                 renameDescriptionField = group?.description.orEmpty()
+                renameEmojiField = group?.emoji.orEmpty()
                 onClearRenameError()
             },
             onConfirm = {
@@ -421,7 +430,18 @@ fun GroupDetailScreen(
                 val targetDescription = renameDescriptionField.trim()
                 if (targetName.isBlank()) return@RenameGroupDialog
                 renameSubmitted = true
-                onRenameGroup(targetName, targetDescription)
+                onRenameGroup(targetName, targetDescription, renameEmojiField)
+            }
+        )
+    }
+
+    if (showEmojiPicker) {
+        EmojiPickerDialog(
+            currentEmoji = renameEmojiField.ifEmpty { null },
+            onDismiss = { showEmojiPicker = false },
+            onEmojiSelected = { emoji ->
+                renameEmojiField = emoji ?: ""
+                showEmojiPicker = false
             }
         )
     }
@@ -1201,11 +1221,14 @@ private fun List<Long>.toggle(id: Long): List<Long> = if (contains(id)) filterNo
 private fun RenameGroupDialog(
     value: String,
     description: String,
+    emoji: String,
     errorMessage: String?,
     isProcessing: Boolean,
     isConfirmEnabled: Boolean,
     onValueChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
+    onEmojiClick: () -> Unit,
+    onEmojiClear: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -1228,6 +1251,37 @@ private fun RenameGroupDialog(
                         singleLine = true,
                         enabled = !isProcessing
                     )
+                }
+
+                FormBlock(label = "그룹 심볼 이모지") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            onClick = onEmojiClick,
+                            modifier = Modifier.size(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (emoji.isNotEmpty()) Purple60.copy(alpha = 0.1f) else Gray400.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, if (emoji.isNotEmpty()) Purple60 else BorderGray),
+                            enabled = !isProcessing
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (emoji.isNotEmpty()) {
+                                    Text(text = emoji, fontSize = 24.sp)
+                                } else {
+                                    Text(text = "😀", fontSize = 20.sp, color = Gray400)
+                                }
+                            }
+                        }
+
+                        TextButton(
+                            onClick = onEmojiClear,
+                            enabled = emoji.isNotEmpty() && !isProcessing
+                        ) {
+                            Text("이모지 설정 지우기")
+                        }
+                    }
                 }
 
                 FormBlock(label = "그룹 설명") {

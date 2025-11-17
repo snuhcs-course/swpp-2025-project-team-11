@@ -59,7 +59,7 @@ class AddGroupActivity : ComponentActivity() {
                 // AddGroupScreen 입력값들 보관
                 var name by rememberSaveable { mutableStateOf("") }
                 var description by rememberSaveable { mutableStateOf("") }
-                var emoji by rememberSaveable { mutableStateOf<String?>(null) }
+                var emoji by rememberSaveable { mutableStateOf("") }
                 var options by rememberSaveable { mutableStateOf(emptyList<PromptOption>()) }
                 var members by remember { mutableStateOf(emptyList<com.fiveis.xend.data.model.Contact>()) }
                 var showContactSelectDialog by remember { mutableStateOf(false) }

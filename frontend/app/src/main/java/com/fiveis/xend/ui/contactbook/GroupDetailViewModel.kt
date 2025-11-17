@@ -111,7 +111,7 @@ class GroupDetailViewModel(
         }
     }
 
-    fun renameGroup(newName: String, newDescription: String) {
+    fun renameGroup(newName: String, newDescription: String, emoji: String) {
         val id = observingId ?: return
         val trimmedName = newName.trim()
         if (trimmedName.isBlank()) {
@@ -121,10 +121,17 @@ class GroupDetailViewModel(
         if (ui.value.isRenaming) return
 
         val trimmedDescription = newDescription.trim()
+        val targetEmoji = emoji.ifEmpty { "" }
         viewModelScope.launch {
             ui.update { it.copy(isRenaming = true, renameError = null) }
             try {
-                repo.updateGroup(groupId = id, name = trimmedName, description = trimmedDescription)
+                repo.updateGroup(
+                    groupId = id,
+                    name = trimmedName,
+                    description = trimmedDescription,
+                    emoji = targetEmoji,
+                    emojiProvided = true
+                )
                 ui.update { it.copy(isRenaming = false, renameError = null) }
             } catch (e: Exception) {
                 ui.update {

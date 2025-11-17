@@ -51,7 +51,7 @@ interface ContactApiService {
     @PATCH("api/contact/groups/{id}/")
     suspend fun updateGroup(
         @Path("id") groupId: Long,
-        @Body payload: Map<String, @JvmSuppressWildcards Any>
+        @Body payload: Map<String, @JvmSuppressWildcards Any?>
     ): Response<GroupResponse>
 
     @POST("api/contact/prompt-options/")
