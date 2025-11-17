@@ -243,8 +243,13 @@ fun GroupDetailScreen(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clip(CircleShape)
-                                    .background(themeColor)
-                            )
+                                    .background(themeColor),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                group.emoji?.let {
+                                    Text(text = it, fontSize = 20.sp)
+                                }
+                            }
                             Spacer(Modifier.size(12.dp))
                             Text(
                                 group.name,

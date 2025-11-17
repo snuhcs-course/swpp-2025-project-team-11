@@ -439,6 +439,7 @@ private fun GroupResponse.toEntities(): Triple<GroupEntity, List<PromptOptionEnt
         id = id,
         name = name,
         description = description,
+        emoji = emoji,
         createdAt = createdAt,
         updatedAt = updatedAt
     )
