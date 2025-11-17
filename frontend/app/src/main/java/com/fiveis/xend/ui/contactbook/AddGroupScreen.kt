@@ -438,6 +438,7 @@ fun ContactSelectDialog(
     onDismiss: () -> Unit,
     onConfirm: (List<Contact>) -> Unit
 ) {
+    val sortedContacts = remember(contacts) { contacts.sortedBy { it.name } }
     // ID만 저장해서 Set 비교 문제 해결
     var tempSelectedIds by remember { mutableStateOf(selectedContacts.map { it.id }.toSet()) }
 
@@ -491,7 +492,7 @@ fun ContactSelectDialog(
                             .fillMaxWidth()
                             .height(300.dp)
                     ) {
-                        itemsIndexed(contacts) { _, contact ->
+                        itemsIndexed(sortedContacts) { _, contact ->
                             val isSelected = tempSelectedIds.contains(contact.id)
                             Surface(
                                 modifier = Modifier
@@ -506,7 +507,7 @@ fun ContactSelectDialog(
                                 color = if (isSelected) {
                                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                                 } else {
-                                    Color.Transparent
+                                    Color.White
                                 },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
