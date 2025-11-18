@@ -37,7 +37,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         max_length=1000,
     )
 
+    language_preference = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=30,
+    )
+
     class Meta:
         model = UserProfile
-        fields = ("display_name", "info", "created_at", "updated_at")
+        fields = ("display_name", "info", "language_preference", "created_at", "updated_at")
         read_only_fields = ("created_at", "updated_at")
