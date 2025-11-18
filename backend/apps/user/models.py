@@ -61,5 +61,7 @@ class UserProfile(TimeStampedModel):
 
     info = models.TextField(blank=True, help_text="메일 작성 시 프롬프트에 포함될 사용자 정보 (소속, 직책, 연락처 등 자유 입력)")
 
+    language_preference = models.CharField(max_length=30, blank=True, help_text="사용자가 선호하는 언어")
+
     def __str__(self):
         return f"Profile of {self.user.email}"

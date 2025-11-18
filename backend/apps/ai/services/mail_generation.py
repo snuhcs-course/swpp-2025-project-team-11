@@ -1,5 +1,6 @@
 import time
 from collections.abc import Generator
+from typing import Any
 
 from apps.ai.services.chains import body_chain, plan_chain, subject_chain, validator_chain
 from apps.ai.services.graph import mail_graph
@@ -222,3 +223,82 @@ def stream_mail_generation_with_plan(
 
         yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))
         mapping.clear()
+
+
+def debug_mail_generation_analysis(
+    user,
+    subject: str | None,
+    body: str | None,
+    to_emails: list[str],
+) -> dict[str, Any]:
+    base_ctx = collect_prompt_context(
+        user,
+        to_emails,
+        include_analysis=True,
+        include_fewshots=True,
+    )
+    analysis_value = base_ctx.get("analysis")
+    fewshots_value = base_ctx.get("fewshots")
+
+    def _run_once(override_ctx: dict[str, Any]) -> dict[str, str]:
+        merged_ctx: dict[str, Any] = {**base_ctx, **override_ctx}
+
+        raw_inputs = build_prompt_inputs(
+            merged_ctx,
+        )
+        raw_inputs["subject"] = subject or ""
+        raw_inputs["body"] = body or ""
+
+        req_id = make_req_id()
+        masker = PiiMasker(req_id)
+        masked_inputs, mapping = masker.mask_inputs(raw_inputs)
+
+        try:
+            locked_title = (subject_chain.invoke(masked_inputs) or "").strip()
+        except Exception:
+            locked_title = ""
+
+        unmasked_title = (locked_title and masker and "".join(unmask_stream([locked_title], req_id, mapping))) or locked_title
+
+        locked_inputs = {
+            "locked_subject": locked_title,
+            "body": masked_inputs.get("body", ""),
+            "language": raw_inputs.get("language"),
+            "recipients": raw_inputs.get("recipients"),
+            "group_name": raw_inputs.get("group_name"),
+            "group_description": raw_inputs.get("group_description"),
+            "prompt_text": raw_inputs.get("prompt_text"),
+            "sender_role": raw_inputs.get("sender_role"),
+            "recipient_role": raw_inputs.get("recipient_role"),
+            "plan_text": "",
+            "analysis": raw_inputs.get("analysis", None),
+            "fewshots": raw_inputs.get("fewshots", None),
+        }
+
+        try:
+            raw_body = body_chain.invoke(locked_inputs) or ""
+        except Exception:
+            raw_body = ""
+
+        unmasked_body = "".join(unmask_stream([raw_body], req_id, mapping)) if raw_body else raw_body
+
+        mapping.clear()
+
+        return {
+            "subject": unmasked_title,
+            "body": unmasked_body,
+        }
+
+    result_without_any = _run_once({"analysis": None, "fewshots": None})
+
+    result_with_analysis = _run_once({"fewshots": None})
+
+    result_with_fewshots = _run_once({"analysis": None})
+
+    return {
+        "analysis": analysis_value,
+        "fewshots": fewshots_value,
+        "without_analysis": result_without_any,
+        "with_analysis": result_with_analysis,
+        "with_fewshots": result_with_fewshots,
+    }
