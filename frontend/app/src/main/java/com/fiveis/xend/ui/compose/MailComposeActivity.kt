@@ -1,12 +1,15 @@
 package com.fiveis.xend.ui.compose
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -31,6 +34,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +51,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.PersonAdd
@@ -75,6 +83,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -90,6 +99,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -161,11 +171,14 @@ fun EmailComposeScreen(
     error: String?,
     onBack: () -> Unit = {},
     onTemplateClick: () -> Unit = {},
+    onAttachmentClick: () -> Unit = {},
+    onRemoveAttachment: (Uri) -> Unit = {},
     onUndo: () -> Unit = {},
     onAiComplete: () -> Unit = {},
     onStopStreaming: () -> Unit = {},
     modifier: Modifier = Modifier,
     sendUiState: SendUiState,
+    attachments: List<Uri>,
     onSend: () -> Unit,
     suggestionText: String = "",
     onAcceptSuggestion: () -> Unit = {},
@@ -196,7 +209,7 @@ fun EmailComposeScreen(
                 scrollBehavior = scrollBehavior,
                 onBack = onBack,
                 onTemplateClick = onTemplateClick,
-                onAttachmentClick = { /* 첨부파일 선택 예정 */ },
+                onAttachmentClick = onAttachmentClick,
                 onSend = onSend,
                 sendUiState = sendUiState,
                 canSend = contacts.isNotEmpty()
@@ -275,6 +288,11 @@ fun EmailComposeScreen(
                 value = subject,
                 enabled = !isStreaming,
                 onValueChange = onSubjectChange
+            )
+
+            LightAttachmentPager(
+                attachments = attachments,
+                onRemove = onRemoveAttachment
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -942,7 +960,7 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
         },
         singleLine = true,
         enabled = enabled,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = composeOutlinedTextFieldColors(),
         modifier = Modifier
             .fillMaxWidth()
@@ -1186,6 +1204,26 @@ class MailComposeActivity : ComponentActivity() {
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
                 val editorState = rememberXendRichEditorState()
+                val attachmentUris = remember { mutableStateListOf<Uri>() }
+
+                // SAF launcher for attachments
+                val attachmentPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.GetMultipleContents()
+                ) { uris ->
+                    // Persist access for later upload
+                    uris.forEach { uri ->
+                        runCatching {
+                            application.contentResolver.takePersistableUriPermission(
+                                uri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            )
+                        }
+                    }
+
+                    val existing = attachmentUris.toSet()
+                    val newOnes = uris.filterNot { it in existing }
+                    attachmentUris.addAll(newOnes)
+                }
 
                 // Draft loading states
                 var showLoadDraftDialog by remember { mutableStateOf(false) }
@@ -1437,9 +1475,12 @@ class MailComposeActivity : ComponentActivity() {
                                 isStreaming = composeUi.isStreaming,
                                 error = composeUi.error,
                                 sendUiState = sendUi,
+                                attachments = attachmentUris,
                                 // Trigger our custom back press handling
                                 onBack = { onBackPressedDispatcher.onBackPressed() },
                                 onTemplateClick = { showTemplateScreen = true },
+                                onAttachmentClick = { attachmentPicker.launch("*/*") },
+                                onRemoveAttachment = { uri -> attachmentUris.remove(uri) },
                                 onUndo = undoAction,
                                 suggestionText = composeUi.suggestionText,
                                 onAcceptSuggestion = acceptSuggestion,
@@ -1478,7 +1519,8 @@ class MailComposeActivity : ComponentActivity() {
                                     sendVm.sendEmail(
                                         to = contacts.map { it.email },
                                         subject = subject.ifBlank { "(제목 없음)" },
-                                        body = editorState.getHtml()
+                                        body = editorState.getHtml(),
+                                        attachments = attachmentUris.toList()
                                     )
                                 },
                                 onAddContactClick = { contact ->
@@ -1645,6 +1687,165 @@ class MailComposeActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun LightAttachmentRow(attachments: List<Uri>) {
+    LightAttachmentPager(attachments = attachments, onRemove = {})
+}
+
+@Composable
+private fun LightAttachmentPager(attachments: List<Uri>, onRemove: (Uri) -> Unit) {
+    if (attachments.isEmpty()) return
+
+    val context = LocalContext.current
+    val items = attachments.map { uri ->
+        val resolver = context.contentResolver
+        val name =
+            resolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else "첨부파일"
+            } ?: "첨부파일"
+        val size =
+            resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getLong(idx) else -1L
+            } ?: -1L
+        val sizeLabel = formatFileSize(size)
+        ComposeAttachmentChip(uri = uri, name = name, sizeLabel = sizeLabel)
+    }
+
+    val pagerState = rememberPagerState(pageCount = { items.size })
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp)
+    ) {
+        Text(
+            text = "첨부파일 ${attachments.size}개",
+            style = MaterialTheme.typography.bodySmall.copy(color = ToolbarIconTint)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        HorizontalPager(
+            state = pagerState,
+            pageSize = PageSize.Fill,
+            beyondViewportPageCount = 1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+        ) { page ->
+            items[page].Content(
+                modifier = Modifier.fillMaxWidth(),
+                onRemove = { onRemove(items[page].uri) }
+            )
+        }
+    }
+}
+
+private data class ComposeAttachmentChip(val uri: Uri, val name: String, val sizeLabel: String) {
+    @Composable
+    fun Content(modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = ComposeSurface,
+            border = BorderStroke(1.dp, ComposeOutline),
+            modifier = modifier
+                .heightIn(min = 44.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Blue60.copy(alpha = 0.15f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.InsertDriveFile,
+                            contentDescription = null,
+                            tint = Blue60,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = shortenFilename(name),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = sizeLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        maxLines = 1,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                    )
+                }
+
+                if (onRemove != null) {
+                    IconButton(
+                        onClick = onRemove,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Remove,
+                            contentDescription = "첨부 취소",
+                            tint = Color.Red
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatFileSize(size: Long): String {
+    if (size <= 0) return "0B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    var value = size.toDouble()
+    var index = 0
+    while (value >= 1024 && index < units.lastIndex) {
+        value /= 1024
+        index++
+    }
+    return if (index == 0) {
+        "${size}B"
+    } else {
+        String.format(java.util.Locale.getDefault(), "%.1f%s", value, units[index])
+    }
+}
+
+private fun shortenFilename(name: String, maxLength: Int = 30): String {
+    if (name.length <= maxLength) return name
+    val dotIndex = name.lastIndexOf('.')
+    val hasExt = dotIndex in 1 until name.lastIndex
+    val ext = if (hasExt) name.substring(dotIndex) else ""
+    val baseMax = (maxLength - ext.length - 3).coerceAtLeast(4)
+    val base = name.take(baseMax)
+    return "$base...$ext"
+}
+
 // ========================================================
 // Preview
 // ========================================================
@@ -1665,6 +1866,7 @@ private fun EmailComposePreview() {
             isStreaming = false,
             error = null,
             sendUiState = SendUiState(),
+            attachments = emptyList(),
             onTemplateClick = {},
             onSend = {},
             suggestionText = "",

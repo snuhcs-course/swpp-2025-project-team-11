@@ -1,6 +1,7 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
+import android.net.Uri
 import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
 import com.fiveis.xend.data.model.toMultipartParts
@@ -8,13 +9,22 @@ import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.RetrofitClient
 
 class MailSendRepository(context: Context) {
-    private val mailApiService: MailApiService = RetrofitClient.getMailApiService(context)
+    private val appContext = context.applicationContext
+    private val mailApiService: MailApiService = RetrofitClient.getMailApiService(appContext)
 
-    suspend fun sendEmail(to: List<String>, subject: String, body: String): SendResponse {
+    suspend fun sendEmail(
+        to: List<String>,
+        subject: String,
+        body: String,
+        attachmentUris: List<Uri> = emptyList()
+    ): SendResponse {
         val request = MailSendRequest(to = to, subject = subject, body = body)
 
         val response = mailApiService.sendEmail(
-            parts = request.toMultipartParts()
+            parts = request.toMultipartParts(
+                context = appContext,
+                attachmentUris = attachmentUris
+            )
         )
 
         // 응답 코드가 201이고, 요청이 성공했는지 확인
