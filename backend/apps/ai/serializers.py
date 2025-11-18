@@ -61,6 +61,20 @@ class _MailGenResultSerializer(serializers.Serializer):
 
 
 class MailGenerateAnalysisResponseSerializer(serializers.Serializer):
-    analysis = serializers.CharField(allow_null=True, help_text="collect_prompt_context에서 생성된 analysis 값 (없으면 null)")
-    without_analysis = _MailGenResultSerializer(help_text="analysis 없이 invoke한 결과")
-    with_analysis = _MailGenResultSerializer(help_text="analysis 포함 후 invoke한 결과")
+    analysis = serializers.JSONField(
+        allow_null=True,
+        help_text="collect_prompt_context에서 생성된 분석 결과 (없으면 null)",
+    )
+    fewshots = serializers.JSONField(
+        allow_null=True,
+        help_text="collect_prompt_context에서 수집한 few-shot 예시들 (없으면 null)",
+    )
+    without_analysis = _MailGenResultSerializer(
+        help_text="analysis / fewshots 둘 다 사용하지 않고 생성한 베이스라인 결과",
+    )
+    with_analysis = _MailGenResultSerializer(
+        help_text="analysis만 사용(fewshots 제거)하여 생성한 결과",
+    )
+    with_fewshots = _MailGenResultSerializer(
+        help_text="fewshots만 사용(analysis 제거)하여 생성한 결과",
+    )

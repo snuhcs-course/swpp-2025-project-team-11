@@ -7,10 +7,12 @@ from typing import Any
 
 import pandas as pd
 from django.db.models import Prefetch
+from django.db.models.functions import Length
 from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFPlumberLoader, TextLoader
 
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.contact.models import Contact, PromptOption
+from apps.mail.models import SentMail
 
 
 def sse_event(name, payload, *, eid=None, retry_ms=None):
@@ -32,7 +34,9 @@ def collect_prompt_context(
     user,
     to_emails: list[str],
     include_analysis: bool = True,
-    recipient_label_fmt: str = "Recipient {i}",
+    include_fewshots: bool = False,
+    fewshot_k: int = 3,
+    min_body_len: int = 0,
 ) -> dict[str, Any]:
     """
     유저 + 수신자 이메일 리스트를 기반으로 프롬프트 컨텍스트 수집.
@@ -96,6 +100,7 @@ def collect_prompt_context(
         "sender_role": None,
         "recipient_role": None,
         "language": None,
+        "fewshots": [],
         "analysis": None,
     }
 
@@ -119,6 +124,8 @@ def collect_prompt_context(
             "language": _clean(getattr(ctx, "language_preference", None)),
         }
 
+        if include_fewshots:
+            out["fewshots"] = _fetch_fewshot_bodies_for_single(user, c, fewshot_k, min_body_len)
         if include_analysis:
             out["analysis"] = _fetch_analysis_for_single(user, c)
         return out
@@ -132,6 +139,8 @@ def collect_prompt_context(
             "group_description": _clean(g.description),
             "prompt_options": serialize_opts(get_group_opts(g)),
         }
+        if include_fewshots:
+            out["fewshots"] = _fetch_fewshot_bodies_for_group(user, g, fewshot_k, min_body_len)
         if include_analysis:
             out["analysis"] = _fetch_analysis_for_group(user, g)
         return out
@@ -152,6 +161,24 @@ def collect_prompt_context(
         "group_description": None,
         "prompt_options": serialize_opts(opts) if opts else [],
     }
+
+
+def _fetch_fewshot_bodies_for_single(user, contact, k: int, min_body_len: int) -> list[str]:
+    qs = SentMail.objects.filter(user=user, contact=contact).exclude(body__isnull=True).exclude(body__exact="").order_by("-sent_at")
+    if min_body_len > 0:
+        qs = qs.annotate(body_len=Length("body")).filter(body_len__gte=min_body_len)
+    bodies = list(qs.values_list("body", flat=True)[:k])
+
+    if not bodies and getattr(contact, "group_id", None):
+        bodies = _fetch_fewshot_bodies_for_group(user, contact.group, k, min_body_len)
+    return bodies
+
+
+def _fetch_fewshot_bodies_for_group(user, group, k: int, min_body_len: int) -> list[str]:
+    qs = SentMail.objects.filter(user=user, contact__group=group).exclude(body__isnull=True).exclude(body__exact="").order_by("-sent_at")
+    if min_body_len > 0:
+        qs = qs.annotate(body_len=Length("body")).filter(body_len__gte=min_body_len)
+    return list(qs.values_list("body", flat=True)[:k])
 
 
 def _fetch_analysis_for_single(user, contact) -> dict | None:
@@ -213,6 +240,7 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
         "recipient_role": _clean(ctx.get("recipient_role")),
         "language": language,
         "analysis": ctx.get("analysis"),
+        "fewshots": ctx.get("fewshots"),
     }
 
 

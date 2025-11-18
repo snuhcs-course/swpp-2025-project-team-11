@@ -99,6 +99,27 @@ Representative Sentences:
 </analysis>
 {%- endif %}
 
+{%- if fewshots %}
+Below are example emails that demonstrate the desired tone and style.
+Use them only as internal references for style and structure — do not copy them verbatim.
+
+<fewshots>
+{%- for fs in fewshots %}
+Example {{ loop.index }}:
+Subject: {{ fs.subject }}
+Body: {{ fs.body }}
+{%- endfor %}
+</fewshots>
+{%- endif %}
+
+{%- if recipients %}
+This email will be sent to:
+{%- for r in recipients %}
+- {{ r }}
+{%- endfor %}
+Use an appropriate greeting. If multiple recipients are present, write a collective salutation.
+{%- endif %}
+
 {%- if recipients %}
 This email will be sent to:
 {%- for r in recipients %}

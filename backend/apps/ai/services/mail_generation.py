@@ -231,19 +231,21 @@ def debug_mail_generation_analysis(
     body: str | None,
     to_emails: list[str],
 ) -> dict[str, Any]:
-    """
-    collect_prompt_context의 analysis 사용 여부에 따른 메일 생성 결과 비교용 디버그 헬퍼.
-
-    - collect_prompt_context(include_analysis=True)로 analysis를 한 번만 가져온 뒤
-    - analysis=None 인 경우 / 실제 analysis를 넣은 경우 각각 한 번씩 LLM invoke 수행
-    - 각 경우의 제목/본문과 analysis 값을 JSON 형태로 반환
-    """
-    # 베이스 컨텍스트 (analysis 포함)
-    base_ctx = collect_prompt_context(user, to_emails, include_analysis=True)
+    base_ctx = collect_prompt_context(
+        user,
+        to_emails,
+        include_analysis=True,
+        include_fewshots=True,
+    )
     analysis_value = base_ctx.get("analysis")
+    fewshots_value = base_ctx.get("fewshots")
 
-    def _run_once(ctx: dict[str, Any]) -> dict[str, str]:
-        raw_inputs = build_prompt_inputs(ctx)
+    def _run_once(override_ctx: dict[str, Any]) -> dict[str, str]:
+        merged_ctx: dict[str, Any] = {**base_ctx, **override_ctx}
+
+        raw_inputs = build_prompt_inputs(
+            merged_ctx,
+        )
         raw_inputs["subject"] = subject or ""
         raw_inputs["body"] = body or ""
 
@@ -270,6 +272,7 @@ def debug_mail_generation_analysis(
             "recipient_role": raw_inputs.get("recipient_role"),
             "plan_text": "",
             "analysis": raw_inputs.get("analysis", None),
+            "fewshots": raw_inputs.get("fewshots", None),
         }
 
         try:
@@ -286,16 +289,16 @@ def debug_mail_generation_analysis(
             "body": unmasked_body,
         }
 
-    # analysis 없이
-    ctx_without = {**base_ctx, "analysis": None}
-    result_without = _run_once(ctx_without)
+    result_without_any = _run_once({"analysis": None, "fewshots": None})
 
-    # analysis 포함
-    ctx_with = dict(base_ctx)
-    result_with = _run_once(ctx_with)
+    result_with_analysis = _run_once({"fewshots": None})
+
+    result_with_fewshots = _run_once({"analysis": None})
 
     return {
         "analysis": analysis_value,
-        "without_analysis": result_without,
-        "with_analysis": result_with,
+        "fewshots": fewshots_value,
+        "without_analysis": result_without_any,
+        "with_analysis": result_with_analysis,
+        "with_fewshots": result_with_fewshots,
     }
