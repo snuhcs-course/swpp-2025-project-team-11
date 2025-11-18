@@ -6,7 +6,7 @@ from .base import *
 
 ENVIRONMENT = ServerEnvironmentType.DEV
 
-ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org", "15.164.93.45", "xend1.com"]
+ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org", "15.164.93.45", "xend1.shop"]
 
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
