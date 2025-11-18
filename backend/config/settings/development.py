@@ -6,10 +6,10 @@ from .base import *
 
 ENVIRONMENT = ServerEnvironmentType.DEV
 
-ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org", "15.164.93.45"]
+ALLOWED_HOSTS = ["xend-fiveis-dev.duckdns.org", "15.164.93.45", "xend1.com"]
 
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=20),
 }
