@@ -13,6 +13,7 @@ from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFP
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.contact.models import Contact, PromptOption
 from apps.mail.models import SentMail
+from apps.user.models import UserProfile
 
 
 def sse_event(name, payload, *, eid=None, retry_ms=None):
@@ -91,6 +92,14 @@ def collect_prompt_context(
     def get_group_opts(g):
         return list(g.options.all()) if g else []
 
+    user_profile = UserProfile.objects.filter(user=user).first()
+    if user_profile:
+        language = _clean(user_profile.language_preference)
+        profile = {
+            "display_name": _clean(user_profile.display_name),
+            "info": _clean(user_profile.info),
+        }
+
     base = {
         "recipients": recipients,
         "group_name": None,
@@ -99,9 +108,10 @@ def collect_prompt_context(
         "personal_prompt": None,
         "sender_role": None,
         "recipient_role": None,
-        "language": None,
+        "language": language,
         "fewshots": [],
         "analysis": None,
+        "profile": profile,
     }
 
     if not contacts:
@@ -121,7 +131,7 @@ def collect_prompt_context(
             "personal_prompt": _clean(getattr(ctx, "personal_prompt", None)),
             "sender_role": _clean(getattr(ctx, "sender_role", None)),
             "recipient_role": _clean(getattr(ctx, "recipient_role", None)),
-            "language": _clean(getattr(ctx, "language_preference", None)),
+            "language": _clean(getattr(ctx, "language_preference", None)) or base["language"],
         }
 
         if include_fewshots:
@@ -241,6 +251,7 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
         "language": language,
         "analysis": ctx.get("analysis"),
         "fewshots": ctx.get("fewshots"),
+        "profile": ctx.get("profile"),
     }
 
 

@@ -72,6 +72,16 @@ Compose a polished, well-structured email body in {{ language }} that matches th
 Do not include a subject line or extra commentary.
 Avoid unnecessary blank lines when information is missing.
 
+{%- if profile %}
+Below is the user's profile.
+Reflect these profiles in your generated message.
+
+<profile>
+User's name: {{ profile.display_name }}
+User's information: {{ profile.info }}
+</profile>
+{%- endif %}
+
 {%- if analysis %}
 Below is the user's analyzed writing style from their past emails.
 Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
@@ -229,6 +239,56 @@ Incoming mail:
 Subject: "{{ incoming_subject }}"
 Body:
 "{{ incoming_body }}"
+
+{%- if profile %}
+Below is the user's profile.
+Reflect these profiles in your generated message.
+
+<profile>
+User's name: {{ profile.display_name }}
+User's information: {{ profile.info }}
+</profile>
+{%- endif %}
+
+{%- if analysis %}
+Below is the user's analyzed writing style from their past emails.
+Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
+
+<analysis>
+Lexical Style:
+{{ analysis.lexical_style }}
+
+Grammar Patterns:
+{{ analysis.grammar_patterns }}
+
+Emotional Tone:
+{{ analysis.emotional_tone }}
+
+Figurative Usage:
+{{ analysis.figurative_usage }}
+
+Long Sentence Ratio:
+{{ analysis.long_sentence_ratio }}
+
+Representative Sentences:
+{%- for sentence in analysis.representative_sentences %}
+- {{ sentence }}
+{%- endfor %}
+</analysis>
+{%- endif %}
+
+{%- if fewshots %}
+Below are example emails that demonstrate the desired tone and style.
+Use them only as internal references for style and structure — do not copy them verbatim.
+
+<fewshots>
+{%- for fs in fewshots %}
+Example {{ loop.index }}:
+Subject: {{ fs.subject }}
+Body: {{ fs.body }}
+{%- endfor %}
+</fewshots>
+{%- endif %}
 
 {%- if recipients %}
 Recipients:
