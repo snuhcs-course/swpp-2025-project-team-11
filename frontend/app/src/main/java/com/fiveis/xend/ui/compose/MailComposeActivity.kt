@@ -100,6 +100,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -108,6 +109,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -1237,6 +1240,20 @@ class MailComposeActivity : ComponentActivity() {
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
                 var canUndo by rememberSaveable { mutableStateOf(false) }
                 var canRedo by rememberSaveable { mutableStateOf(false) }
+                val lifecycleOwner = LocalLifecycleOwner.current
+
+                // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
+                DisposableEffect(lifecycleOwner, aiRealtime) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME && aiRealtime) {
+                            composeVm.ensureRealtimeConnection()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
 
                 // Banner state
                 var bannerState by remember { mutableStateOf<BannerState?>(null) }
@@ -1485,7 +1502,16 @@ class MailComposeActivity : ComponentActivity() {
                                 suggestionText = composeUi.suggestionText,
                                 onAcceptSuggestion = acceptSuggestion,
                                 aiRealtime = aiRealtime,
-                                onAiRealtimeToggle = { aiRealtime = it },
+                                onAiRealtimeToggle = {
+                                    aiRealtime = it
+                                    if (it) {
+                                        // 토글을 켜면 현재 텍스트를 대기열에 넣고 연결 준비되면 전송
+                                        composeVm.requestImmediateSuggestion(
+                                            currentText = editorState.getHtml(),
+                                            force = true
+                                        )
+                                    }
+                                },
                                 onAiComplete = {
                                     // Save current state before AI generation
                                     composeVm.saveUndoSnapshot(
