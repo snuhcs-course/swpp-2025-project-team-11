@@ -10,6 +10,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from ..core.mixins import AuthRequiredMixin
+from ..core.renderers import SSERenderer
 from ..core.utils.docs import extend_schema_with_common_errors
 from .serializers import (
     AttachmentAnalysisResponseSerializer,
@@ -28,6 +29,7 @@ from .services.reply import stream_reply_options_llm
 
 class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = MailGenerateRequest
+    renderer_classes = [SSERenderer]
 
     @extend_schema(
         operation_id="mail_generate_stream",
@@ -129,6 +131,7 @@ class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
 
 class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = MailGenerateRequest
+    renderer_classes = [SSERenderer]
 
     @extend_schema(
         operation_id="mail_generate_with_plan_stream",
@@ -249,6 +252,7 @@ class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView)
 
 class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = ReplyGenerateRequest
+    renderer_classes = [SSERenderer]
 
     @extend_schema(
         operation_id="reply_generate_stream",

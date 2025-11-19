@@ -55,6 +55,7 @@ def stream_mail_generation(
         "recipient_role": raw_inputs.get("recipient_role"),
         "plan_text": "",
         "analysis": raw_inputs.get("analysis", None),
+        "fewshots": raw_inputs.get("fewshots"),
     }
 
     try:
@@ -100,16 +101,9 @@ def stream_mail_generation_with_plan(
     body_inputs = state["body_inputs"]
     locked_title_masked = state["locked_title"]
 
-    ctx = collect_prompt_context(user, to_emails)
-    prompt_inputs = build_prompt_inputs(ctx)
-
-    for k, v in prompt_inputs.items():
-        if v is not None:
-            masked_inputs[k] = v
-
     yield sse_event("plan.start", {}, eid="plan-0")
 
-    masked_plan_chunks: list[str] = []
+    plan_chunks: list[str] = []
 
     raw_stream = plan_chain.stream(masked_inputs)
 
@@ -121,20 +115,17 @@ def stream_mail_generation_with_plan(
         text = text.strip()
         if not text:
             return
-        for unmasked in unmask_stream([text], req_id, mapping):
-            if not unmasked:
-                continue
-            yield sse_event(
-                "plan.delta",
-                {"idx": para_idx, "text": unmasked + "\n"},
-                eid=f"plan-{para_idx}",
-            )
+        yield sse_event(
+            "plan.delta",
+            {"idx": para_idx, "text": text + "\n"},
+            eid=f"plan-{para_idx}",
+        )
         para_idx += 1
 
     for ch in raw_stream:
         if not ch:
             continue
-        masked_plan_chunks.append(ch)
+        plan_chunks.append(ch)
         paragraph_buf += ch
 
         if "\n\n" in paragraph_buf:
@@ -156,8 +147,8 @@ def stream_mail_generation_with_plan(
 
     yield sse_event("plan.done", {}, eid="plan-done")
 
-    masked_plan_text = "".join(masked_plan_chunks)
-    body_inputs["plan_text"] = masked_plan_text
+    plan_text = "".join(plan_chunks)
+    body_inputs["plan_text"] = plan_text
 
     unmasked_title = "".join(unmask_stream([locked_title_masked], req_id, mapping)) if locked_title_masked else ""
     yield sse_event("subject", {"title": unmasked_title, "text": unmasked_title}, eid="0")
