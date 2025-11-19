@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1384,6 +1385,13 @@ class MailComposeActivity : ComponentActivity() {
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
+                val context = LocalContext.current
+
+                LaunchedEffect(sendVm, context) {
+                    sendVm.toastEvents.collect { message ->
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
 
                 val undoAction: () -> Unit = {
                     composeVm.undo(subject, editorState.getHtml())?.let { snapshot ->

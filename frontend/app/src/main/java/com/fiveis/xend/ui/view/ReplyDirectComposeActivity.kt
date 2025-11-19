@@ -2,6 +2,7 @@ package com.fiveis.xend.ui.view
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +17,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -87,6 +89,13 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     factory = SendMailViewModel.Factory(application)
                 )
                 val sendUiState by sendVm.ui.collectAsState()
+                val context = LocalContext.current
+
+                LaunchedEffect(sendVm, context) {
+                    sendVm.toastEvents.collect { message ->
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
 
                 val lookupVm: ContactLookupViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {

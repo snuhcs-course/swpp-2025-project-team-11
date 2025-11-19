@@ -29,7 +29,7 @@ class MailSendRepository(context: Context) {
             )
         } catch (ioe: IOException) {
             Log.e("MailSendRepository", "Failed to prepare attachment streams for URIs=$attachmentUris", ioe)
-            throw ioe
+            throw AttachmentException("Attachment preparation failed", ioe)
         }
 
         val response = mailApiService.sendEmail(parts = parts)
@@ -47,3 +47,5 @@ class MailSendRepository(context: Context) {
         }
     }
 }
+
+class AttachmentException(message: String, cause: Throwable? = null) : IOException(message, cause)
