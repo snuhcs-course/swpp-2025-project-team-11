@@ -174,9 +174,9 @@ class MeProfileView(AuthRequiredMixin, RetrieveUpdateAPIView):
         profile, _ = UserProfile.objects.get_or_create(
             user=user,
             defaults={
-                "info": self.request.info,
-                "display_name": self.request.display_name or user.name,
-                "language_preference": self.request.language_preference,
+                "info": getattr(self.request, "info", ""),
+                "display_name": getattr(self.request, "display_name", "") or user.name,
+                "language_preference": getattr(self.request, "language_preference", ""),
             },
         )
         return profile
