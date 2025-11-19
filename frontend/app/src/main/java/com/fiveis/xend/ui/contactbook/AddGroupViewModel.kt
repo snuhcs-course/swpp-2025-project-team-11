@@ -50,7 +50,7 @@ class AddGroupViewModel(
     fun addGroup(
         name: String,
         description: String,
-        emoji: String? = null,
+        emoji: String = "",
         options: List<PromptOption>,
         members: List<com.fiveis.xend.data.model.Contact> = emptyList()
     ) {

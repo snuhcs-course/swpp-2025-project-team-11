@@ -471,9 +471,9 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                         .background(groupColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (group.emoji != null) {
+                    if (!group.emoji.isNullOrEmpty()) {
                         Text(
-                            text = group.emoji,
+                            text = group.emoji ?: "",
                             fontSize = 20.sp
                         )
                     }

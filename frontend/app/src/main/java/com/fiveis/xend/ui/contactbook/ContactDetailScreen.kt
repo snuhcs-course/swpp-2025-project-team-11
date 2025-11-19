@@ -281,8 +281,13 @@ fun ContactDetailScreen(
                                     modifier = Modifier
                                         .size(42.dp)
                                         .clip(CircleShape)
-                                        .background(groupColor)
-                                )
+                                        .background(groupColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    group.emoji?.let {
+                                        Text(text = it, fontSize = 20.sp)
+                                    }
+                                }
                                 Spacer(Modifier.size(16.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(

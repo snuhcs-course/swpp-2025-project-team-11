@@ -284,11 +284,17 @@ class ContactBookRepository(
     suspend fun addGroup(
         name: String,
         description: String,
-        emoji: String? = null,
+        emoji: String = "",
         options: List<PromptOption>
     ): GroupResponse {
+        val normalizedEmoji = emoji.ifEmpty { "" }
         val request =
-            AddGroupRequest(name = name, description = description, emoji = emoji, optionIds = options.map { it.id })
+            AddGroupRequest(
+                name = name,
+                description = description,
+                emoji = normalizedEmoji,
+                optionIds = options.map { it.id }
+            )
         val res = api.addGroup(request)
         if (!res.isSuccessful) {
             val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
@@ -319,11 +325,14 @@ class ContactBookRepository(
         groupId: Long,
         name: String? = null,
         description: String? = null,
+        emoji: String? = null,
+        emojiProvided: Boolean = false,
         optionIds: List<Long>? = null
     ): GroupResponse {
-        val payload = mutableMapOf<String, Any>()
+        val payload = mutableMapOf<String, Any?>()
         if (name != null) payload["name"] = name
         if (description != null) payload["description"] = description
+        if (emojiProvided) payload["emoji"] = emoji ?: ""
         if (optionIds != null) payload["option_ids"] = optionIds
         require(payload.isNotEmpty()) { "updateGroup payload is empty" }
 
@@ -439,6 +448,7 @@ private fun GroupResponse.toEntities(): Triple<GroupEntity, List<PromptOptionEnt
         id = id,
         name = name,
         description = description,
+        emoji = emoji,
         createdAt = createdAt,
         updatedAt = updatedAt
     )
