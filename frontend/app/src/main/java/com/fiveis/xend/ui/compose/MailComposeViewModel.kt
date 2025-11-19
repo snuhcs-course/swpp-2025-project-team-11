@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -222,7 +223,9 @@ class MailComposeViewModel(
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
 
-        pendingSuggestionText = currentText
+        viewModelScope.launch(Dispatchers.Main) {
+            pendingSuggestionText = currentText
+        }
 
         wsClient?.let { client ->
             if (client.isActive()) {
@@ -236,9 +239,9 @@ class MailComposeViewModel(
     }
 
     private fun sendPendingSuggestion() {
-        val text = pendingSuggestionText ?: return
-        pendingSuggestionText = null
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Main) {
+            val text = pendingSuggestionText ?: return@launch
+            pendingSuggestionText = null
             delay(100) // Short delay to let the UI update
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",

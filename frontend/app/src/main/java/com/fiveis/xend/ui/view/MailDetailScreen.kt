@@ -99,6 +99,8 @@ import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
+import com.fiveis.xend.utils.formatFileSize
+import com.fiveis.xend.utils.shortenFilename
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -661,7 +663,7 @@ private fun AttachmentItem(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = attachment.filename,
+                        text = shortenFilename(attachment.filename, 25),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary,
@@ -1427,22 +1429,6 @@ private fun attachmentBadgeColor(filename: String): Color {
         "xls", "xlsx", "csv" -> AttachmentExcelBg
         "png", "jpg", "jpeg", "gif", "bmp", "webp" -> AttachmentImageBg
         else -> Blue40
-    }
-}
-
-private fun formatFileSize(size: Long): String {
-    if (size <= 0) return "0B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var value = size.toDouble()
-    var index = 0
-    while (value >= 1024 && index < units.lastIndex) {
-        value /= 1024
-        index++
-    }
-    return if (index == 0) {
-        "${size}B"
-    } else {
-        String.format(Locale.getDefault(), "%.1f%s", value, units[index])
     }
 }
 
