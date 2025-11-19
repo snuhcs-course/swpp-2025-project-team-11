@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.google.gson.annotations.SerializedName
+import java.io.IOException
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -63,7 +64,11 @@ fun MailSendRequest.toMultipartParts(
             override fun contentType() = mimeType.toMediaTypeOrNull()
 
             override fun writeTo(sink: okio.BufferedSink) {
-                contentResolver.openInputStream(uri)?.use { input ->
+                val inputStream = contentResolver.openInputStream(uri)
+                    ?: throw IOException(
+                        "Unable to open input stream for attachment uri=$uri (package=${context.packageName})"
+                    )
+                inputStream.use { input ->
                     sink.writeAll(input.source())
                 }
             }

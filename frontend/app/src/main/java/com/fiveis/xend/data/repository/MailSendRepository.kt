@@ -2,11 +2,13 @@ package com.fiveis.xend.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
 import com.fiveis.xend.data.model.toMultipartParts
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.RetrofitClient
+import java.io.IOException
 
 class MailSendRepository(context: Context) {
     private val appContext = context.applicationContext
@@ -20,12 +22,17 @@ class MailSendRepository(context: Context) {
     ): SendResponse {
         val request = MailSendRequest(to = to, subject = subject, body = body)
 
-        val response = mailApiService.sendEmail(
-            parts = request.toMultipartParts(
+        val parts = try {
+            request.toMultipartParts(
                 context = appContext,
                 attachmentUris = attachmentUris
             )
-        )
+        } catch (ioe: IOException) {
+            Log.e("MailSendRepository", "Failed to prepare attachment streams for URIs=$attachmentUris", ioe)
+            throw ioe
+        }
+
+        val response = mailApiService.sendEmail(parts = parts)
 
         // 응답 코드가 201이고, 요청이 성공했는지 확인
         if (response.isSuccessful && response.code() == 201) {

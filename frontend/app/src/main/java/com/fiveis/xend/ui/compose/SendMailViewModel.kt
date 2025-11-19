@@ -2,11 +2,13 @@ package com.fiveis.xend.ui.compose
 
 import android.app.Application
 import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.data.repository.MailSendRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -43,10 +45,22 @@ class SendMailViewModel(application: Application) : AndroidViewModel(application
                     error = null
                 )
             } catch (e: Exception) {
-                _ui.value = SendUiState(
-                    isSending = false,
-                    error = e.message ?: "알 수 없는 오류"
-                )
+                if (e is IOException) {
+                    Toast.makeText(
+                        getApplication(),
+                        "파일 첨부에 문제가 있었어요.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    _ui.value = SendUiState(
+                        isSending = false,
+                        error = "파일 첨부에 문제가 있었어요."
+                    )
+                } else {
+                    _ui.value = SendUiState(
+                        isSending = false,
+                        error = e.message ?: "알 수 없는 오류"
+                    )
+                }
             }
         }
     }
