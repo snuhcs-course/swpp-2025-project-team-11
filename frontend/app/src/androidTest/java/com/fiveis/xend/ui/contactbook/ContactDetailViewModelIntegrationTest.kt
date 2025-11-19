@@ -40,18 +40,20 @@ class ContactDetailViewModelIntegrationTest {
 
     @Test
     fun load_same_id_twice_without_force_does_not_reload() = runBlocking {
-        // Given
+        // Given - Load once and wait for completion
         viewModel.load(1L)
-        Thread.sleep(1000)
+        Thread.sleep(1500) // Wait long enough for loading to complete
         val firstState = viewModel.uiState.first()
+        assertFalse(firstState.isLoading) // Verify loading is done
 
-        // When
+        // When - Call load again with same ID and force=false
         viewModel.load(1L, force = false)
-        Thread.sleep(500)
+        Thread.sleep(100) // Short wait
 
-        // Then
+        // Then - Loading state should remain false (early return prevents reload)
         val secondState = viewModel.uiState.first()
-        assertEquals(firstState.isLoading, secondState.isLoading)
+        assertFalse(secondState.isLoading) // Should still be false, no reload triggered
+        assertEquals(firstState.contact, secondState.contact) // Contact should be unchanged
     }
 
     @Test

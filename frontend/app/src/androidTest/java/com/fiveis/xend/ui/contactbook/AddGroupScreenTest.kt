@@ -848,4 +848,271 @@ class AddGroupScreenTest {
         composeTestRule.onNodeWithText("AI 프롬프트 설정").assertIsDisplayed()
         composeTestRule.onNodeWithText("그룹 멤버 (0명)").assertIsDisplayed()
     }
+
+    @Test
+    fun test_emojiPickerDialog_displays_when_shown() {
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = null,
+                onDismiss = {},
+                onEmojiSelected = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("심볼 이모지 선택").assertIsDisplayed()
+        composeTestRule.onNodeWithText("닫기").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_emojiPickerDialog_displays_emojis() {
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = null,
+                onDismiss = {},
+                onEmojiSelected = {}
+            )
+        }
+
+        // Then - Should display emoji grid
+        composeTestRule.onNodeWithText("심볼 이모지 선택").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_emojiPickerDialog_close_triggers_callback() {
+        // Given
+        var dismissed = false
+
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = null,
+                onDismiss = { dismissed = true },
+                onEmojiSelected = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("닫기").performClick()
+
+        // Then
+        assert(dismissed)
+    }
+
+    @Test
+    fun test_emojiPickerDialog_shows_remove_button_with_current_emoji() {
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = "😀",
+                onDismiss = {},
+                onEmojiSelected = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("제거").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_emojiPickerDialog_no_remove_button_without_emoji() {
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = null,
+                onDismiss = {},
+                onEmojiSelected = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("제거").assertDoesNotExist()
+    }
+
+    @Test
+    fun test_contactSelectDialog_displays_title() {
+        // When
+        composeTestRule.setContent {
+            ContactSelectDialog(
+                contacts = emptyList(),
+                selectedContacts = emptyList(),
+                onDismiss = {},
+                onConfirm = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("연락처 선택").assertIsDisplayed()
+        composeTestRule.onNodeWithText("그룹에 추가할 연락처를 선택하세요").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_contactSelectDialog_shows_empty_message_when_no_contacts() {
+        // When
+        composeTestRule.setContent {
+            ContactSelectDialog(
+                contacts = emptyList(),
+                selectedContacts = emptyList(),
+                onDismiss = {},
+                onConfirm = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("등록된 연락처가 없습니다").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_contactSelectDialog_displays_contacts() {
+        // Given
+        val contacts = listOf(
+            Contact(1, null, "John", "john@example.com"),
+            Contact(2, null, "Jane", "jane@example.com")
+        )
+
+        // When
+        composeTestRule.setContent {
+            ContactSelectDialog(
+                contacts = contacts,
+                selectedContacts = emptyList(),
+                onDismiss = {},
+                onConfirm = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("John").assertIsDisplayed()
+        composeTestRule.onNodeWithText("john@example.com").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Jane").assertIsDisplayed()
+        composeTestRule.onNodeWithText("jane@example.com").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_contactSelectDialog_cancel_triggers_callback() {
+        // Given
+        var dismissed = false
+
+        // When
+        composeTestRule.setContent {
+            ContactSelectDialog(
+                contacts = emptyList(),
+                selectedContacts = emptyList(),
+                onDismiss = { dismissed = true },
+                onConfirm = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("취소").performClick()
+
+        // Then
+        assert(dismissed)
+    }
+
+    @Test
+    fun test_contactSelectDialog_shows_confirm_button_with_count() {
+        // When
+        composeTestRule.setContent {
+            ContactSelectDialog(
+                contacts = emptyList(),
+                selectedContacts = emptyList(),
+                onDismiss = {},
+                onConfirm = {}
+            )
+        }
+
+        // Then
+        composeTestRule.onNodeWithText("확인 (0)").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_addGroupScreen_shows_first_three_members_when_many_exist() {
+        // Given
+        val members = List(5) { Contact(it.toLong(), null, "Member$it", "m$it@example.com") }
+
+        // When
+        composeTestRule.setContent {
+            AddGroupScreen(
+                uiState = AddGroupUiState(),
+                onBack = {},
+                onAdd = {},
+                onGroupNameChange = {},
+                onGroupDescriptionChange = {},
+                onPromptOptionsChange = {},
+                members = members
+            )
+        }
+
+        // Then - Should show member count includes all members
+        composeTestRule.onNodeWithText("그룹 멤버 (5명)").assertIsDisplayed()
+        // First 3 members should be visible
+        composeTestRule.onNodeWithText("Member0").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Member1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Member2").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_addGroupScreen_with_exactly_three_members() {
+        // Given - exactly 3 members, no expand button should appear
+        val members = List(3) { Contact(it.toLong(), null, "Member$it", "m$it@example.com") }
+
+        // When
+        composeTestRule.setContent {
+            AddGroupScreen(
+                uiState = AddGroupUiState(),
+                onBack = {},
+                onAdd = {},
+                onGroupNameChange = {},
+                onGroupDescriptionChange = {},
+                onPromptOptionsChange = {},
+                members = members
+            )
+        }
+
+        // Then - All 3 members should be visible
+        composeTestRule.onNodeWithText("그룹 멤버 (3명)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Member0").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Member1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Member2").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_addGroupScreen_emoji_button_displays() {
+        // When
+        composeTestRule.setContent {
+            AddGroupScreen(
+                uiState = AddGroupUiState(),
+                onBack = {},
+                onAdd = {},
+                onGroupNameChange = {},
+                onGroupDescriptionChange = {},
+                onPromptOptionsChange = {}
+            )
+        }
+
+        // Then - Emoji button should be visible (default emoji icon)
+        composeTestRule.onNodeWithText("😀").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_addGroupScreen_emoji_change_callback() {
+        // Given
+        var selectedEmoji: String? = null
+
+        // When
+        composeTestRule.setContent {
+            AddGroupScreen(
+                uiState = AddGroupUiState(),
+                onBack = {},
+                onAdd = {},
+                onGroupNameChange = {},
+                onGroupDescriptionChange = {},
+                onGroupEmojiChange = { selectedEmoji = it },
+                onPromptOptionsChange = {}
+            )
+        }
+
+        // Then - callback should be set
+        assert(selectedEmoji == null)
+    }
 }

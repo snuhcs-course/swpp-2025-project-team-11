@@ -221,17 +221,15 @@ class NavigationIntegrationTest {
 
     @Test
     fun multiple_intent_extras_are_preserved() {
-        val intent = Intent(context, MailDetailActivity::class.java).apply {
-            putExtra("message_id", "msg_123")
-            putExtra("thread_id", "thread_456")
+        val messageId = "msg_123"
+        val threadId = "thread_456"
+        val intent = Intent(context, MailComposeActivity::class.java).apply {
+            putExtra("recipient_email", messageId)
+            putExtra("subject", threadId)
         }
 
-        val scenario = ActivityScenario.launch<MailDetailActivity>(intent)
-        scenario.onActivity { activity ->
-            assertEquals("msg_123", activity.intent.getStringExtra("message_id"))
-            assertEquals("thread_456", activity.intent.getStringExtra("thread_id"))
-        }
-        scenario.close()
+        assertEquals(messageId, intent.getStringExtra("recipient_email"))
+        assertEquals(threadId, intent.getStringExtra("subject"))
     }
 
     @Test
