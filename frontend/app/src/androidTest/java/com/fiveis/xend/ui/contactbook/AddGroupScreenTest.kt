@@ -145,7 +145,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("VIP Group")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("VIP Group")
 
         // Then
         assert(changedName == "VIP Group")
@@ -508,7 +508,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("중요 고객")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("중요 고객")
 
         // Then
         assert(changedName == "중요 고객")
@@ -532,7 +532,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput(longName)
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput(longName)
 
         // Then
         assert(changedName == longName)
@@ -627,7 +627,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("TestGroup")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("TestGroup")
 
         // Then
         assert(name == "TestGroup")
@@ -650,7 +650,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("Team@2024")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("Team@2024")
 
         // Then
         assert(changedName == "Team@2024")
@@ -678,7 +678,7 @@ class AddGroupScreenTest {
 
         composeTestRule.onNodeWithContentDescription("뒤로가기").performClick()
         composeTestRule.onNodeWithContentDescription("그룹 추가").performClick()
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("Test")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("Test")
         composeTestRule.onNodeWithText("그룹을 소개해 주세요").performTextInput("Desc")
 
         // Then
@@ -749,7 +749,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("VIP")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("VIP")
         composeTestRule.onNodeWithText("그룹을 소개해 주세요").performTextInput("Important clients")
 
         // Then
@@ -822,7 +822,7 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("Team 2024")
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("Team 2024")
 
         // Then
         assert(changedName == "Team 2024")
