@@ -60,6 +60,7 @@ def body_prep_node(state: State) -> State:
         "analysis": raw_inputs.get("analysis", None),
         "fewshots": raw_inputs.get("fewshots"),
         "plan_text": plan_text,
+        "profile": raw_inputs.get("profile"),
     }
     state["body_inputs"] = locked_inputs
     return state

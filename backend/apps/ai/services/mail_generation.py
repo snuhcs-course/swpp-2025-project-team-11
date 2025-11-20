@@ -56,6 +56,7 @@ def stream_mail_generation(
         "plan_text": "",
         "analysis": raw_inputs.get("analysis", None),
         "fewshots": raw_inputs.get("fewshots"),
+        "profile": raw_inputs.get("profile"),
     }
 
     try:
@@ -264,6 +265,7 @@ def debug_mail_generation_analysis(
             "plan_text": "",
             "analysis": raw_inputs.get("analysis", None),
             "fewshots": raw_inputs.get("fewshots", None),
+            "profile": raw_inputs.get("profile"),
         }
 
         try:
