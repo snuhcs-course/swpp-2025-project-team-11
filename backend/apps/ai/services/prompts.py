@@ -643,7 +643,7 @@ Very important:
 
 Output ONLY the final JSON object.
 NO explanations. NO comments. NO lists of intermediate results.
-If the previou analysis results do not provide enough information for a specific field, DO NOT output that field in the JSON.
+If the previous analysis results do not provide enough information for a specific field, DO NOT output that field in the JSON.
 """.strip()
 
 INTEGRATE_USER = """
