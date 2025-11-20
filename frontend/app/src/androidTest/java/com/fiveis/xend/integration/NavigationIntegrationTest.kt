@@ -243,21 +243,33 @@ class NavigationIntegrationTest {
 
     @Test
     fun profile_activity_launches_from_sent_activity() {
-        val scenario = ActivityScenario.launch(SentActivity::class.java)
         Intents.init()
-        composeTestRule.onNodeWithContentDescription("Profile").performClick()
-        intended(hasComponent(ProfileActivity::class.java.name))
-        Intents.release()
-        scenario.close()
+        try {
+            val scenario = ActivityScenario.launch(SentActivity::class.java)
+            Thread.sleep(1000) // Wait for activity to fully load
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithContentDescription("Profile").performClick()
+            Thread.sleep(500) // Wait for intent
+            intended(hasComponent(ProfileActivity::class.java.name))
+            scenario.close()
+        } finally {
+            Intents.release()
+        }
     }
 
     @Test
     fun profile_activity_launches_from_mail_activity() {
-        val scenario = ActivityScenario.launch(MailActivity::class.java)
         Intents.init()
-        composeTestRule.onNodeWithContentDescription("Profile").performClick()
-        intended(hasComponent(ProfileActivity::class.java.name))
-        Intents.release()
-        scenario.close()
+        try {
+            val scenario = ActivityScenario.launch(MailActivity::class.java)
+            Thread.sleep(1000) // Wait for activity to fully load
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithContentDescription("Profile").performClick()
+            Thread.sleep(500) // Wait for intent
+            intended(hasComponent(ProfileActivity::class.java.name))
+            scenario.close()
+        } finally {
+            Intents.release()
+        }
     }
 }
