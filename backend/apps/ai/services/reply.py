@@ -78,6 +78,9 @@ def stream_reply_options_llm(
         "prompt_text": masked_inputs.get("prompt_text"),
         "sender_role": masked_inputs.get("sender_role"),
         "recipient_role": masked_inputs.get("recipient_role"),
+        "analysis": masked_inputs.get("analysis"),
+        "fewshots": masked_inputs.get("fewshots"),
+        "profile": masked_inputs.get("profile"),
     }
 
     def worker(opt_idx: int, locked_type: str, locked_title: str):
