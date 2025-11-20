@@ -86,6 +86,7 @@ User's information: {{ profile.info }}
 Below is the user's analyzed writing style from their past emails.
 Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
 
+<analysis>
 {%- if analysis.lexical_style %}
 Lexical Style:
     {%- if analysis.lexical_style.summary %}
@@ -313,6 +314,7 @@ User's information: {{ profile.info }}
 Below is the user's analyzed writing style from their past emails.
 Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
 
+<analysis>
 {%- if analysis.lexical_style %}
 Lexical Style:
     {%- if analysis.lexical_style.summary %}
@@ -390,6 +392,9 @@ Representative Sentences:
     {%- for sentence in analysis.representative_sentences %}
     - {{ sentence }}
     {%- endfor %}
+{%- endif %}
+
+</analysis>
 {%- endif %}
 
 {%- if fewshots %}
