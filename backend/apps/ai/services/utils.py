@@ -92,6 +92,8 @@ def collect_prompt_context(
     def get_group_opts(g):
         return list(g.options.all()) if g else []
 
+    language = None
+    profile = None
     user_profile = UserProfile.objects.filter(user=user).first()
     if user_profile:
         language = _clean(user_profile.language_preference)
