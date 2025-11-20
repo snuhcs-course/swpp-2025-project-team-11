@@ -86,26 +86,85 @@ User's information: {{ profile.info }}
 Below is the user's analyzed writing style from their past emails.
 Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
 
-<analysis>
+{%- if analysis.lexical_style %}
 Lexical Style:
-{{ analysis.lexical_style }}
+    {%- if analysis.lexical_style.summary %}
+    summary: {{ analysis.lexical_style.summary }}
+    {%- endif %}
+    {%- if analysis.lexical_style.top_connectives %}
+    top_connectives: {{ analysis.lexical_style.top_connectives }}
+    {%- endif %}
+    {%- if analysis.lexical_style.frequent_phrases %}
+    frequent_phrases: {{ analysis.lexical_style.frequent_phrases }}
+    {%- endif %}
+    {%- if analysis.lexical_style.slang_or_chat_markers %}
+    slang_or_chat_markers: {{ analysis.lexical_style.slang_or_chat_markers }}
+    {%- endif %}
+    {%- if analysis.lexical_style.politeness_lexemes %}
+    politeness_lexemes: {{ analysis.lexical_style.politeness_lexemes }}
+    {%- endif %}
+{%- endif %}
 
+{%- if analysis.grammar_patterns %}
 Grammar Patterns:
-{{ analysis.grammar_patterns }}
+    {%- if analysis.grammar_patterns.summary %}
+    summary: {{ analysis.grammar_patterns.summary }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.ender_distribution %}
+    ender_distribution: {{ analysis.grammar_patterns.ender_distribution }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.sentence_length %}
+    sentence_length: {{ analysis.grammar_patterns.sentence_length }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.sentence_type_ratio %}
+    sentence_type_ratio: {{ analysis.grammar_patterns.sentence_type_ratio }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.structure_pattern %}
+    structure_pattern: {{ analysis.grammar_patterns.structure_pattern }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.paragraph_stats %}
+    paragraph_stats: {{ analysis.grammar_patterns.paragraph_stats }}
+    {%- endif %}
+{%- endif %}
 
+{%- if analysis.emotional_tone %}
 Emotional Tone:
-{{ analysis.emotional_tone }}
+    {%- if analysis.emotional_tone.summary %}
+    summary: {{ analysis.emotional_tone.summary }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.overall %}
+    overall: {{ analysis.emotional_tone.overall }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.formality_level %}
+    formality_level: {{ analysis.emotional_tone.formality_level }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.politeness_level %}
+    politeness_level: {{ analysis.emotional_tone.politeness_level }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.directness_score %}
+    directness_score: {{ analysis.emotional_tone.directness_score }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.warmth_score %}
+    warmth_score: {{ analysis.emotional_tone.warmth_score }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.speech_act_distribution %}
+    speech_act_distribution: {{ analysis.emotional_tone.speech_act_distribution }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.request_style %}
+    request_style: {{ analysis.emotional_tone.request_style }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.notes %}
+    notes: {{ analysis.emotional_tone.notes }}
+    {%- endif %}
+{%- endif %}
 
-Figurative Usage:
-{{ analysis.figurative_usage }}
-
-Long Sentence Ratio:
-{{ analysis.long_sentence_ratio }}
-
+{%- if analysis.representative_sentences %}
 Representative Sentences:
-{%- for sentence in analysis.representative_sentences %}
-- {{ sentence }}
-{%- endfor %}
+    {%- for sentence in analysis.representative_sentences %}
+    - {{ sentence }}
+    {%- endfor %}
+{%- endif %}
+
 </analysis>
 {%- endif %}
 
@@ -254,27 +313,83 @@ User's information: {{ profile.info }}
 Below is the user's analyzed writing style from their past emails.
 Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
 
-<analysis>
+{%- if analysis.lexical_style %}
 Lexical Style:
-{{ analysis.lexical_style }}
+    {%- if analysis.lexical_style.summary %}
+    summary: {{ analysis.lexical_style.summary }}
+    {%- endif %}
+    {%- if analysis.lexical_style.top_connectives %}
+    top_connectives: {{ analysis.lexical_style.top_connectives }}
+    {%- endif %}
+    {%- if analysis.lexical_style.frequent_phrases %}
+    frequent_phrases: {{ analysis.lexical_style.frequent_phrases }}
+    {%- endif %}
+    {%- if analysis.lexical_style.slang_or_chat_markers %}
+    slang_or_chat_markers: {{ analysis.lexical_style.slang_or_chat_markers }}
+    {%- endif %}
+    {%- if analysis.lexical_style.politeness_lexemes %}
+    politeness_lexemes: {{ analysis.lexical_style.politeness_lexemes }}
+    {%- endif %}
+{%- endif %}
 
+{%- if analysis.grammar_patterns %}
 Grammar Patterns:
-{{ analysis.grammar_patterns }}
+    {%- if analysis.grammar_patterns.summary %}
+    summary: {{ analysis.grammar_patterns.summary }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.ender_distribution %}
+    ender_distribution: {{ analysis.grammar_patterns.ender_distribution }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.sentence_length %}
+    sentence_length: {{ analysis.grammar_patterns.sentence_length }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.sentence_type_ratio %}
+    sentence_type_ratio: {{ analysis.grammar_patterns.sentence_type_ratio }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.structure_pattern %}
+    structure_pattern: {{ analysis.grammar_patterns.structure_pattern }}
+    {%- endif %}
+    {%- if analysis.grammar_patterns.paragraph_stats %}
+    paragraph_stats: {{ analysis.grammar_patterns.paragraph_stats }}
+    {%- endif %}
+{%- endif %}
 
+{%- if analysis.emotional_tone %}
 Emotional Tone:
-{{ analysis.emotional_tone }}
+    {%- if analysis.emotional_tone.summary %}
+    summary: {{ analysis.emotional_tone.summary }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.overall %}
+    overall: {{ analysis.emotional_tone.overall }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.formality_level %}
+    formality_level: {{ analysis.emotional_tone.formality_level }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.politeness_level %}
+    politeness_level: {{ analysis.emotional_tone.politeness_level }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.directness_score %}
+    directness_score: {{ analysis.emotional_tone.directness_score }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.warmth_score %}
+    warmth_score: {{ analysis.emotional_tone.warmth_score }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.speech_act_distribution %}
+    speech_act_distribution: {{ analysis.emotional_tone.speech_act_distribution }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.request_style %}
+    request_style: {{ analysis.emotional_tone.request_style }}
+    {%- endif %}
+    {%- if analysis.emotional_tone.notes %}
+    notes: {{ analysis.emotional_tone.notes }}
+    {%- endif %}
+{%- endif %}
 
-Figurative Usage:
-{{ analysis.figurative_usage }}
-
-Long Sentence Ratio:
-{{ analysis.long_sentence_ratio }}
-
+{%- if analysis.representative_sentences %}
 Representative Sentences:
-{%- for sentence in analysis.representative_sentences %}
-- {{ sentence }}
-{%- endfor %}
-</analysis>
+    {%- for sentence in analysis.representative_sentences %}
+    - {{ sentence }}
+    {%- endfor %}
 {%- endif %}
 
 {%- if fewshots %}
@@ -363,33 +478,6 @@ Do not assume any default politeness, formality, or writing style beyond these u
 Relationship:
 You are writing as the {{ sender_role or "sender" }} to the {{ recipient_role or "recipient" }}.
 Use this information only to guide contextual understanding — do not inject politeness or tone unless it matches the user-provided instructions.
-{%- endif %}
-
-{%- if analysis %}
-Below is the user's analyzed writing style from their past emails.
-Reflect these characteristics in your generated message, including tone, phrasing, and linguistic tendencies.
-
-<analysis>
-Lexical Style:
-{{ analysis.lexical_style }}
-
-Grammar Patterns:
-{{ analysis.grammar_patterns }}
-
-Emotional Tone:
-{{ analysis.emotional_tone }}
-
-Figurative Usage:
-{{ analysis.figurative_usage }}
-
-Long Sentence Ratio:
-{{ analysis.long_sentence_ratio }}
-
-Representative Sentences:
-{%- for sentence in analysis.representative_sentences %}
-- {{ sentence }}
-{%- endfor %}
-</analysis>
 {%- endif %}
 
 The user may have given a subject/body draft. Keep the plan semantically consistent with that draft.  
@@ -490,6 +578,7 @@ Be extremely meticulous and thorough: analyze each requested field carefully, pr
 
 Analyze the written mail style and output ONLY the JSON object.
 NO extra commentary.
+If the email does not provide enough information for a specific field, DO NOT output that field in the JSON.
 """.strip()
 
 ANALYSIS_USER = """
@@ -549,6 +638,7 @@ Very important:
 
 Output ONLY the final JSON object.
 NO explanations. NO comments. NO lists of intermediate results.
+If the previou analysis results do not provide enough information for a specific field, DO NOT output that field in the JSON.
 """.strip()
 
 INTEGRATE_USER = """
