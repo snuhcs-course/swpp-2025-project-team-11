@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 
+from apps.ai.tasks import backfill_contact_mail_analysis
 from apps.contact.models import (
     Contact,
     ContactContext,
@@ -53,7 +54,12 @@ class ContactListCreateView(AuthRequiredMixin, OwnerQuerysetMixin, generics.List
     @transaction.atomic
     def perform_create(self, serializer):
         # serializer.create handles nested context create
-        serializer.save(user=self.request.user)
+        contact = serializer.save(user=self.request.user)
+        backfill_contact_mail_analysis.delay(
+            user_id=self.request.user.id,
+            contact_id=contact.id,
+            limit=2,
+        )
 
 
 class ContactDetailView(AuthRequiredMixin, OwnerQuerysetMixin, generics.RetrieveUpdateDestroyAPIView):
