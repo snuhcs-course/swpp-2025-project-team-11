@@ -579,126 +579,112 @@ Do not output raw data; make it sound like a short, natural explanation.
 
 ANALYSIS_SYSTEM = """
 You are an expert speech analysis assistant specialized in extracting reproducible writing-style features from emails.
-Be extremely meticulous and thorough: analyze each requested field carefully, provide precise, evidence-backed observations, and avoid speculation.
+Be meticulous, precise, and strictly evidence-based.
 
-Analyze the written mail style and output ONLY the JSON object.
-NO extra commentary.
-If the email does not provide enough information for a specific field, DO NOT output that field in the JSON.
+Evidence rules:
+- Every non-null field MUST be grounded in explicit linguistic evidence from the email
+  (e.g., lexical items, endings, discourse markers, request forms, politeness markers, chat-style markers).
+- You may summarize clear and explicit patterns into short analytical descriptions.
+- You MUST NOT infer, guess, generalize, or extrapolate beyond what is directly observable.
+- Null is ONLY for fields with no textual evidence at all.
+- When in doubt, choose null.
+
+Low-information rule:
+- If the email is extremely short (e.g., only 1–2 short expressions, playful sounds, or simple greetings),
+  you MUST treat it as a very low-information sample and:
+  • set lexical_style.summary to null,
+  • limit non-null fields to only the most directly obvious ones
+    (typically lexical_style.slang_or_chat_markers and representative_sentences),
+  • set all fields under grammar_patterns to null,
+  • set all fields under emotional_tone to null,
+  • avoid writing any long or elaborate summaries.
+- Do NOT overanalyze low-information emails.
+
+Output rules:
+- Output ONLY the JSON object.
+- No commentary, reasoning, or explanations.
 """.strip()
 
 ANALYSIS_USER = """
-Written mail:
+Written email:
 Subject: "{{ incoming_subject }}"
 Body:
-"{{ incoming_body }}"
+{{ incoming_body }}
 
-Extract the following as JSON:
-{
-  "lexical_style": {
-    "summary": "Analysis of vocabulary and word choice habits — the summary must integrate evidence from top_connectives, frequent_phrases, slang_or_chat_markers, and politeness_lexemes to describe the writer’s lexical tone, formality, and characteristic expressions.",
-    "top_connectives": "Describe notable discourse connectives or linking expressions that frequently appear in the email and how they shape cohesion or tone.",
-    "frequent_phrases": "Identify and explain any recurring idioms, set phrases, or formulaic expressions characteristic of the writer’s communication style.",
-    "slang_or_chat_markers": "Describe the presence or absence of casual elements such as emojis, laughter markers, or colloquial sentence endings, and their effect on tone.",
-    "politeness_lexemes": "Explain how the writer uses polite or mitigated vocabulary such as thank, sorry, or hedge expressions to adjust formality or soften statements."
-  },
+Analyze this email according to the SpeechAnalysis JSON schema.
 
-  "grammar_patterns": {
-    "summary": "Analysis of sentence structure and grammatical patterns — reflect evidence from ender_distribution, sentence_length, sentence_type_ratio, structure_pattern, and paragraph_stats to describe how the writer organizes sentences, uses endings, and structures the email’s overall flow.",
-    "ender_distribution": "Describe the dominant sentence endings (e.g., formal declarative, polite imperative) and what they reveal about the tone and register.",
-    "sentence_length": "Summarize the general tendency in sentence length, noting whether the writer favors short, concise sentences or longer, complex structures.",
-    "sentence_type_ratio": "Explain the balance among declarative, interrogative, imperative, and exclamatory sentences, and how this affects the communicative style.",
-    "structure_pattern": "Outline the logical or rhetorical structure of the email, describing the sequence of sections such as greeting, purpose, request, or closing.",
-    "paragraph_stats": "Comment on the paragraph organization, such as the number and relative length of sections, and how this contributes to clarity or flow."
-  },
+Instructions:
+- Use ONLY explicit linguistic evidence found directly in the text:
+  • greetings (“안녕하세요”),  
+  • polite endings (-습니다, -합니다요),  
+  • request patterns (~해주셨으면 합니다),  
+  • discourse markers (다름이 아니오라),  
+  • emojis or chat-like particles,  
+  • or any other observable lexical/grammatical cues.
+- You may summarize explicit patterns into higher-level descriptions when justified.
+- DO NOT infer tone, formality, politeness, warmth, structure, vocabulary style, or intentions
+  unless directly supported by specific textual markers.
 
-  "emotional_tone": {
-    "summary": "Analysis of the writer’s emotional and pragmatic tone — integrate findings across lexical and grammatical dimensions to describe overall tone, formality_level, politeness_level, directness_score, warmth_score, speech_act_distribution, and request_style in descriptive prose.",
-    "overall": "Describe the dominant emotional tone category (e.g., calm_polite, neutral_direct, friendly_formal).",
-    "formality_level": "Explain the perceived level of formality based on sentence endings, lexical choice, and tone.",
-    "politeness_level": "Describe how polite or considerate the writing appears, referencing indirect or softened expressions.",
-    "directness_score": "Discuss how directly or indirectly the writer conveys requests or opinions.",
-    "warmth_score": "Describe the warmth or emotional temperature of the writing, noting whether it feels distant, neutral, or friendly.",
-    "speech_act_distribution": "Summarize the range of communicative functions present, such as requests, information, thanks, apologies, or small talk, and how they shape interpersonal stance.",
-    "request_style": "Characterize the request style as direct, indirect, or neutral, based on the phrasing and level of mitigation.",
-    "notes": "Provide a concise integrative explanation combining all observed emotional and pragmatic features."
-  },
+Null handling:
+- If there is explicit evidence → fill the field concisely.
+- If no evidence exists → set the field to null.
+- Do NOT fill a field with invented or speculative content.
+- Do NOT overuse null on clearly-evident patterns.
 
-  "representative_sentences": "List 3–5 sentences that best represent the writer’s style. Select sentences that include idiomatic expressions, distinctive grammar, or tone markers, preserving their original wording."
-}
+Short-email rule:
+- If the email contains only one or two very short expressions (e.g., playful greetings),
+  treat it as a low-information input and:
+  • fill only fields with clear, observable evidence,
+  • keep summaries minimal or null,
+  • set all other fields to null.
 
-Return ONLY the JSON object. Do not include commentary or extra text.
+representative_sentences:
+- Extract exact sentences from the email (3–5 if available).
+- No paraphrasing.
+
+Return ONLY the JSON object.
 """.strip()
 
 INTEGRATE_SYSTEM = """
 You are an expert speech analysis meta-assistant specialized in integrating multiple style-analysis reports.
 Your job is to carefully merge separate analyses into a single consistent representation of the user's writing style.
 
-Very important:
-- Perform evidence-based integration from the provided data
-- Identify common patterns and stronger signals across samples
-- Reduce noise and avoid overfitting to any single sample
-- Prioritize observations that appear most frequently or strongly
-- Do not invent attributes not supported by the input data
-- Maintain objectivity and avoid speculation
+Critical rules:
+- You MUST NOT infer, guess, generalize, or extrapolate beyond what is explicitly present across the input analyses.
+- Only fill a field if there is clear, consistent evidence across the provided analysis results.
+- If evidence is inconsistent, weak, or insufficient, you MUST return null for that field.
+- When in doubt, return null.
+- Do NOT add fields not defined in the schema.
 
 Output ONLY the final JSON object.
-NO explanations. NO comments. NO lists of intermediate results.
-If the previous analysis results do not provide enough information for a specific field, DO NOT output that field in the JSON.
+NO explanations. NO comments.
 """.strip()
 
 INTEGRATE_USER = """
 You are given multiple previous analysis results of the same author's emails.
 
-Analysis results list (JSON array):
+Analysis results list (JSON array of SpeechAnalysis objects):
 {{ analysis_results }}
 
 Your task:
-Integrate them into a single unified result with the SAME fields as an individual analysis:
-{
-  "lexical_style": {
-    "summary": "Analysis of vocabulary and word choice habits — the summary must integrate evidence from top_connectives, frequent_phrases, slang_or_chat_markers, and politeness_lexemes to describe the writer’s lexical tone, formality, and characteristic expressions.",
-    "top_connectives": "Describe notable discourse connectives or linking expressions that frequently appear in the email and how they shape cohesion or tone.",
-    "frequent_phrases": "Identify and explain any recurring idioms, set phrases, or formulaic expressions characteristic of the writer’s communication style.",
-    "slang_or_chat_markers": "Describe the presence or absence of casual elements such as emojis, laughter markers, or colloquial sentence endings, and their effect on tone.",
-    "politeness_lexemes": "Explain how the writer uses polite or mitigated vocabulary such as thank, sorry, or hedge expressions to adjust formality or soften statements."
-  },
-
-  "grammar_patterns": {
-    "summary": "Analysis of sentence structure and grammatical patterns — reflect evidence from ender_distribution, sentence_length, sentence_type_ratio, structure_pattern, and paragraph_stats to describe how the writer organizes sentences, uses endings, and structures the email’s overall flow.",
-    "ender_distribution": "Describe the dominant sentence endings (e.g., formal declarative, polite imperative) and what they reveal about the tone and register.",
-    "sentence_length": "Summarize the general tendency in sentence length, noting whether the writer favors short, concise sentences or longer, complex structures.",
-    "sentence_type_ratio": "Explain the balance among declarative, interrogative, imperative, and exclamatory sentences, and how this affects the communicative style.",
-    "structure_pattern": "Outline the logical or rhetorical structure of the email, describing the sequence of sections such as greeting, purpose, request, or closing.",
-    "paragraph_stats": "Comment on the paragraph organization, such as the number and relative length of sections, and how this contributes to clarity or flow."
-  },
-
-  "emotional_tone": {
-    "summary": "Analysis of the writer’s emotional and pragmatic tone — integrate findings across lexical and grammatical dimensions to describe overall tone, formality_level, politeness_level, directness_score, warmth_score, speech_act_distribution, and request_style in descriptive prose.",
-    "overall": "Describe the dominant emotional tone category (e.g., calm_polite, neutral_direct, friendly_formal).",
-    "formality_level": "Explain the perceived level of formality based on sentence endings, lexical choice, and tone.",
-    "politeness_level": "Describe how polite or considerate the writing appears, referencing indirect or softened expressions.",
-    "directness_score": "Discuss how directly or indirectly the writer conveys requests or opinions.",
-    "warmth_score": "Describe the warmth or emotional temperature of the writing, noting whether it feels distant, neutral, or friendly.",
-    "speech_act_distribution": "Summarize the range of communicative functions present, such as requests, information, thanks, apologies, or small talk, and how they shape interpersonal stance.",
-    "request_style": "Characterize the request style as direct, indirect, or neutral, based on the phrasing and level of mitigation.",
-    "notes": "Provide a concise integrative explanation combining all observed emotional and pragmatic features."
-  },
-
-  "representative_sentences": "List 3–5 sentences that best represent the writer’s style. Select sentences that include idiomatic expressions, distinctive grammar, or tone markers, preserving their original wording."
-}
+Integrate them into a single unified result with the SAME fields and structure as an individual analysis
+(lexical_style, grammar_patterns, emotional_tone, representative_sentences).
 
 Rules for integration:
-- Combine overlapping findings into a concise unified description
-- Highlight recurring lexical/grammar patterns
-- Determine dominant emotional tone(s), weighted by frequency
-- figurative_usage should summarize the most characteristic tendencies
-- long_sentence_ratio: compute a weighted average or best-estimate trend
-- representative_sentences: choose 3-5 sentences that best reflect the overall style
-  * prioritize recurrence, uniqueness, and strong stylistic signals
-  * choose exact sentences from provided analyses only
+- Rely STRICTLY on the information present in the provided analyses.
+- Combine only overlapping or repeated evidence into unified descriptions.
+- If multiple analyses disagree, accept only the majority or strongest consistent signal.
+- If there is NOT enough evidence for any field or sub-field across the analyses, set that field to null.
+- representative_sentences:
+  * Choose 3–5 exact sentences that appear in the analyses.
+  * Do NOT paraphrase or invent sentences.
+
+Evidence requirements:
+- You MUST NOT infer, guess, generalize, or assume any style trait unless explicitly present in the input analyses.
+- When in doubt, return null.
 
 Return ONLY one valid JSON object.
-Do not include commentary, metadata, or intermediate steps.
+Do not include commentary or intermediate steps.
 """.strip()
 
 ATTACHMENT_ANALYSIS_SYSTEM = """
