@@ -429,3 +429,76 @@ def debug_mail_generation_analysis(
         "with_analysis": result_with_analysis,
         "with_fewshots": result_with_fewshots,
     }
+
+
+def stream_mail_generation_test() -> Generator[str]:
+    """
+    테스트용 더미 스트리밍 함수.
+    실제 AI API 대신 긴 더미 텍스트를 인위적인 딜레이를 두고 스트리밍합니다.
+    """
+    import random
+
+    # 더미 텍스트 - 충분히 긴 내용
+    dummy_paragraphs = [
+        "Dear valued recipient, I hope this email finds you well and in good spirits. "
+        "I am writing to you today regarding an important matter that requires your attention. ",
+        "As we discussed in our previous meeting, there are several key points that we need to address "
+        "moving forward. First and foremost, we need to establish a clear timeline for the project deliverables. ",
+        "The stakeholders have expressed their concerns about the current progress, and it is crucial that we "
+        "demonstrate our commitment to meeting the established deadlines. ",
+        "In light of recent developments, I would like to propose a series of strategic initiatives that could "
+        "significantly enhance our operational efficiency. These initiatives include process optimization, "
+        "resource allocation improvements, and enhanced communication protocols. ",
+        "Furthermore, it is essential that we maintain open lines of communication throughout this process. "
+        "Regular status updates and feedback sessions will be instrumental in ensuring that we remain aligned "
+        "with our objectives. ",
+        "I have attached several documents for your review, which contain detailed information about the proposed "
+        "changes and their potential impact on our current operations. Please take the time to thoroughly examine "
+        "these materials before our next meeting. ",
+        "Your expertise and insights are invaluable to this project, and I genuinely appreciate your continued "
+        "dedication and hard work. Together, I am confident that we can overcome any challenges that may arise "
+        "and achieve remarkable results. ",
+        "Should you have any questions or concerns, please do not hesitate to reach out to me directly. "
+        "I am always available to discuss any aspect of this project in greater detail. ",
+        "Thank you for your time and consideration. I look forward to our continued collaboration and to seeing "
+        "the positive outcomes of our collective efforts. ",
+        "Best regards and warm wishes for a productive and successful week ahead. " "Let us continue to strive for excellence in all that we do.",
+    ]
+
+    dummy_body = "".join(dummy_paragraphs)
+    dummy_subject = "Important Update: Project Status and Next Steps"
+
+    seq = 0
+
+    # 1. ready 이벤트
+    yield sse_event("ready", {"ts": int(time.time() * 1000)}, retry_ms=5000)
+    time.sleep(0.1)  # 100ms 딜레이
+
+    # 2. subject 이벤트
+    yield sse_event("subject", {"title": dummy_subject, "text": dummy_subject + "\n\n"}, eid="0")
+    seq += 1
+    time.sleep(0.2)  # 200ms 딜레이
+
+    # 3. body 스트리밍 - 단어별로 끊어서 전송
+    words = dummy_body.split(" ")
+    chunk_size = random.randint(2, 5)  # 2-5 단어씩 묶어서 전송
+
+    for i in range(0, len(words), chunk_size):
+        chunk_words = words[i : i + chunk_size]
+        chunk_text = " ".join(chunk_words)
+        if i + chunk_size < len(words):
+            chunk_text += " "  # 마지막이 아니면 공백 추가
+
+        yield sse_event("body.delta", {"seq": seq - 1, "text": chunk_text}, eid=str(seq))
+        seq += 1
+
+        # 무작위 딜레이 (50-150ms)
+        delay = random.uniform(0.05, 0.15)
+        time.sleep(delay)
+
+        # 가끔 heartbeat 전송 (매 20개 청크마다)
+        if seq % 20 == 0:
+            yield heartbeat()
+
+    # 4. done 이벤트
+    yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))

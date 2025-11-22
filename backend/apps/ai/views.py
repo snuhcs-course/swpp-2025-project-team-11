@@ -25,6 +25,7 @@ from .services.attachment_analysis import analyze_gmail_attachment, analyze_uplo
 from .services.mail_generation import (
     debug_mail_generation_analysis,
     stream_mail_generation,
+    stream_mail_generation_test,
     stream_mail_generation_with_plan,
     stream_mail_generation_with_timestamp,
 )
@@ -561,3 +562,31 @@ class MailGenerateAnalysisTestView(AuthRequiredMixin, generics.GenericAPIView):
             to_emails=data.get("to_emails"),
         )
         return Response(result)
+
+
+class MailGenerateStreamTestView(AuthRequiredMixin, generics.GenericAPIView):
+    renderer_classes = [SSERenderer]
+
+    @extend_schema(
+        operation_id="mail_generate_stream_test",
+        summary="Generate mail via streaming (SSE) - TEST with dummy data",
+        description=(
+            "테스트용 SSE 엔드포인트. 실제 AI API 대신 더미 텍스트를 스트리밍합니다.\n"
+            "- 인위적인 딜레이를 두고 긴 더미 텍스트를 전송\n"
+            "- 실제 엔드포인트와 동일한 이벤트 형식 사용\n"
+            "- 프론트엔드 스트리밍 테스트용\n"
+            "- 빈 요청({})도 허용됨"
+        ),
+        request=None,
+        responses={
+            200: (OpenApiTypes.STR, "text/event-stream"),
+        },
+    )
+    def post(self, request):
+        # 테스트용이므로 validation 없이 바로 더미 스트림 전송
+        gen = stream_mail_generation_test()
+
+        resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp

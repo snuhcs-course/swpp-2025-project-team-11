@@ -5,6 +5,7 @@ from .views import (
     AttachmentAnalyzeUploadView,
     EmailPromptPreviewView,
     MailGenerateAnalysisTestView,
+    MailGenerateStreamTestView,
     MailGenerateStreamView,
     MailGenerateStreamWithTimestampView,
     MailGenerateWithPlanStreamView,
@@ -19,6 +20,7 @@ urlpatterns = [
         name="mail-generate-stream-with-timestamp",
     ),
     path("mail/generate-with-plan/stream/", MailGenerateWithPlanStreamView.as_view(), name="mail-generate-with-plan-stream"),
+    path("mail/generate/streamtest/", MailGenerateStreamTestView.as_view(), name="mail-generate-stream-test"),
     path("mail/reply/stream/", ReplyOptionsStreamView.as_view(), name="mail-reply-stream"),
     path("mail/prompts/preview/", EmailPromptPreviewView.as_view()),
     path(
