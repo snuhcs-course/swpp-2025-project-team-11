@@ -432,10 +432,15 @@ class GmailService:
 
 
 @google_token_required
-def list_emails_logic(access_token, max_results, page_token, label_ids):
+def list_emails_logic(access_token, max_results, page_token, label_ids, q=None):
     """Helper function to list emails using Google access token"""
     gmail_service = GmailService(access_token)
-    result = gmail_service.list_messages(max_results=max_results, page_token=page_token, label_ids=label_ids)
+    result = gmail_service.list_messages(
+        max_results=max_results,
+        page_token=page_token,
+        label_ids=label_ids,
+        q=q,
+    )
 
     # Fetch detailed info for each message
     msg_refs = result.get("messages", [])
