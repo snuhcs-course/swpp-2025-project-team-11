@@ -67,6 +67,7 @@ class MailDetailViewModel(
 
     private val _uiState = MutableStateFlow(MailDetailUiState())
     val uiState: StateFlow<MailDetailUiState> = _uiState.asStateFlow()
+    private var markReadInProgress = false
 
     init {
         loadMail()
@@ -86,6 +87,7 @@ class MailDetailViewModel(
                             isLoading = false
                         )
                     }
+                    markEmailAsReadIfNeeded(email)
                 } else {
                     Log.e("MailDetailViewModel", "Email not found in DB cache")
                     _uiState.update { it.copy(error = "메일을 찾을 수 없습니다.", isLoading = true) }
@@ -129,6 +131,8 @@ class MailDetailViewModel(
                     error = null
                 )
             }
+
+            markEmailAsReadIfNeeded(updatedMail)
         } catch (e: Exception) {
             Log.e("MailDetailViewModel", "Exception fetching mail detail", e)
             handleMailDetailError(e.message ?: "메일을 불러오는 중 오류가 발생했습니다.")
@@ -161,6 +165,29 @@ class MailDetailViewModel(
             attachments = attachments,
             cachedAt = existing?.cachedAt ?: System.currentTimeMillis()
         )
+    }
+
+    private fun markEmailAsReadIfNeeded(email: EmailItem) {
+        if (!email.isUnread || markReadInProgress) {
+            return
+        }
+
+        markReadInProgress = true
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    inboxRepository.updateReadStatus(email.id, isUnread = false)
+                }
+                _uiState.update { state ->
+                    val currentMail = state.mail ?: return@update state
+                    state.copy(mail = currentMail.copy(isUnread = false))
+                }
+            } catch (e: Exception) {
+                Log.e("MailDetailViewModel", "Failed to mark email as read", e)
+            } finally {
+                markReadInProgress = false
+            }
+        }
     }
 
     fun downloadAttachment(attachment: Attachment) {

@@ -10,12 +10,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.fiveis.xend.R
 import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.repository.SentRepository
 import com.fiveis.xend.network.RetrofitClient
+import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.compose.MailComposeActivity
 import com.fiveis.xend.ui.contactbook.ContactBookActivity
 import com.fiveis.xend.ui.inbox.InboxActivity
@@ -25,6 +27,14 @@ import com.fiveis.xend.ui.view.MailDetailActivity
 
 class SentActivity : ComponentActivity() {
     private val viewModel: SentViewModel by viewModels { SentViewModelFactory(this.applicationContext) }
+    private val contactLookupViewModel: ContactLookupViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return ContactLookupViewModel(application) as T
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +53,10 @@ class SentActivity : ComponentActivity() {
         setContent {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
+                val contactsByEmailState by contactLookupViewModel.byEmail.collectAsState()
+                val contactsByEmail = remember(contactsByEmailState) {
+                    contactsByEmailState.mapValues { it.value.name }
+                }
 
                 SentScreen(
                     uiState = uiState,
@@ -73,7 +87,8 @@ class SentActivity : ComponentActivity() {
                                 overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                             }
                         }
-                    }
+                    },
+                    contactsByEmail = contactsByEmail
                 )
             }
         }

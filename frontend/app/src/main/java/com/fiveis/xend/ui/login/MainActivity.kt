@@ -97,7 +97,8 @@ class MainActivity : ComponentActivity() {
             .requestEmail()
             .requestScopes(
                 Scope("https://www.googleapis.com/auth/gmail.readonly"),
-                Scope("https://www.googleapis.com/auth/gmail.send")
+                Scope("https://www.googleapis.com/auth/gmail.send"),
+                Scope("https://www.googleapis.com/auth/gmail.modify")
             )
             .build()
 

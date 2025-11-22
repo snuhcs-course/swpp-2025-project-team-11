@@ -257,7 +257,8 @@ fun MailScreen(
                         },
                         onScrollStopped = {
                             showBottomBar = true
-                        }
+                        },
+                        contactsByEmail = inboxUiState.contactsByEmail
                     )
                 }
             }

@@ -69,6 +69,13 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
+import com.fiveis.xend.utils.EmailUtils
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 @Composable
 fun SentScreen(
@@ -80,10 +87,10 @@ fun SentScreen(
     onRefresh: () -> Unit = {},
     onLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
+    contactsByEmail: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-
     // 스크롤 방향 감지
     var showBottomBar by remember { mutableStateOf(true) }
     var previousIndex by remember { mutableStateOf(0) }
@@ -93,20 +100,16 @@ fun SentScreen(
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (currentIndex, currentOffset) ->
-            // 맨 위에 있을 때는 항상 표시
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
             } else {
-                // 스크롤 방향 감지
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
-
                 showBottomBar = !isScrollingDown
             }
-
             previousIndex = currentIndex
             previousScrollOffset = currentOffset
         }
@@ -122,24 +125,14 @@ fun SentScreen(
                         easing = FastOutSlowInEasing
                     ),
                     initialOffsetY = { it }
-                ) + fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                ),
+                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
                 exit = slideOutVertically(
                     animationSpec = tween(
                         durationMillis = 150,
                         easing = FastOutSlowInEasing
                     ),
                     targetOffsetY = { it }
-                ) + fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                )
+                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
             ) {
                 BottomNavBar(selected = "sent", onSelect = onBottomNavChange)
             }
@@ -166,7 +159,8 @@ fun SentScreen(
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
-                        listState = listState
+                        listState = listState,
+                        contactsByEmail = contactsByEmail
                     )
                 }
             }
@@ -182,29 +176,19 @@ fun SentScreen(
                         easing = FastOutSlowInEasing
                     ),
                     initialOffsetY = { it }
-                ) + fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                ),
+                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
                 exit = slideOutVertically(
                     animationSpec = tween(
                         durationMillis = 150,
                         easing = FastOutSlowInEasing
                     ),
                     targetOffsetY = { it }
-                ) + fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                )
+                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
             ) {
                 FloatingActionButton(
                     onClick = onFabClick,
                     modifier = Modifier
-                        .offset(y = 28.dp) // 하단바와 겹치도록 아래로 이동
+                        .offset(y = 28.dp)
                         .padding(bottom = navBarPadding.calculateBottomPadding())
                         .size(56.dp),
                     containerColor = Blue80,
@@ -288,7 +272,8 @@ private fun EmailList(
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -301,7 +286,11 @@ private fun EmailList(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             items(items = emails, key = { it.id }) { item ->
-                EmailRow(item = item, onClick = { onEmailClick(item) })
+                EmailRow(
+                    item = item,
+                    contactsByEmail = contactsByEmail,
+                    onClick = { onEmailClick(item) }
+                )
                 HorizontalDivider(
                     modifier = Modifier,
                     thickness = DividerDefaults.Thickness,
@@ -374,7 +363,8 @@ fun EmailListContent(
     isLoadingMore: Boolean,
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
-    onScrollStopped: () -> Unit = {}
+    onScrollStopped: () -> Unit = {},
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     val listState = rememberLazyListState()
 
@@ -413,13 +403,14 @@ fun EmailListContent(
             onLoadMore = onLoadMore,
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
-            listState = listState
+            listState = listState,
+            contactsByEmail = contactsByEmail
         )
     }
 }
 
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
+private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -451,7 +442,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val recipientDisplay = formatRecipientDisplay(item.toEmail)
+                    val recipientDisplay = formatRecipientDisplay(item.toEmail, contactsByEmail)
                     Text(
                         text = "To: $recipientDisplay",
                         color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
@@ -465,7 +456,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     Spacer(Modifier.width(8.dp))
 // 날짜 포매팅 해야함
                     Text(
-                        text = item.date,
+                        text = formatDisplayDate(item.date),
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -584,10 +575,41 @@ private fun extractDisplayName(emailField: String): String {
         ?: emailField.substringBefore("<").trim().ifEmpty { emailField }
 }
 
-private fun formatRecipientDisplay(rawToField: String): String {
+private fun formatRecipientDisplay(rawToField: String, contactsByEmail: Map<String, String>): String {
     val recipients = rawToField.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     if (recipients.isEmpty()) return "알 수 없음"
 
-    val primary = extractDisplayName(recipients.first())
+    val primaryRaw = recipients.first()
+    val primaryEmail = EmailUtils.extractEmailAddress(primaryRaw).lowercase()
+    val contactName = contactsByEmail[primaryEmail]
+    val fallbackName = extractDisplayName(primaryRaw)
+    val primary = contactName ?: fallbackName
     return if (recipients.size > 1) "$primary 외 ${recipients.size - 1}명" else primary
+}
+
+private fun formatDisplayDate(isoDate: String): String {
+    return try {
+        val parsedDateTime = OffsetDateTime.parse(isoDate)
+            .atZoneSameInstant(ZoneId.systemDefault())
+
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val emailDate = parsedDateTime.toLocalDate()
+
+        when {
+            emailDate.isEqual(today) -> {
+                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+                    .format(parsedDateTime)
+            }
+            emailDate.year == today.year -> {
+                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
+                formatter.format(parsedDateTime)
+            }
+            else -> {
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
+                    .format(parsedDateTime)
+            }
+        }
+    } catch (e: Exception) {
+        isoDate
+    }
 }
