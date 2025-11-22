@@ -105,7 +105,7 @@ class ContactTest {
     }
 }
 
-class ContactContextTest {
+class ContactWithContextTest {
 
     @Test
     fun create_contact_context_with_required_field_only() {

@@ -74,7 +74,7 @@ class MailComposeWebSocketClientTest {
         var error: String? = null
         client.connect({}, { e -> error = e }, {})
 
-        client.sendMessage(text = "text", toEmails = emptyList())
+        client.sendMessage(systemPrompt = "prompt", text = "text")
 
         assertNotNull(error)
         // Check if error message contains "WebSocket" or "연결"
@@ -93,12 +93,12 @@ class MailComposeWebSocketClientTest {
         client.connect({}, {}, {})
         listenerSlot.captured.onOpen(mockWebSocket, mockk(relaxed = true))
 
-        val recipients = listOf("recipient@example.com")
-        client.sendMessage(text = "user text", toEmails = recipients)
+        client.sendMessage(systemPrompt = "prompt", text = "user text")
 
         val expectedJson = JSONObject()
+            .put("system_prompt", "prompt")
             .put("text", "user text")
-            .put("to_emails", JSONArray(recipients))
+            .put("max_tokens", 50)
             .toString()
 
         verify { mockWebSocket.send(expectedJson) }

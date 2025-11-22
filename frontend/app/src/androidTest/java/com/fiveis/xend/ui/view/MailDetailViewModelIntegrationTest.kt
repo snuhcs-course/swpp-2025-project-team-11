@@ -7,6 +7,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.data.repository.InboxRepository
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -23,15 +25,18 @@ class MailDetailViewModelIntegrationTest {
 
     private lateinit var database: AppDatabase
     private lateinit var emailDao: EmailDao
+    private lateinit var context: Context
+    private lateinit var mockRepository: InboxRepository
 
     @Before
     fun setup() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        context = ApplicationProvider.getApplicationContext<Context>()
         database = Room.inMemoryDatabaseBuilder(
             context,
             AppDatabase::class.java
         ).build()
         emailDao = database.emailDao()
+        mockRepository = mockk(relaxed = true)
     }
 
     @After
@@ -46,7 +51,7 @@ class MailDetailViewModelIntegrationTest {
         emailDao.insertEmail(testEmail)
 
         // When
-        val viewModel = MailDetailViewModel(emailDao, "test_id_1")
+        val viewModel = MailDetailViewModel(context, emailDao, mockRepository, "test_id_1")
         Thread.sleep(500)
 
         // Then
@@ -59,8 +64,12 @@ class MailDetailViewModelIntegrationTest {
 
     @Test
     fun viewModel_handles_missing_email() = runBlocking {
+        // Given
+        io.mockk.coEvery { mockRepository.getMail("nonexistent_id") } returns
+            retrofit2.Response.error(404, okhttp3.ResponseBody.create(null, ""))
+
         // When
-        val viewModel = MailDetailViewModel(emailDao, "nonexistent_id")
+        val viewModel = MailDetailViewModel(context, emailDao, mockRepository, "nonexistent_id")
         Thread.sleep(500)
 
         // Then
@@ -68,7 +77,7 @@ class MailDetailViewModelIntegrationTest {
         assertFalse(state.isLoading)
         assertNull(state.mail)
         assertNotNull(state.error)
-        assertEquals("Email not found", state.error)
+        assertEquals("메일을 불러오지 못했습니다. (404)", state.error)
     }
 
     @Test
@@ -82,7 +91,7 @@ class MailDetailViewModelIntegrationTest {
         emailDao.insertEmail(testEmail)
 
         // When
-        val viewModel = MailDetailViewModel(emailDao, "test-id-special")
+        val viewModel = MailDetailViewModel(context, emailDao, mockRepository, "test-id-special")
         Thread.sleep(500)
 
         // Then
@@ -100,7 +109,7 @@ class MailDetailViewModelIntegrationTest {
         emailDao.insertEmail(testEmail)
 
         // When
-        val viewModel = MailDetailViewModel(emailDao, "test_id_2")
+        val viewModel = MailDetailViewModel(context, emailDao, mockRepository, "test_id_2")
         val immediateState = viewModel.uiState.first()
 
         // Then - Initial state should be loading

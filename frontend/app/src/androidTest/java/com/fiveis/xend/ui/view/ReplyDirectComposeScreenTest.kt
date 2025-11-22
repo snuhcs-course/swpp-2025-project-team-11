@@ -98,7 +98,7 @@ class ReplyDirectComposeScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("받는 사람: ").assertIsDisplayed()
+        composeTestRule.onNodeWithText("받는 사람").assertIsDisplayed()
         composeTestRule.onNodeWithText("John Doe").assertIsDisplayed()
     }
 
@@ -116,8 +116,8 @@ class ReplyDirectComposeScreenTest {
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
+        // Then - Check for group name instead of "그룹"
+        composeTestRule.onNodeWithText("Group1").assertIsDisplayed()
     }
 
     @Test
@@ -224,12 +224,14 @@ class ReplyDirectComposeScreenTest {
                 subject = "Test",
                 groups = emptyList(),
                 onBack = {},
-                onSend = {}
+                onSend = {},
+                canUndo = true,
+                isStreaming = false
             )
         }
 
         // Then
-        composeTestRule.onNodeWithText("실행취소").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("실행취소").assertIsDisplayed()
     }
 
     @Test
@@ -507,9 +509,9 @@ class ReplyDirectComposeScreenTest {
             )
         }
 
-        // Then
+        // Then - Check that all group names are displayed
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Group1, Group2, Group3").assertIsDisplayed()
     }
 
     @Test

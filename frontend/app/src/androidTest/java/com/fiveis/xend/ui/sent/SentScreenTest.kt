@@ -23,6 +23,7 @@ class SentScreenTest {
             threadId = "thread_$id",
             subject = subject,
             fromEmail = "me@test.com",
+            toEmail = "",
             snippet = "Email snippet",
             date = "2024.12.19",
             dateRaw = "2024-12-19T10:00:00Z",
@@ -248,7 +249,7 @@ class SentScreenTest {
     fun sentScreen_displays_sender_name_extraction() {
         // Given
         val emails = listOf(
-            createMockEmail("1", "Test Subject").copy(fromEmail = "Jane Smith <jane@test.com>")
+            createMockEmail("1", "Test Subject").copy(toEmail = "Jane Smith <jane@test.com>")
         )
         val uiState = SentUiState(emails = emails)
 
@@ -261,14 +262,14 @@ class SentScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("Jane Smith").assertIsDisplayed()
+        composeTestRule.onNodeWithText("To: Jane Smith").assertIsDisplayed()
     }
 
     @Test
     fun sentScreen_displays_plain_email_address() {
         // Given
         val emails = listOf(
-            createMockEmail("1", "Test Subject").copy(fromEmail = "myemail@test.com")
+            createMockEmail("1", "Test Subject").copy(toEmail = "myemail@test.com")
         )
         val uiState = SentUiState(emails = emails)
 
@@ -281,7 +282,7 @@ class SentScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("myemail@test.com").assertIsDisplayed()
+        composeTestRule.onNodeWithText("To: myemail@test.com").assertIsDisplayed()
     }
 
     @Test

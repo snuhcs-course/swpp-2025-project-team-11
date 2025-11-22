@@ -1,0 +1,294 @@
+package com.fiveis.xend.data.model
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.util.Date
+
+class EmailItemExtendedTest {
+
+    @Test
+    fun test_emailItem_complete() {
+        val date = Date()
+        val email = EmailItem(
+            id = "msg_123",
+            threadId = "thread_456",
+            subject = "Meeting Tomorrow",
+            fromEmail = "sender@example.com",
+            snippet = "Let's discuss the project",
+            date = date,
+            dateRaw = "1705334400000",
+            isUnread = true,
+            labelIds = listOf("INBOX", "IMPORTANT")
+        )
+
+        assertEquals("msg_123", email.id)
+        assertEquals("thread_456", email.threadId)
+        assertEquals("Meeting Tomorrow", email.subject)
+        assertEquals("sender@example.com", email.fromEmail)
+        assertEquals("Let's discuss the project", email.snippet)
+        assertEquals(date, email.date)
+        assertEquals("1705334400000", email.dateRaw)
+        assertTrue(email.isUnread)
+        assertEquals(2, email.labelIds.size)
+    }
+
+    @Test
+    fun test_emailItem_unreadEmail() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "New Email",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = true,
+            labelIds = listOf("INBOX")
+        )
+
+        assertTrue(email.isUnread)
+    }
+
+    @Test
+    fun test_emailItem_readEmail() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Read Email",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertFalse(email.isUnread)
+    }
+
+    @Test
+    fun test_emailItem_inboxLabel() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Inbox Email",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertTrue(email.labelIds.contains("INBOX"))
+    }
+
+    @Test
+    fun test_emailItem_sentLabel() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Sent Email",
+            fromEmail = "me@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("SENT")
+        )
+
+        assertTrue(email.labelIds.contains("SENT"))
+    }
+
+    @Test
+    fun test_emailItem_multipleLabels() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Important Email",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = true,
+            labelIds = listOf("INBOX", "IMPORTANT", "STARRED", "CATEGORY_PERSONAL")
+        )
+
+        assertEquals(4, email.labelIds.size)
+        assertTrue(email.labelIds.contains("IMPORTANT"))
+        assertTrue(email.labelIds.contains("STARRED"))
+    }
+
+    @Test
+    fun test_emailItem_emptyLabels() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "No Labels",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = emptyList()
+        )
+
+        assertEquals(0, email.labelIds.size)
+    }
+
+    @Test
+    fun test_emailItem_longSubject() {
+        val longSubject = "A".repeat(1000)
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = longSubject,
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertEquals(1000, email.subject.length)
+    }
+
+    @Test
+    fun test_emailItem_specialCharactersInSubject() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Re: 한글 제목 & Special 💌",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertEquals("Re: 한글 제목 & Special 💌", email.subject)
+    }
+
+    @Test
+    fun test_emailItem_longSnippet() {
+        val longSnippet = "This is a very long snippet. " * 50
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Subject",
+            fromEmail = "sender@example.com",
+            snippet = longSnippet,
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertTrue(email.snippet.length > 1000)
+    }
+
+    @Test
+    fun test_emailItem_equality() {
+        val date = Date()
+        val email1 = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Subject",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = date,
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+        val email2 = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Subject",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = date,
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertEquals(email1, email2)
+    }
+
+    @Test
+    fun test_emailItem_inequality_differentId() {
+        val date = Date()
+        val email1 = EmailItem(
+            "1", "t1", "Subject", "sender@example.com",
+            "Snippet", date, "1705334400000", false, listOf("INBOX")
+        )
+        val email2 = EmailItem(
+            "2", "t1", "Subject", "sender@example.com",
+            "Snippet", date, "1705334400000", false, listOf("INBOX")
+        )
+
+        assertNotEquals(email1, email2)
+    }
+
+    @Test
+    fun test_emailItem_copy() {
+        val original = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "Original",
+            fromEmail = "sender@example.com",
+            snippet = "Snippet",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = true,
+            labelIds = listOf("INBOX")
+        )
+        val modified = original.copy(subject = "Modified", isUnread = false)
+
+        assertEquals("Original", original.subject)
+        assertTrue(original.isUnread)
+        assertEquals("Modified", modified.subject)
+        assertFalse(modified.isUnread)
+    }
+
+    @Test
+    fun test_emailItem_emptySubject() {
+        val email = EmailItem(
+            id = "1",
+            threadId = "t1",
+            subject = "",
+            fromEmail = "sender@example.com",
+            snippet = "No subject",
+            date = Date(),
+            dateRaw = "1705334400000",
+            isUnread = false,
+            labelIds = listOf("INBOX")
+        )
+
+        assertEquals("", email.subject)
+    }
+
+    @Test
+    fun test_emailItem_variousEmailFormats() {
+        val emails = listOf(
+            "simple@example.com",
+            "user.name@example.co.uk",
+            "user+tag@example.com",
+            "user_123@sub.example.com"
+        )
+
+        emails.forEach { emailAddress ->
+            val email = EmailItem(
+                "1", "t1", "Subject", emailAddress,
+                "Snippet", Date(), "1705334400000", false, listOf("INBOX")
+            )
+            assertEquals(emailAddress, email.fromEmail)
+        }
+    }
+}

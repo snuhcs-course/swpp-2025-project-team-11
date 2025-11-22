@@ -4,6 +4,7 @@ import com.fiveis.xend.data.model.AuthCodeRequest
 import com.fiveis.xend.data.model.AuthResponse
 import com.fiveis.xend.data.model.JwtTokens
 import com.fiveis.xend.data.model.LogoutRequest
+import com.fiveis.xend.data.model.LogoutResponse
 import com.fiveis.xend.data.source.AuthApiService
 import com.fiveis.xend.network.RetrofitClient
 import io.mockk.coEvery
@@ -175,22 +176,18 @@ class AuthRepositoryTest {
 
     @Test
     fun logout_with_valid_tokens_calls_api_service() = runTest {
-        val accessToken = "access_token_123"
         val refreshToken = "refresh_token_123"
 
         coEvery {
-            authApiService.logout(
-                accessToken = "Bearer $accessToken",
-                request = LogoutRequest(refresh = refreshToken)
-            )
-        } returns Response.success(Unit)
+            authApiService.logout(LogoutRequest(refresh = refreshToken))
+        } returns Response.success(LogoutResponse(detail = "Successfully logged out"))
 
-        repository.logout(accessToken, refreshToken)
+        val result = repository.logout(refreshToken)
 
+        assertTrue(result is LogoutResult.Success)
         coVerify {
             authApiService.logout(
-                accessToken = "Bearer $accessToken",
-                request = match { request ->
+                match { request ->
                     request.refresh == refreshToken
                 }
             )
@@ -198,48 +195,38 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun logout_with_null_access_token_does_not_call_api() = runTest {
-        val refreshToken = "refresh_token_123"
+    fun logout_with_null_refresh_token_returns_failure() = runTest {
+        val result = repository.logout(null)
 
-        repository.logout(null, refreshToken)
-
+        assertTrue(result is LogoutResult.Failure)
         coVerify(exactly = 0) {
-            authApiService.logout(any(), any())
+            authApiService.logout(any())
         }
     }
 
     @Test
-    fun logout_with_null_refresh_token_uses_empty_string() = runTest {
-        val accessToken = "access_token_123"
-
-        coEvery {
-            authApiService.logout(
-                accessToken = "Bearer $accessToken",
-                request = LogoutRequest(refresh = "")
-            )
-        } returns Response.success(Unit)
-
-        repository.logout(accessToken, null)
-
-        coVerify {
-            authApiService.logout(
-                accessToken = "Bearer $accessToken",
-                request = match { request ->
-                    request.refresh == ""
-                }
-            )
-        }
-    }
-
-    @Test
-    fun logout_with_api_failure_does_not_throw_exception() = runTest {
-        val accessToken = "access_token_123"
+    fun logout_with_api_success_returns_success() = runTest {
         val refreshToken = "refresh_token_123"
 
         coEvery {
-            authApiService.logout(any(), any())
+            authApiService.logout(LogoutRequest(refresh = refreshToken))
+        } returns Response.success(LogoutResponse(detail = "Successfully logged out"))
+
+        val result = repository.logout(refreshToken)
+
+        assertTrue(result is LogoutResult.Success)
+    }
+
+    @Test
+    fun logout_with_api_failure_returns_failure() = runTest {
+        val refreshToken = "refresh_token_123"
+
+        coEvery {
+            authApiService.logout(any())
         } throws Exception("Server error")
 
-        repository.logout(accessToken, refreshToken)
+        val result = repository.logout(refreshToken)
+
+        assertTrue(result is LogoutResult.Failure)
     }
 }
