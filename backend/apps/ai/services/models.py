@@ -23,39 +23,171 @@ class ValidationResult(BaseModel):
 
 
 class LexicalStyle(BaseModel):
-    summary: str | None
-    top_connectives: str | None
-    frequent_phrases: str | None
-    slang_or_chat_markers: str | None
-    politeness_lexemes: str | None
+    summary: str | None = Field(
+        default=None,
+        description=(
+            "Analysis of vocabulary and word choice habits — the summary must "
+            "integrate evidence from top_connectives, frequent_phrases, "
+            "slang_or_chat_markers, and politeness_lexemes to describe the "
+            "writer’s lexical tone, formality, and characteristic expressions."
+        ),
+    )
+    top_connectives: str | None = Field(
+        default=None,
+        description=(
+            "Describe notable discourse connectives or linking expressions that "
+            "frequently appear in the email and how they shape cohesion or tone."
+        ),
+    )
+    frequent_phrases: str | None = Field(
+        default=None,
+        description=(
+            "Identify and explain any recurring idioms, set phrases, or "
+            "formulaic expressions characteristic of the writer’s communication "
+            "style."
+        ),
+    )
+    slang_or_chat_markers: str | None = Field(
+        default=None,
+        description=(
+            "Describe the presence or absence of casual elements such as emojis, "
+            "laughter markers, or colloquial sentence endings, and their effect "
+            "on tone."
+        ),
+    )
+    politeness_lexemes: str | None = Field(
+        default=None,
+        description=(
+            "Explain how the writer uses polite or mitigated vocabulary such as "
+            "thank, sorry, or hedge expressions to adjust formality or soften "
+            "statements."
+        ),
+    )
 
 
 class GrammarPatterns(BaseModel):
-    summary: str | None
-    ender_distribution: str | None
-    sentence_length: str | None
-    sentence_type_ratio: str | None
-    structure_pattern: str | None
-    paragraph_stats: str | None
+    summary: str | None = Field(
+        default=None,
+        description=(
+            "Analysis of sentence structure and grammatical patterns — reflect "
+            "evidence from ender_distribution, sentence_length, "
+            "sentence_type_ratio, structure_pattern, and paragraph_stats to "
+            "describe how the writer organizes sentences, uses endings, and "
+            "structures the email’s overall flow."
+        ),
+    )
+    ender_distribution: str | None = Field(
+        default=None,
+        description=(
+            "Describe the dominant sentence endings (e.g., formal declarative, "
+            "polite imperative) and what they reveal about the tone and "
+            "register."
+        ),
+    )
+    sentence_length: str | None = Field(
+        default=None,
+        description=(
+            "Summarize the general tendency in sentence length, noting whether "
+            "the writer favors short, concise sentences or longer, complex "
+            "structures."
+        ),
+    )
+    sentence_type_ratio: str | None = Field(
+        default=None,
+        description=(
+            "Explain the balance among declarative, interrogative, imperative, "
+            "and exclamatory sentences, and how this affects the communicative "
+            "style."
+        ),
+    )
+    structure_pattern: str | None = Field(
+        default=None,
+        description=(
+            "Outline the logical or rhetorical structure of the email, "
+            "describing the sequence of sections such as greeting, purpose, "
+            "request, or closing."
+        ),
+    )
+    paragraph_stats: str | None = Field(
+        default=None,
+        description=(
+            "Comment on the paragraph organization, such as the number and "
+            "relative length of sections, and how this contributes to clarity "
+            "or flow."
+        ),
+    )
 
 
 class EmotionalTone(BaseModel):
-    summary: str | None
-    overall: str | None
-    formality_level: str | None
-    politeness_level: str | None
-    directness_score: str | None
-    warmth_score: str | None
-    speech_act_distribution: str | None
-    request_style: str | None
-    notes: str | None
+    summary: str | None = Field(
+        default=None,
+        description=(
+            "Analysis of the writer’s emotional and pragmatic tone — integrate "
+            "findings across lexical and grammatical dimensions to describe "
+            "overall tone, formality_level, politeness_level, directness_score, "
+            "warmth_score, speech_act_distribution, and request_style in "
+            "descriptive prose."
+        ),
+    )
+    overall: str | None = Field(
+        default=None,
+        description=("Describe the dominant emotional tone category " "(e.g., calm_polite, neutral_direct, friendly_formal)."),
+    )
+    formality_level: str | None = Field(
+        default=None,
+        description=("Explain the perceived level of formality based on sentence " "endings, lexical choice, and tone."),
+    )
+    politeness_level: str | None = Field(
+        default=None,
+        description=("Describe how polite or considerate the writing appears, " "referencing indirect or softened expressions."),
+    )
+    directness_score: str | None = Field(
+        default=None,
+        description=("Discuss how directly or indirectly the writer conveys requests or " "opinions."),
+    )
+    warmth_score: str | None = Field(
+        default=None,
+        description=("Describe the warmth or emotional temperature of the writing, " "noting whether it feels distant, neutral, or friendly."),
+    )
+    speech_act_distribution: str | None = Field(
+        default=None,
+        description=(
+            "Summarize the range of communicative functions present, such as "
+            "requests, information, thanks, apologies, or small talk, and how "
+            "they shape interpersonal stance."
+        ),
+    )
+    request_style: str | None = Field(
+        default=None,
+        description=("Characterize the request style as direct, indirect, or neutral, " "based on the phrasing and level of mitigation."),
+    )
+    notes: str | None = Field(
+        default=None,
+        description=("Provide a concise integrative explanation combining all observed " "emotional and pragmatic features."),
+    )
 
 
 class SpeechAnalysis(BaseModel):
-    lexical_style: LexicalStyle | None
-    grammar_patterns: GrammarPatterns | None
-    emotional_tone: EmotionalTone | None
-    representative_sentences: list[str] = Field(default_factory=list)
+    lexical_style: LexicalStyle | None = Field(
+        default=None,
+        description="Lexical-level analysis of the writer’s style.",
+    )
+    grammar_patterns: GrammarPatterns | None = Field(
+        default=None,
+        description="Sentence-level grammar and structural patterns in the email.",
+    )
+    emotional_tone: EmotionalTone | None = Field(
+        default=None,
+        description="Emotional and pragmatic tone of the writer’s email.",
+    )
+    representative_sentences: list[str] = Field(
+        default_factory=list,
+        description=(
+            "List 3–5 sentences that best represent the writer’s style. "
+            "Select sentences that include idiomatic expressions, distinctive "
+            "grammar, or tone markers, preserving their original wording."
+        ),
+    )
 
 
 class AttachmentAnalysisResult(BaseModel):

@@ -51,7 +51,7 @@ def analyze_speech(self, user_id, subject, body, to_emails):
                     )
 
                 # 해당 (user, contact.group)에 해당하는 GroupAnalysisResult이 없다면 방금 분석된 결과를 필드에 그대로 넣어줌
-                if not GroupAnalysisResult.objects.filter(user=user, group=contact.group).exists():
+                if contact.group and not GroupAnalysisResult.objects.filter(user=user, group=contact.group).exists():
                     GroupAnalysisResult.objects.create(
                         user=user,
                         group=contact.group,
@@ -64,8 +64,6 @@ def analyze_speech(self, user_id, subject, body, to_emails):
 
     except Exception as e:
         self.retry(exc=e, countdown=2**self.request.retries)
-
-    return analysis_result
 
 
 # 주기적으로 n개의 AnalysisResult를 통합하여 분석 결과를 만드는 task -> group 단위 + contact 단위
