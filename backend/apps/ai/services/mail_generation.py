@@ -78,6 +78,140 @@ def stream_mail_generation(
         yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))
 
 
+def stream_mail_generation_with_timestamp(
+    user,
+    subject: str | None,
+    body: str | None,
+    to_emails: list[str],
+) -> Generator[str, None, None]:
+    """
+    기존 stream_mail_generation 과 동일한 로직이지만,
+    각 SSE 이벤트에 server_ts / elapsed_ms / (옵션) delta_ms 를 포함해서
+    타이밍 디버깅용으로 사용하는 버전.
+    """
+
+    ctx = collect_prompt_context(user, to_emails)
+    raw_inputs = build_prompt_inputs(ctx)
+    raw_inputs["subject"] = subject or ""
+    raw_inputs["body"] = body or ""
+
+    req_id = make_req_id()
+    masker = PiiMasker(req_id)
+    masked_inputs, mapping = masker.mask_inputs(raw_inputs)
+
+    # 스트리밍 기준 시간 (서버 기준)
+    stream_start_ts = time.time()
+
+    ready_ts = time.time()
+    yield sse_event(
+        "ready",
+        {
+            "ts": int(ready_ts * 1000),
+            "server_ts": int(ready_ts * 1000),
+            "elapsed_ms": int((ready_ts - stream_start_ts) * 1000),
+        },
+        retry_ms=5000,
+    )
+
+    try:
+        locked_title = (subject_chain.invoke(masked_inputs) or "").strip()
+    except Exception:
+        locked_title = ""
+
+    unmasked_title = locked_title and masker and "".join(unmask_stream([locked_title], req_id, mapping)) or locked_title
+
+    merged_subject = f"{unmasked_title}\n\n" if unmasked_title else ""
+
+    subject_ts = time.time()
+    yield sse_event(
+        "subject",
+        {
+            "title": unmasked_title,
+            "text": merged_subject,
+            "server_ts": int(subject_ts * 1000),
+            "elapsed_ms": int((subject_ts - stream_start_ts) * 1000),
+        },
+        eid="0",
+    )
+
+    seq = 1
+    last_ping = time.monotonic()
+
+    locked_inputs = {
+        "locked_subject": locked_title,
+        "body": masked_inputs.get("body", ""),
+        "language": raw_inputs.get("language"),
+        "recipients": raw_inputs.get("recipients"),
+        "group_name": raw_inputs.get("group_name"),
+        "group_description": raw_inputs.get("group_description"),
+        "prompt_text": raw_inputs.get("prompt_text"),
+        "sender_role": raw_inputs.get("sender_role"),
+        "recipient_role": raw_inputs.get("recipient_role"),
+        "plan_text": "",
+        "analysis": raw_inputs.get("analysis", None),
+        "fewshots": raw_inputs.get("fewshots"),
+        "profile": raw_inputs.get("profile"),
+    }
+
+    try:
+        raw_stream = body_chain.stream(locked_inputs)
+
+        prev_chunk_ts: float | None = None
+
+        for chunk in unmask_stream(raw_stream, req_id, mapping):
+            if chunk:
+                now_ts = time.time()
+                now_ms = int(now_ts * 1000)
+                elapsed_ms = int((now_ts - stream_start_ts) * 1000)
+
+                if prev_chunk_ts is not None:
+                    delta_ms = int((now_ts - prev_chunk_ts) * 1000)
+                else:
+                    delta_ms = None
+
+                prev_chunk_ts = now_ts
+
+                payload = {
+                    "seq": seq - 1,
+                    "text": chunk,
+                    "server_ts": now_ms,
+                    "elapsed_ms": elapsed_ms,
+                }
+                if delta_ms is not None:
+                    payload["delta_ms"] = delta_ms
+
+                yield sse_event("body.delta", payload, eid=str(seq))
+                seq += 1
+
+            if time.monotonic() - last_ping > 10:
+                yield heartbeat()
+                last_ping = time.monotonic()
+
+    except Exception as e:
+        err_ts = time.time()
+        yield sse_event(
+            "error",
+            {
+                "message": str(e),
+                "server_ts": int(err_ts * 1000),
+                "elapsed_ms": int((err_ts - stream_start_ts) * 1000),
+            },
+            eid=str(seq),
+        )
+    finally:
+        mapping.clear()
+        done_ts = time.time()
+        yield sse_event(
+            "done",
+            {
+                "reason": "stop",
+                "server_ts": int(done_ts * 1000),
+                "elapsed_ms": int((done_ts - stream_start_ts) * 1000),
+            },
+            eid=str(seq + 1),
+        )
+
+
 def stream_mail_generation_with_plan(
     user: dict,
     subject: str | None,
