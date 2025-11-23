@@ -3,6 +3,7 @@ package com.fiveis.xend.ui.compose
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -1249,6 +1250,7 @@ class MailComposeActivity : ComponentActivity() {
                 var contactSuggestions by remember { mutableStateOf<List<Contact>>(emptyList()) }
 
                 var showTemplateScreen by remember { mutableStateOf(false) }
+                var pendingTemplateBody by remember { mutableStateOf<String?>(null) }
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
                 var canUndo by rememberSaveable { mutableStateOf(false) }
                 var canRedo by rememberSaveable { mutableStateOf(false) }
@@ -1482,6 +1484,13 @@ class MailComposeActivity : ComponentActivity() {
                     composeVm.acceptSuggestion()
                     composeVm.requestImmediateSuggestion(editorState.getHtml())
                 }
+                LaunchedEffect(pendingTemplateBody, showTemplateScreen, editorState.editor) {
+                    val body = pendingTemplateBody
+                    if (!showTemplateScreen && body != null && editorState.editor != null) {
+                        editorState.setHtml(body)
+                        pendingTemplateBody = null
+                    }
+                }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     Scaffold { innerPadding ->
@@ -1491,7 +1500,7 @@ class MailComposeActivity : ComponentActivity() {
                                 onBack = { showTemplateScreen = false },
                                 onTemplateSelected = { template ->
                                     subject = template.subject
-                                    editorState.setHtml(template.body)
+                                    pendingTemplateBody = convertTemplateBodyToHtml(template.body)
                                     showTemplateScreen = false
                                 },
                                 modifier = Modifier.padding(innerPadding)
@@ -1863,6 +1872,16 @@ private data class ComposeAttachmentChip(val uri: Uri, val name: String, val siz
             }
         }
     }
+}
+
+private fun convertTemplateBodyToHtml(rawText: String): String {
+    return rawText.lines()
+        .joinToString("<br>") { line ->
+            val trimmed = line.trimEnd()
+            val encoded = TextUtils.htmlEncode(trimmed)
+            if (encoded.isEmpty()) "&nbsp;" else encoded
+        }
+        .replace(Regex("(<br>)+$"), "")
 }
 
 // ========================================================
