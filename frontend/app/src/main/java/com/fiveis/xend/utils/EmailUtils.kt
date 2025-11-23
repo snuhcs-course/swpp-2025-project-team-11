@@ -12,21 +12,23 @@ object EmailUtils {
     private const val TAG = "EmailUtils"
 
     /**
-     * Supported date formats for parsing dateRaw.
+     * Supported date format patterns for parsing dateRaw.
      * Gmail API returns dates in RFC 2822 or ISO 8601 formats.
+     *
+     * Note: SimpleDateFormat instances are created per-call to avoid thread safety issues.
      */
-    private val dateFormats = listOf(
+    private val dateFormatPatterns = listOf(
         // RFC 2822 formats
-        SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
-        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
-        SimpleDateFormat("d MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
-        SimpleDateFormat("dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
+        "EEE, d MMM yyyy HH:mm:ss Z",
+        "EEE, dd MMM yyyy HH:mm:ss Z",
+        "d MMM yyyy HH:mm:ss Z",
+        "dd MMM yyyy HH:mm:ss Z",
         // ISO 8601 formats
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ENGLISH),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ENGLISH),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.ENGLISH),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.ENGLISH),
-        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ssZ",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        "yyyy-MM-dd HH:mm:ss"
     )
 
     /**
@@ -42,8 +44,9 @@ object EmailUtils {
     fun parseDateToTimestamp(dateRaw: String): Long {
         if (dateRaw.isBlank()) return 0L
 
-        for (format in dateFormats) {
+        for (pattern in dateFormatPatterns) {
             try {
+                val format = SimpleDateFormat(pattern, Locale.ENGLISH)
                 val date = format.parse(dateRaw)
                 if (date != null) {
                     Log.d(TAG, "Parsed '$dateRaw' -> ${date.time}")
