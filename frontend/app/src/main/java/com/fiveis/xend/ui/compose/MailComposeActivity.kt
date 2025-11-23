@@ -777,8 +777,18 @@ private fun RecipientSection(
             }
         }
 
+        val pendingEmail = newContact.text.trim()
+        val normalizedPendingEmail = normalizeEmail(pendingEmail)
+        val isAlreadySavedContact = knownContactsByEmail.containsKey(normalizedPendingEmail)
+        val isAlreadySelected = contacts.any { normalizeEmail(it.email) == normalizedPendingEmail }
+        val shouldShowAddContactButton =
+            pendingEmail.length >= 2 &&
+                onAddContactClick != null &&
+                !isAlreadySavedContact &&
+                !isAlreadySelected
+
         AnimatedVisibility(
-            visible = contactSuggestions.isNotEmpty() || (newContact.text.length >= 2 && onAddContactClick != null)
+            visible = contactSuggestions.isNotEmpty() || shouldShowAddContactButton
         ) {
             Column(
                 modifier = Modifier
@@ -805,8 +815,7 @@ private fun RecipientSection(
                 }
 
                 // 연락처 추가 버튼
-                if (newContact.text.length >= 2 && onAddContactClick != null) {
-                    val pendingEmail = newContact.text.trim()
+                if (shouldShowAddContactButton) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
