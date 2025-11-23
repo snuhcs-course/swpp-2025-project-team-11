@@ -230,6 +230,13 @@ fun ReplyDirectComposeScreen(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(bottom = 8.dp)
+                                .then(
+                                    if (it.onActionClick != null && it.actionText == null) {
+                                        Modifier.clickable { it.onActionClick.invoke() }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                         )
                     }
                 }
