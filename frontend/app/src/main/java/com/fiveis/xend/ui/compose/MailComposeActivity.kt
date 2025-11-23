@@ -558,39 +558,35 @@ private fun SubjectControlRow(
                 }
             }
             if (isStreaming) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // 스트리밍 중 - 텍스트, 로딩 인디케이터, 중지 버튼 순서로 표시
+                Text(
+                    text = "AI 플래너가 메일 구조를 설계 중입니다",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue60
+                )
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onStopStreaming,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Stop,
-                            contentDescription = "AI 중지",
-                            tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "중지",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFFEF4444)
-                            )
-                        )
-                    }
-                    Text(
-                        text = "AI 플래너가 메일 구조를 설계 중입니다",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "AI 중지",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(16.dp)
                     )
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = Blue60
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "중지",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFEF4444)
+                        )
                     )
                 }
             } else {
