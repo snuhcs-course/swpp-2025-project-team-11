@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +77,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlin.math.absoluteValue
 
 @Composable
 fun SentScreen(
@@ -95,6 +97,7 @@ fun SentScreen(
     var showBottomBar by remember { mutableStateOf(true) }
     var previousIndex by remember { mutableStateOf(0) }
     var previousScrollOffset by remember { mutableStateOf(0) }
+    val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -103,12 +106,15 @@ fun SentScreen(
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
             } else {
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
-                showBottomBar = !isScrollingDown
+                if (offsetDelta > scrollThresholdPx) {
+                    showBottomBar = !isScrollingDown
+                }
             }
             previousIndex = currentIndex
             previousScrollOffset = currentOffset

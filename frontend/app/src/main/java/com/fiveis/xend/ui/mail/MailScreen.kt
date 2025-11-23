@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +62,7 @@ import com.fiveis.xend.ui.inbox.InboxUiState
 import com.fiveis.xend.ui.sent.SentUiState
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
+import kotlin.math.absoluteValue
 
 enum class MailTab {
     INBOX,
@@ -90,6 +92,7 @@ fun MailScreen(
     var showBottomBar by remember { mutableStateOf(true) }
     var previousIndex by remember { mutableStateOf(0) }
     var previousScrollOffset by remember { mutableStateOf(0) }
+    val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     Scaffold(
         bottomBar = {
@@ -217,12 +220,16 @@ fun MailScreen(
                             if (currentIndex == 0 && currentOffset == 0) {
                                 showBottomBar = true
                             } else {
+                                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
                                 val isScrollingDown = if (currentIndex != previousIndex) {
                                     currentIndex > previousIndex
                                 } else {
                                     currentOffset > previousScrollOffset
                                 }
-                                showBottomBar = !isScrollingDown
+
+                                if (offsetDelta > scrollThresholdPx) {
+                                    showBottomBar = !isScrollingDown
+                                }
                             }
                             previousIndex = currentIndex
                             previousScrollOffset = currentOffset
