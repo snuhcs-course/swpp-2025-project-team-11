@@ -102,7 +102,8 @@ class SentViewModelFactory(private val context: Context) : ViewModelProvider.Fac
             val mailApiService = RetrofitClient.getMailApiService(context)
             val database = AppDatabase.getDatabase(context)
             val repository = SentRepository(mailApiService, database.emailDao())
-            return SentViewModel(repository) as T
+            val prefs = context.getSharedPreferences("xend_pagination", Context.MODE_PRIVATE)
+            return SentViewModel(repository, prefs) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

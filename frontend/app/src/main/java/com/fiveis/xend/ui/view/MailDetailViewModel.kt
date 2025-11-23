@@ -14,6 +14,7 @@ import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.utils.EmailUtils
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
@@ -163,7 +164,8 @@ class MailDetailViewModel(
             labelIds = labelIds,
             body = body,
             attachments = attachments,
-            cachedAt = existing?.cachedAt ?: System.currentTimeMillis()
+            cachedAt = existing?.cachedAt ?: System.currentTimeMillis(),
+            dateTimestamp = existing?.dateTimestamp ?: EmailUtils.parseDateToTimestamp(dateRaw)
         )
     }
 

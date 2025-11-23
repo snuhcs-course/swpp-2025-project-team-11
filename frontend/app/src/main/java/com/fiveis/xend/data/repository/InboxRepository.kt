@@ -10,6 +10,7 @@ import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.data.model.ReadStatusUpdateRequest
 import com.fiveis.xend.network.MailApiService
+import com.fiveis.xend.utils.EmailUtils
 import kotlinx.coroutines.flow.Flow
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -18,9 +19,19 @@ class InboxRepository(
     private val mailApiService: MailApiService,
     private val emailDao: EmailDao
 ) {
+    /**
+     * Add dateTimestamp to emails for proper chronological sorting
+     */
+    private fun List<EmailItem>.withParsedTimestamps(): List<EmailItem> {
+        return map { email ->
+            val timestamp = EmailUtils.parseDateToTimestamp(email.dateRaw)
+            email.copy(dateTimestamp = timestamp)
+        }
+    }
+
     fun getCachedEmails(): Flow<List<EmailItem>> {
-        return emailDao.getEmailsByLabel("INBOX").also {
-            Log.d("InboxRepository", "getCachedEmails Flow created for INBOX")
+        return emailDao.getInboxEmails().also {
+            Log.d("InboxRepository", "getCachedEmails Flow created for INBOX (excluding SENT)")
         }
     }
 
@@ -59,7 +70,7 @@ class InboxRepository(
                         return Result.success(null)
                     }
 
-                    emailDao.insertEmails(messages)
+                    emailDao.insertEmails(messages.withParsedTimestamps())
                     val count = emailDao.getEmailCount()
                     Log.d("InboxRepository", "Successfully inserted ${messages.size} emails into DB")
                     Log.d("InboxRepository", "Total emails in DB: $count")
@@ -96,7 +107,7 @@ class InboxRepository(
                 Log.d("InboxRepository", "Received ${newEmails.size} new emails (total: $totalFetched)")
 
                 if (newEmails.isNotEmpty()) {
-                    emailDao.insertEmails(newEmails)
+                    emailDao.insertEmails(newEmails.withParsedTimestamps())
                 }
 
                 val previousToken = pageToken
@@ -174,7 +185,7 @@ class InboxRepository(
 
     suspend fun saveEmailsToCache(emails: List<EmailItem>) {
         Log.d("InboxRepository", "saveEmailsToCache: saving ${emails.size} emails")
-        emailDao.insertEmails(emails)
+        emailDao.insertEmails(emails.withParsedTimestamps())
         val count = emailDao.getEmailCount()
         Log.d("InboxRepository", "saveEmailsToCache: total emails in DB = $count")
     }

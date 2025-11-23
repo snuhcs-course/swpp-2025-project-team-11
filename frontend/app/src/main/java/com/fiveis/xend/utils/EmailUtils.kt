@@ -1,9 +1,63 @@
 package com.fiveis.xend.utils
 
+import android.util.Log
+import java.text.SimpleDateFormat
+import java.util.Locale
+
 /**
  * Email 주소 파싱 유틸리티
  */
 object EmailUtils {
+
+    private const val TAG = "EmailUtils"
+
+    /**
+     * Supported date formats for parsing dateRaw.
+     * Gmail API returns dates in RFC 2822 or ISO 8601 formats.
+     */
+    private val dateFormats = listOf(
+        // RFC 2822 formats
+        SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
+        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
+        SimpleDateFormat("d MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
+        SimpleDateFormat("dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH),
+        // ISO 8601 formats
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ENGLISH),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ENGLISH),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.ENGLISH),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.ENGLISH),
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
+    )
+
+    /**
+     * Parse dateRaw string to epoch timestamp in milliseconds.
+     *
+     * @param dateRaw Raw date string from Gmail API (RFC 2822 or ISO 8601 format)
+     * @return Epoch timestamp in milliseconds, or 0 if parsing fails
+     *
+     * Examples:
+     * - "Tue, 19 Nov 2024 10:30:00 +0900" → 1732001400000
+     * - "2024-11-19T10:30:00+09:00" → 1732001400000
+     */
+    fun parseDateToTimestamp(dateRaw: String): Long {
+        if (dateRaw.isBlank()) return 0L
+
+        for (format in dateFormats) {
+            try {
+                val date = format.parse(dateRaw)
+                if (date != null) {
+                    Log.d(TAG, "Parsed '$dateRaw' -> ${date.time}")
+                    return date.time
+                }
+            } catch (_: Exception) {
+                // Try next format
+            }
+        }
+
+        Log.w(TAG, "Failed to parse dateRaw: $dateRaw")
+        return 0L
+    }
+
     /**
      * "이름 <email@example.com>" 또는 "<email@example.com>" 형식에서 이메일만 추출
      *

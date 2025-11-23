@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -40,19 +41,61 @@ data class InboxUiState(
  */
 class InboxViewModel(
     private val repository: InboxRepository,
-    private val contactRepository: ContactBookRepository
+    private val contactRepository: ContactBookRepository,
+    private val prefs: SharedPreferences
 ) : ViewModel() {
+
+    companion object {
+        private const val PREF_INBOX_NEXT_PAGE_TOKEN = "inbox_next_page_token"
+    }
 
     private val _uiState = MutableStateFlow(InboxUiState())
     val uiState: StateFlow<InboxUiState> = _uiState.asStateFlow()
 
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
+        // SharedPreferences에서 저장된 토큰 복원
+        restorePageToken()
         loadCachedEmails()
         loadGroups()
         observeContacts()
         // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
         silentRefreshEmails()
+    }
+
+    /**
+     * SharedPreferences에서 저장된 페이지 토큰 복원
+     */
+    private fun restorePageToken() {
+        val savedToken = prefs.getString(PREF_INBOX_NEXT_PAGE_TOKEN, null)
+        Log.d("InboxViewModel", "Restored page token from prefs: $savedToken")
+        if (savedToken != null) {
+            _uiState.update { it.copy(loadMoreNextPageToken = savedToken) }
+        }
+    }
+
+    /**
+     * 페이지 토큰을 SharedPreferences에 저장
+     */
+    private fun savePageToken(token: String?) {
+        Log.d("InboxViewModel", "Saving page token to prefs: $token")
+        prefs.edit().apply {
+            if (token != null) {
+                putString(PREF_INBOX_NEXT_PAGE_TOKEN, token)
+            } else {
+                remove(PREF_INBOX_NEXT_PAGE_TOKEN)
+            }
+            apply()
+        }
+    }
+
+    /**
+     * 토큰 에러 시 초기화 (만료된 토큰 등)
+     */
+    private fun clearPageToken() {
+        Log.d("InboxViewModel", "Clearing page token due to error")
+        savePageToken(null)
+        _uiState.update { it.copy(loadMoreNextPageToken = null) }
     }
 
     private fun loadGroups() {
@@ -126,17 +169,19 @@ class InboxViewModel(
                     Log.d("InboxViewModel", "refreshEmails succeeded, nextPageToken: $nextToken")
 
                     _uiState.update { currentState ->
-                        // DB가 비어있을 때만 loadMoreNextPageToken 설정
-                        // (DB에 메일이 있으면 refresh 토큰은 이미 저장된 메일을 가리키므로 버림)
-                        val newLoadMoreToken = if (currentState.emails.isEmpty()) {
-                            Log.d("InboxViewModel", "DB empty - setting loadMoreNextPageToken: $nextToken")
+                        // 저장된 토큰이 없고, 새 토큰이 있을 때만 설정
+                        // (이미 토큰이 있으면 유지 - loadMore로 받은 토큰이 더 정확함)
+                        val newLoadMoreToken = if (currentState.loadMoreNextPageToken == null && nextToken != null) {
+                            Log.d("InboxViewModel", "No existing token - setting loadMoreNextPageToken: $nextToken")
+                            // 새 토큰을 SharedPreferences에 저장
+                            savePageToken(nextToken)
                             nextToken
                         } else {
                             Log.d(
                                 "InboxViewModel",
-                                "DB has ${currentState.emails.size} emails - keeping existing loadMoreNextPageToken: " +
-                                    "${currentState.loadMoreNextPageToken}"
+                                "Keeping existing loadMoreNextPageToken: ${currentState.loadMoreNextPageToken}"
                             )
+                            // 기존 토큰 유지 (이미 SharedPreferences에 저장되어 있음)
                             currentState.loadMoreNextPageToken
                         }
 
@@ -205,6 +250,8 @@ class InboxViewModel(
 
                     val newLoadMoreToken = response.body()?.nextPageToken
                     Log.d("InboxViewModel", "Updated loadMoreNextPageToken: $newLoadMoreToken")
+                    // 새 토큰을 SharedPreferences에 저장
+                    savePageToken(newLoadMoreToken)
                     _uiState.update {
                         it.copy(
                             loadMoreNextPageToken = newLoadMoreToken,
@@ -213,7 +260,13 @@ class InboxViewModel(
                         )
                     }
                 } else {
-                    Log.e("InboxViewModel", "loadMoreEmails failed with code: ${response.code()}")
+                    val errorCode = response.code()
+                    Log.e("InboxViewModel", "loadMoreEmails failed with code: $errorCode")
+                    // 400, 401, 404 등의 에러는 토큰 문제일 가능성이 높으므로 초기화
+                    if (errorCode in listOf(400, 401, 404)) {
+                        Log.w("InboxViewModel", "Clearing invalid page token due to error code: $errorCode")
+                        clearPageToken()
+                    }
                     _uiState.update { it.copy(error = "Failed to load more emails", isLoading = false) }
                 }
             } catch (e: Exception) {
