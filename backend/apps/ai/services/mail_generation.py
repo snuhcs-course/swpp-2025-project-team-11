@@ -7,8 +7,10 @@ from apps.ai.services.graph import mail_graph
 from apps.ai.services.models import ValidationResult
 from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
 from apps.ai.services.utils import build_prompt_inputs, collect_prompt_context, heartbeat, sse_event
+from apps.core.utils.async_stream import as_async_stream
 
 
+@as_async_stream
 def stream_mail_generation(
     user,
     subject: str | None,
@@ -78,6 +80,7 @@ def stream_mail_generation(
         yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))
 
 
+@as_async_stream
 def stream_mail_generation_with_timestamp(
     user,
     subject: str | None,
@@ -212,6 +215,7 @@ def stream_mail_generation_with_timestamp(
         )
 
 
+@as_async_stream
 def stream_mail_generation_with_plan(
     user: dict,
     subject: str | None,
@@ -351,6 +355,7 @@ def stream_mail_generation_with_plan(
         mapping.clear()
 
 
+@as_async_stream
 def debug_mail_generation_analysis(
     user,
     subject: str | None,
