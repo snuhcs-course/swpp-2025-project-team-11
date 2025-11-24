@@ -81,17 +81,26 @@ class MailComposeViewModel(
         api.start(
             payload = payload,
             onSubject = { title ->
-                _ui.update { it.copy(subject = title.ifBlank { it.subject }) }
+                _ui.update { state ->
+                    state.copy(subject = title.ifBlank { state.subject })
+                }
             },
             onBodyDelta = { _, text ->
                 bodyBuffer.append(text)
+
+                val partialHtml = bodyBuffer.toString().replace("\n", "<br>")
+                _ui.update { state ->
+                    state.copy(bodyRendered = partialHtml)
+                }
             },
             onDone = {
                 val finalText = bodyBuffer.toString().replace("\n", "<br>")
-                _ui.update { it.copy(isStreaming = false, bodyRendered = finalText) }
+                _ui.update { state ->
+                    state.copy(isStreaming = false, bodyRendered = finalText)
+                }
             },
             onError = { msg ->
-                _ui.update { it.copy(isStreaming = false, error = msg) }
+                _ui.update { state -> state.copy(isStreaming = false, error = msg) }
             }
         )
     }
