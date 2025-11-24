@@ -400,15 +400,15 @@ class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        def gen():
-            yield from stream_reply_options_llm(
+        resp = StreamingHttpResponse(
+            stream_reply_options_llm(
                 user=request.user,
                 subject=data.get("subject"),
                 body=data.get("body"),
                 to_email=data.get("to_email"),
-            )
-
-        resp = StreamingHttpResponse(gen(), content_type="text/event-stream; charset=utf-8")
+            ),
+            content_type="text/event-stream; charset=utf-8",
+        )
         resp["Cache-Control"] = "no-cache"
         resp["X-Accel-Buffering"] = "no"
         return resp
