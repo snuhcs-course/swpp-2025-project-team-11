@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ class MailComposeViewModel(
     private val bodyBuffer = StringBuilder()
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
+    private var pendingSuggestionText: String? = null
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -79,17 +81,26 @@ class MailComposeViewModel(
         api.start(
             payload = payload,
             onSubject = { title ->
-                _ui.update { it.copy(subject = title.ifBlank { it.subject }) }
+                _ui.update { state ->
+                    state.copy(subject = title.ifBlank { state.subject })
+                }
             },
             onBodyDelta = { _, text ->
                 bodyBuffer.append(text)
+
+                val partialHtml = bodyBuffer.toString().replace("\n", "<br>")
+                _ui.update { state ->
+                    state.copy(bodyRendered = partialHtml)
+                }
             },
             onDone = {
                 val finalText = bodyBuffer.toString().replace("\n", "<br>")
-                _ui.update { it.copy(isStreaming = false, bodyRendered = finalText) }
+                _ui.update { state ->
+                    state.copy(isStreaming = false, bodyRendered = finalText)
+                }
             },
             onError = { msg ->
-                _ui.update { it.copy(isStreaming = false, error = msg) }
+                _ui.update { state -> state.copy(isStreaming = false, error = msg) }
             }
         )
     }
@@ -108,41 +119,53 @@ class MailComposeViewModel(
         }
     }
 
+    fun ensureRealtimeConnection() {
+        if (_ui.value.isRealtimeEnabled) {
+            connectWebSocket()
+        }
+    }
+
     private fun connectWebSocket() {
-        wsClient?.connect(
-            onMessage = { message ->
-                try {
-                    val json = JSONObject(message)
-                    val type = json.optString("type")
-                    when (type) {
-                        "gpu.message" -> {
-                            val data = json.optJSONObject("data")
-                            val rawText = data?.optString("text") ?: ""
+        wsClient?.let { client ->
+            client.connect(
+                onMessage = { message ->
+                    try {
+                        val json = JSONObject(message)
+                        val type = json.optString("type")
+                        when (type) {
+                            "gpu.message" -> {
+                                val data = json.optJSONObject("data")
+                                val rawText = data?.optString("text") ?: ""
 
-                            if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
-                                suggestionBuffer.append(" ")
+                                if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
+                                    suggestionBuffer.append(" ")
+                                }
+                                suggestionBuffer.append(rawText)
+
+                                val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
+                                val singleSentence = extractFirstSentence(parsed)
+                                _ui.update { it.copy(suggestionText = singleSentence) }
                             }
-                            suggestionBuffer.append(rawText)
-
-                            val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
-                            val singleSentence = extractFirstSentence(parsed)
-                            _ui.update { it.copy(suggestionText = singleSentence) }
+                            "gpu.done" -> {
+                                suggestionBuffer.clear()
+                            }
                         }
-                        "gpu.done" -> {
-                            suggestionBuffer.clear()
-                        }
+                    } catch (e: Exception) {
+                        _ui.update { it.copy(error = "메시지 파싱 실패: ${e.message}") }
                     }
-                } catch (e: Exception) {
-                    _ui.update { it.copy(error = "메시지 파싱 실패: ${e.message}") }
+                },
+                onError = { error ->
+                    _ui.update { it.copy(error = error) }
+                },
+                onClose = {
+                    _ui.update { it.copy(isRealtimeEnabled = false) }
+                },
+                onConnected = {
+                    sendPendingSuggestion()
                 }
-            },
-            onError = { error ->
-                _ui.update { it.copy(error = error) }
-            },
-            onClose = {
-                _ui.update { it.copy(isRealtimeEnabled = false) }
-            }
-        )
+            )
+            client.connectIfNeeded()
+        }
     }
 
     private fun disconnectWebSocket() {
@@ -202,20 +225,51 @@ class MailComposeViewModel(
     /**
      * Request new suggestion immediately (for tab completion)
      */
-    fun requestImmediateSuggestion(currentText: String) {
-        if (!_ui.value.isRealtimeEnabled) return
+    fun requestImmediateSuggestion(currentText: String, force: Boolean = false) {
+        if (!_ui.value.isRealtimeEnabled && !force) return
 
         debounceJob?.cancel()
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Main) {
+            pendingSuggestionText = currentText
+        }
+
+        wsClient?.let { client ->
+            if (client.isActive()) {
+                sendPendingSuggestion()
+            } else {
+                // 연결이 준비되면 onConnected에서 처리
+                ensureRealtimeConnection()
+                schedulePendingSendFallback()
+            }
+        }
+    }
+
+    private fun sendPendingSuggestion() {
+        viewModelScope.launch(Dispatchers.Main) {
+            val text = pendingSuggestionText ?: return@launch
+            pendingSuggestionText = null
             delay(100) // Short delay to let the UI update
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
-                text = currentText,
+                text = text,
                 maxTokens = 50
             )
+        }
+    }
+
+    private fun schedulePendingSendFallback(timeoutMs: Long = 2000, intervalMs: Long = 100) {
+        viewModelScope.launch {
+            var waited = 0L
+            while (waited < timeoutMs && !(wsClient?.isActive() ?: false)) {
+                delay(intervalMs)
+                waited += intervalMs
+            }
+            if (wsClient?.isActive() == true) {
+                sendPendingSuggestion()
+            }
         }
     }
 

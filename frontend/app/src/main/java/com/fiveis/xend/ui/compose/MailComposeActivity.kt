@@ -1,12 +1,16 @@
 package com.fiveis.xend.ui.compose
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -31,6 +35,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +52,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.PersonAdd
@@ -75,6 +84,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -90,6 +100,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -98,6 +110,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -129,6 +143,8 @@ import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
+import com.fiveis.xend.utils.formatFileSize
+import com.fiveis.xend.utils.shortenFilename
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -161,11 +177,14 @@ fun EmailComposeScreen(
     error: String?,
     onBack: () -> Unit = {},
     onTemplateClick: () -> Unit = {},
+    onAttachmentClick: () -> Unit = {},
+    onRemoveAttachment: (Uri) -> Unit = {},
     onUndo: () -> Unit = {},
     onAiComplete: () -> Unit = {},
     onStopStreaming: () -> Unit = {},
     modifier: Modifier = Modifier,
     sendUiState: SendUiState,
+    attachments: List<Uri>,
     onSend: () -> Unit,
     suggestionText: String = "",
     onAcceptSuggestion: () -> Unit = {},
@@ -196,7 +215,7 @@ fun EmailComposeScreen(
                 scrollBehavior = scrollBehavior,
                 onBack = onBack,
                 onTemplateClick = onTemplateClick,
-                onAttachmentClick = { /* 첨부파일 선택 예정 */ },
+                onAttachmentClick = onAttachmentClick,
                 onSend = onSend,
                 sendUiState = sendUiState,
                 canSend = contacts.isNotEmpty()
@@ -275,6 +294,11 @@ fun EmailComposeScreen(
                 value = subject,
                 enabled = !isStreaming,
                 onValueChange = onSubjectChange
+            )
+
+            LightAttachmentPager(
+                attachments = attachments,
+                onRemove = onRemoveAttachment
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -942,7 +966,7 @@ private fun SubjectField(value: String, enabled: Boolean, onValueChange: (String
         },
         singleLine = true,
         enabled = enabled,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = composeOutlinedTextFieldColors(),
         modifier = Modifier
             .fillMaxWidth()
@@ -1186,6 +1210,26 @@ class MailComposeActivity : ComponentActivity() {
                 // Hoisted states
                 var subject by rememberSaveable { mutableStateOf("") }
                 val editorState = rememberXendRichEditorState()
+                val attachmentUris = remember { mutableStateListOf<Uri>() }
+
+                // SAF launcher for attachments
+                val attachmentPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.GetMultipleContents()
+                ) { uris ->
+                    // Persist access for later upload
+                    uris.forEach { uri ->
+                        runCatching {
+                            application.contentResolver.takePersistableUriPermission(
+                                uri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            )
+                        }
+                    }
+
+                    val existing = attachmentUris.toSet()
+                    val newOnes = uris.filterNot { it in existing }
+                    attachmentUris.addAll(newOnes)
+                }
 
                 // Draft loading states
                 var showLoadDraftDialog by remember { mutableStateOf(false) }
@@ -1199,6 +1243,20 @@ class MailComposeActivity : ComponentActivity() {
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
                 var canUndo by rememberSaveable { mutableStateOf(false) }
                 var canRedo by rememberSaveable { mutableStateOf(false) }
+                val lifecycleOwner = LocalLifecycleOwner.current
+
+                // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
+                DisposableEffect(lifecycleOwner, aiRealtime) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME && aiRealtime) {
+                            composeVm.ensureRealtimeConnection()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
 
                 // Banner state
                 var bannerState by remember { mutableStateOf<BannerState?>(null) }
@@ -1327,6 +1385,13 @@ class MailComposeActivity : ComponentActivity() {
                 // Collect UI states from ViewModels
                 val composeUi by composeVm.ui.collectAsState()
                 val sendUi by sendVm.ui.collectAsState()
+                val context = LocalContext.current
+
+                LaunchedEffect(sendVm, context) {
+                    sendVm.toastEvents.collect { message ->
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
 
                 val undoAction: () -> Unit = {
                     composeVm.undo(subject, editorState.getHtml())?.let { snapshot ->
@@ -1437,14 +1502,26 @@ class MailComposeActivity : ComponentActivity() {
                                 isStreaming = composeUi.isStreaming,
                                 error = composeUi.error,
                                 sendUiState = sendUi,
+                                attachments = attachmentUris,
                                 // Trigger our custom back press handling
                                 onBack = { onBackPressedDispatcher.onBackPressed() },
                                 onTemplateClick = { showTemplateScreen = true },
+                                onAttachmentClick = { attachmentPicker.launch("*/*") },
+                                onRemoveAttachment = { uri -> attachmentUris.remove(uri) },
                                 onUndo = undoAction,
                                 suggestionText = composeUi.suggestionText,
                                 onAcceptSuggestion = acceptSuggestion,
                                 aiRealtime = aiRealtime,
-                                onAiRealtimeToggle = { aiRealtime = it },
+                                onAiRealtimeToggle = {
+                                    aiRealtime = it
+                                    if (it) {
+                                        // 토글을 켜면 현재 텍스트를 대기열에 넣고 연결 준비되면 전송
+                                        composeVm.requestImmediateSuggestion(
+                                            currentText = editorState.getHtml(),
+                                            force = true
+                                        )
+                                    }
+                                },
                                 onAiComplete = {
                                     // Save current state before AI generation
                                     composeVm.saveUndoSnapshot(
@@ -1478,7 +1555,8 @@ class MailComposeActivity : ComponentActivity() {
                                     sendVm.sendEmail(
                                         to = contacts.map { it.email },
                                         subject = subject.ifBlank { "(제목 없음)" },
-                                        body = editorState.getHtml()
+                                        body = editorState.getHtml(),
+                                        attachments = attachmentUris.toList()
                                     )
                                 },
                                 onAddContactClick = { contact ->
@@ -1645,6 +1723,139 @@ class MailComposeActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun LightAttachmentRow(attachments: List<Uri>) {
+    LightAttachmentPager(attachments = attachments, onRemove = {})
+}
+
+@Composable
+private fun LightAttachmentPager(attachments: List<Uri>, onRemove: (Uri) -> Unit) {
+    if (attachments.isEmpty()) return
+
+    val context = LocalContext.current
+    val items = attachments.map { uri ->
+        val resolver = context.contentResolver
+        val name =
+            resolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else "첨부파일"
+            } ?: "첨부파일"
+        val size =
+            resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getLong(idx) else -1L
+            } ?: -1L
+        val sizeLabel = formatFileSize(size)
+        ComposeAttachmentChip(uri = uri, name = name, sizeLabel = sizeLabel)
+    }
+
+    val pagerState = rememberPagerState(pageCount = { items.size })
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp)
+    ) {
+        Text(
+            text = "첨부파일 ${attachments.size}개",
+            style = MaterialTheme.typography.bodySmall.copy(color = ToolbarIconTint)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        HorizontalPager(
+            state = pagerState,
+            pageSize = PageSize.Fill,
+            beyondViewportPageCount = 1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+        ) { page ->
+            items[page].Content(
+                modifier = Modifier.fillMaxWidth(),
+                onRemove = { onRemove(items[page].uri) }
+            )
+        }
+    }
+}
+
+private data class ComposeAttachmentChip(val uri: Uri, val name: String, val sizeLabel: String) {
+    @Composable
+    fun Content(modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = ComposeSurface,
+            border = BorderStroke(1.dp, ComposeOutline),
+            modifier = modifier
+                .heightIn(min = 44.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Blue60.copy(alpha = 0.15f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.InsertDriveFile,
+                            contentDescription = null,
+                            tint = Blue60,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = shortenFilename(name),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = sizeLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        maxLines = 1,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                    )
+                }
+
+                if (onRemove != null) {
+                    IconButton(
+                        onClick = onRemove,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Remove,
+                            contentDescription = "첨부 취소",
+                            tint = Color.Red
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ========================================================
 // Preview
 // ========================================================
@@ -1665,6 +1876,7 @@ private fun EmailComposePreview() {
             isStreaming = false,
             error = null,
             sendUiState = SendUiState(),
+            attachments = emptyList(),
             onTemplateClick = {},
             onSend = {},
             suggestionText = "",

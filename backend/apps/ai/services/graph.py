@@ -58,7 +58,9 @@ def body_prep_node(state: State) -> State:
         "sender_role": raw_inputs.get("sender_role"),
         "recipient_role": raw_inputs.get("recipient_role"),
         "analysis": raw_inputs.get("analysis", None),
+        "fewshots": raw_inputs.get("fewshots"),
         "plan_text": plan_text,
+        "profile": raw_inputs.get("profile"),
     }
     state["body_inputs"] = locked_inputs
     return state

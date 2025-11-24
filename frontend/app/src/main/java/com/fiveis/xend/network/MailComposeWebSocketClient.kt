@@ -21,19 +21,32 @@ class MailComposeWebSocketClient(
     private var messageCallback: ((String) -> Unit)? = null
     private var errorCallback: ((String) -> Unit)? = null
     private var closeCallback: (() -> Unit)? = null
+    private var connectedCallback: (() -> Unit)? = null
     private val isConnecting = AtomicBoolean(false)
     private val isConnected = AtomicBoolean(false)
     private val isRetrying = AtomicBoolean(false)
     private val tokenManager = TokenManager(context)
 
-    fun connect(onMessage: (String) -> Unit, onError: (String) -> Unit, onClose: () -> Unit) {
+    fun connect(
+        onMessage: (String) -> Unit,
+        onError: (String) -> Unit,
+        onClose: () -> Unit,
+        onConnected: (() -> Unit)? = null
+    ) {
         Log.d(TAG, "========== WebSocket Connect Called ==========")
         Log.d(TAG, "WS URL: $wsUrl")
+
+        // 이미 연결되어 있으면 재연결 시도하지 않음
+        if (isConnected.get()) {
+            Log.d(TAG, "Already connected, skip new connection request")
+            return
+        }
 
         // 콜백 먼저 설정
         messageCallback = onMessage
         errorCallback = onError
         closeCallback = onClose
+        connectedCallback = onConnected
 
         // 빈 URL 체크
         if (wsUrl.isBlank()) {
@@ -102,6 +115,7 @@ class MailComposeWebSocketClient(
                         isConnecting.set(false)
                         isConnected.set(true)
                         isRetrying.set(false)
+                        connectedCallback?.invoke()
                     }
 
                     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -201,6 +215,22 @@ class MailComposeWebSocketClient(
             isConnected.set(false)
             errorCallback?.invoke("연결 실패: ${e.message}")
         }
+    }
+
+    fun isActive(): Boolean = isConnected.get()
+
+    fun connectIfNeeded() {
+        if (isConnected.get() || isConnecting.get()) return
+        if (wsUrl.isBlank()) {
+            Log.e(TAG, "❌ WS URL is blank")
+            errorCallback?.invoke("WS_URL이 설정되지 않았습니다.")
+            return
+        }
+        if (messageCallback == null || errorCallback == null || closeCallback == null) {
+            Log.w(TAG, "connectIfNeeded called without callbacks; ignoring")
+            return
+        }
+        connectWithToken()
     }
 
     private fun refreshTokenAndRetry(): Boolean {
