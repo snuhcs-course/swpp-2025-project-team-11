@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.mail.models import AttachmentAnalysis
 
 from ..contact.models import Contact
+from ..mail.services import list_emails_logic
 from .models import ContactAnalysisResult, GroupAnalysisResult, MailAnalysisResult
 from .services.analysis import analyze_speech_llm, integrate_analysis
 
@@ -197,3 +198,57 @@ def delete_up_n(n=10):
 def purge_old_attachment_analysis():
     cutoff = timezone.now() - timedelta(days=1)
     AttachmentAnalysis.objects.filter(created_at__lt=cutoff).delete()
+
+
+@shared_task(bind=True, max_retries=3)
+def backfill_contact_mail_analysis(self, user_id: int, contact_id: int, limit: int = 2) -> int:
+    try:
+        user = User.objects.get(id=user_id)
+        contact = Contact.objects.get(id=contact_id, user_id=user_id)
+    except (User.DoesNotExist, Contact.DoesNotExist):
+        return 0
+
+    try:
+        result, messages = list_emails_logic(
+            user,
+            max_results=limit,
+            page_token=None,
+            label_ids=["SENT"],
+            q=f"to:{contact.email}",  # ⭐️ Gmail 검색 쿼리
+        )
+    except Exception as e:
+        try:
+            raise self.retry(exc=e, countdown=2**self.request.retries)
+        except self.MaxRetriesExceededError:
+            return 0
+
+    if not messages:
+        return 0
+
+    analyzed_count = 0
+
+    for msg in messages:
+        subject = msg.get("subject") or ""
+        body = msg.get("body") or ""
+
+        if not (subject or body):
+            continue
+
+        try:
+            analyze_speech.delay(
+                user_id=user_id,
+                subject=subject,
+                body=body,
+                to_emails=[contact.email],
+            )
+            analyzed_count += 1
+        except Exception as e:
+            import logging
+
+            logging.warning(
+                f"[backfill_contact_mail_analysis] failed to enqueue analyze_speech "
+                f"user={user_id}, contact={contact_id}, msg_id={msg.get('id')}: {e}"
+            )
+            continue
+
+    return analyzed_count
