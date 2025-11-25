@@ -59,6 +59,7 @@ class InboxViewModel(
         loadCachedEmails()
         loadGroups()
         observeContacts()
+        refreshContactsFromServer()
         // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
         silentRefreshEmails()
     }
@@ -71,6 +72,17 @@ class InboxViewModel(
         Log.d("InboxViewModel", "Restored page token from prefs: $savedToken")
         if (savedToken != null) {
             _uiState.update { it.copy(loadMoreNextPageToken = savedToken) }
+        }
+    }
+
+    private fun refreshContactsFromServer() {
+        viewModelScope.launch {
+            try {
+                contactRepository.refreshGroups()
+                contactRepository.refreshContacts()
+            } catch (e: Exception) {
+                Log.e("InboxViewModel", "Failed to refresh contacts when Inbox starts", e)
+            }
         }
     }
 

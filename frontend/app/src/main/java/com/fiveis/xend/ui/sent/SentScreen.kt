@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -370,10 +371,9 @@ fun EmailListContent(
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
     onScrollStopped: () -> Unit = {},
-    contactsByEmail: Map<String, String> = emptyMap()
+    contactsByEmail: Map<String, String> = emptyMap(),
+    listState: LazyListState = rememberLazyListState()
 ) {
-    val listState = rememberLazyListState()
-
     // 스크롤 멈춤 감지
     LaunchedEffect(listState) {
         snapshotFlow {

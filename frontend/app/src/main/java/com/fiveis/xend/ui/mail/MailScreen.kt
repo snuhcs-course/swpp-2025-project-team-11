@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,10 +43,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,11 +92,46 @@ fun MailScreen(
     onDismissDraftSavedBanner: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableStateOf(MailTab.INBOX) }
+    var selectedTab by rememberSaveable { mutableStateOf(MailTab.INBOX) }
     var showBottomBar by remember { mutableStateOf(true) }
     var previousIndex by remember { mutableStateOf(0) }
     var previousScrollOffset by remember { mutableStateOf(0) }
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
+
+    // 각 탭의 스크롤 위치 저장 (Activity 재시작 시에도 복원)
+    val inboxScrollIndex = rememberSaveable { mutableStateOf(0) }
+    val inboxScrollOffset = rememberSaveable { mutableStateOf(0) }
+    val sentScrollIndex = rememberSaveable { mutableStateOf(0) }
+    val sentScrollOffset = rememberSaveable { mutableStateOf(0) }
+
+    // 각 탭의 스크롤 상태를 독립적으로 유지
+    val inboxListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = inboxScrollIndex.value,
+        initialFirstVisibleItemScrollOffset = inboxScrollOffset.value
+    )
+    val sentListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = sentScrollIndex.value,
+        initialFirstVisibleItemScrollOffset = sentScrollOffset.value
+    )
+
+    // 스크롤 위치 변경 시 저장
+    LaunchedEffect(inboxListState) {
+        snapshotFlow {
+            inboxListState.firstVisibleItemIndex to inboxListState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            inboxScrollIndex.value = index
+            inboxScrollOffset.value = offset
+        }
+    }
+
+    LaunchedEffect(sentListState) {
+        snapshotFlow {
+            sentListState.firstVisibleItemIndex to sentListState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            sentScrollIndex.value = index
+            sentScrollOffset.value = offset
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -238,7 +277,8 @@ fun MailScreen(
                             showBottomBar = true
                         },
                         contactEmails = inboxUiState.contactEmails,
-                        contactsByEmail = inboxUiState.contactsByEmail
+                        contactsByEmail = inboxUiState.contactsByEmail,
+                        listState = inboxListState
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
@@ -265,7 +305,8 @@ fun MailScreen(
                         onScrollStopped = {
                             showBottomBar = true
                         },
-                        contactsByEmail = inboxUiState.contactsByEmail
+                        contactsByEmail = inboxUiState.contactsByEmail,
+                        listState = sentListState
                     )
                 }
             }
