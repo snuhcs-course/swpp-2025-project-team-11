@@ -3,6 +3,7 @@ package com.fiveis.xend.ui.compose
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -557,39 +558,35 @@ private fun SubjectControlRow(
                 }
             }
             if (isStreaming) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // 스트리밍 중 - 텍스트, 로딩 인디케이터, 중지 버튼 순서로 표시
+                Text(
+                    text = "AI 플래너가 메일 구조를 설계 중입니다",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue60
+                )
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onStopStreaming,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Stop,
-                            contentDescription = "AI 중지",
-                            tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "중지",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFFEF4444)
-                            )
-                        )
-                    }
-                    Text(
-                        text = "AI 플래너가 메일 구조를 설계 중입니다",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "AI 중지",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(16.dp)
                     )
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = Blue60
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "중지",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFEF4444)
+                        )
                     )
                 }
             } else {
@@ -777,8 +774,18 @@ private fun RecipientSection(
             }
         }
 
+        val pendingEmail = newContact.text.trim()
+        val normalizedPendingEmail = normalizeEmail(pendingEmail)
+        val isAlreadySavedContact = knownContactsByEmail.containsKey(normalizedPendingEmail)
+        val isAlreadySelected = contacts.any { normalizeEmail(it.email) == normalizedPendingEmail }
+        val shouldShowAddContactButton =
+            pendingEmail.length >= 2 &&
+                onAddContactClick != null &&
+                !isAlreadySavedContact &&
+                !isAlreadySelected
+
         AnimatedVisibility(
-            visible = contactSuggestions.isNotEmpty() || (newContact.text.length >= 2 && onAddContactClick != null)
+            visible = contactSuggestions.isNotEmpty() || shouldShowAddContactButton
         ) {
             Column(
                 modifier = Modifier
@@ -805,8 +812,7 @@ private fun RecipientSection(
                 }
 
                 // 연락처 추가 버튼
-                if (newContact.text.length >= 2 && onAddContactClick != null) {
-                    val pendingEmail = newContact.text.trim()
+                if (shouldShowAddContactButton) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1240,6 +1246,7 @@ class MailComposeActivity : ComponentActivity() {
                 var contactSuggestions by remember { mutableStateOf<List<Contact>>(emptyList()) }
 
                 var showTemplateScreen by remember { mutableStateOf(false) }
+                var pendingTemplateBody by remember { mutableStateOf<String?>(null) }
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
                 var canUndo by rememberSaveable { mutableStateOf(false) }
                 var canRedo by rememberSaveable { mutableStateOf(false) }
@@ -1473,6 +1480,13 @@ class MailComposeActivity : ComponentActivity() {
                     composeVm.acceptSuggestion()
                     composeVm.requestImmediateSuggestion(editorState.getHtml())
                 }
+                LaunchedEffect(pendingTemplateBody, showTemplateScreen, editorState.editor) {
+                    val body = pendingTemplateBody
+                    if (!showTemplateScreen && body != null && editorState.editor != null) {
+                        editorState.setHtml(body)
+                        pendingTemplateBody = null
+                    }
+                }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     Scaffold { innerPadding ->
@@ -1482,7 +1496,7 @@ class MailComposeActivity : ComponentActivity() {
                                 onBack = { showTemplateScreen = false },
                                 onTemplateSelected = { template ->
                                     subject = template.subject
-                                    editorState.setHtml(template.body)
+                                    pendingTemplateBody = convertTemplateBodyToHtml(template.body)
                                     showTemplateScreen = false
                                 },
                                 modifier = Modifier.padding(innerPadding)
@@ -1854,6 +1868,16 @@ private data class ComposeAttachmentChip(val uri: Uri, val name: String, val siz
             }
         }
     }
+}
+
+private fun convertTemplateBodyToHtml(rawText: String): String {
+    return rawText.lines()
+        .joinToString("<br>") { line ->
+            val trimmed = line.trimEnd()
+            val encoded = TextUtils.htmlEncode(trimmed)
+            if (encoded.isEmpty()) "&nbsp;" else encoded
+        }
+        .replace(Regex("(<br>)+$"), "")
 }
 
 // ========================================================

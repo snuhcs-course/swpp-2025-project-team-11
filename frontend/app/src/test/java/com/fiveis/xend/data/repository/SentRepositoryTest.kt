@@ -3,6 +3,8 @@ package com.fiveis.xend.data.repository
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailListResponse
+import com.fiveis.xend.data.model.ReadStatusUpdateRequest
+import com.fiveis.xend.data.model.ReadStatusUpdateResponse
 import com.fiveis.xend.network.MailApiService
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -265,8 +267,14 @@ class SentRepositoryTest {
     fun update_read_status_updates_dao() = runTest {
         val emailId = "email123"
 
+        coEvery {
+            mailApiService.updateReadStatus(emailId, ReadStatusUpdateRequest(isRead = true))
+        } returns Response.success(ReadStatusUpdateResponse(id = emailId, labelIds = emptyList()))
+        coEvery { emailDao.updateReadStatus(emailId, false) } returns Unit
+
         repository.updateReadStatus(emailId, false)
 
+        coVerify { mailApiService.updateReadStatus(emailId, ReadStatusUpdateRequest(isRead = true)) }
         coVerify { emailDao.updateReadStatus(emailId, false) }
     }
 
@@ -274,8 +282,14 @@ class SentRepositoryTest {
     fun update_read_status_with_unread_true() = runTest {
         val emailId = "email456"
 
+        coEvery {
+            mailApiService.updateReadStatus(emailId, ReadStatusUpdateRequest(isRead = false))
+        } returns Response.success(ReadStatusUpdateResponse(id = emailId, labelIds = emptyList()))
+        coEvery { emailDao.updateReadStatus(emailId, true) } returns Unit
+
         repository.updateReadStatus(emailId, true)
 
+        coVerify { mailApiService.updateReadStatus(emailId, ReadStatusUpdateRequest(isRead = false)) }
         coVerify { emailDao.updateReadStatus(emailId, true) }
     }
 

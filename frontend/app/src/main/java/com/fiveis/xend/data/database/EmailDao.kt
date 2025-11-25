@@ -13,8 +13,16 @@ interface EmailDao {
     @Query("SELECT * FROM emails ORDER BY cachedAt DESC")
     fun getAllEmails(): Flow<List<EmailItem>>
 
-    @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY date DESC")
+    @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY dateTimestamp DESC")
     fun getEmailsByLabel(label: String): Flow<List<EmailItem>>
+
+    /**
+     * Get INBOX emails excluding SENT (to avoid showing self-sent emails in inbox)
+     */
+    @Query(
+        "SELECT * FROM emails WHERE labelIds LIKE '%INBOX%' AND labelIds NOT LIKE '%SENT%' ORDER BY dateTimestamp DESC"
+    )
+    fun getInboxEmails(): Flow<List<EmailItem>>
 
     @Query("SELECT * FROM emails WHERE id = :emailId")
     suspend fun getEmailById(emailId: String): EmailItem?
@@ -53,7 +61,7 @@ interface EmailDao {
         SELECT * FROM emails
         WHERE subject LIKE '%' || :query || '%'
         OR fromEmail LIKE '%' || :query || '%'
-        ORDER BY date DESC
+        ORDER BY dateTimestamp DESC
         """
     )
     fun searchEmails(query: String): Flow<List<EmailItem>>

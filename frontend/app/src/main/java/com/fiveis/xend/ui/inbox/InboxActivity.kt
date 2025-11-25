@@ -122,7 +122,8 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
             val database = AppDatabase.getDatabase(context)
             val inboxRepository = InboxRepository(mailApiService, database.emailDao())
             val contactRepository = ContactBookRepository(context)
-            return InboxViewModel(inboxRepository, contactRepository) as T
+            val prefs = context.getSharedPreferences("xend_pagination", Context.MODE_PRIVATE)
+            return InboxViewModel(inboxRepository, contactRepository, prefs) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
