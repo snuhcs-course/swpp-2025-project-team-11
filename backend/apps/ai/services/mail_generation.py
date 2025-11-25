@@ -355,7 +355,6 @@ def stream_mail_generation_with_plan(
         mapping.clear()
 
 
-@as_async_stream
 def debug_mail_generation_analysis(
     user,
     subject: str | None,
