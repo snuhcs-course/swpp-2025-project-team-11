@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -99,6 +102,7 @@ import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
+import com.fiveis.xend.utils.EmailUtils
 import com.fiveis.xend.utils.formatFileSize
 import com.fiveis.xend.utils.shortenFilename
 import java.io.File
@@ -113,6 +117,7 @@ fun MailDetailScreen(
     knownContactsByEmail: Map<String, Contact> = emptyMap(),
     onBack: () -> Unit,
     onReply: () -> Unit = {},
+    onAddContactClick: (String, String) -> Unit = { _, _ -> },
     onDownloadAttachment: (Attachment) -> Unit = {},
     onAnalyzeAttachment: (Attachment) -> Unit = {},
     onDismissAnalysis: () -> Unit = {},
@@ -202,7 +207,8 @@ fun MailDetailScreen(
                         onAttachmentClick = { selected -> attachmentToDownload = selected },
                         onAnalyzeAttachment = onAnalyzeAttachment,
                         onPreviewAttachment = onPreviewAttachment,
-                        onOpenAttachmentExternally = onOpenAttachmentExternally
+                        onOpenAttachmentExternally = onOpenAttachmentExternally,
+                        onAddContactClick = onAddContactClick
                     )
                 }
             }
@@ -364,7 +370,8 @@ private fun MailDetailContent(
     onAttachmentClick: (Attachment) -> Unit,
     onAnalyzeAttachment: (Attachment) -> Unit,
     onPreviewAttachment: (Attachment) -> Unit,
-    onOpenAttachmentExternally: (Attachment) -> Unit
+    onOpenAttachmentExternally: (Attachment) -> Unit,
+    onAddContactClick: (String, String) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -384,7 +391,8 @@ private fun MailDetailContent(
             recipientEmail = mail.toEmail,
             isSentMail = isSentMail,
             date = mail.date,
-            knownContactsByEmail = knownContactsByEmail
+            knownContactsByEmail = knownContactsByEmail,
+            onAddContactClick = onAddContactClick
         )
         HorizontalDivider(
             thickness = 1.dp,
@@ -416,7 +424,8 @@ private fun SenderInfoSection(
     recipientEmail: String,
     isSentMail: Boolean,
     date: String,
-    knownContactsByEmail: Map<String, Contact>
+    knownContactsByEmail: Map<String, Contact>,
+    onAddContactClick: (String, String) -> Unit
 ) {
     val (displayName, displayEmail) = if (isSentMail) {
         parseSenderEmail(recipientEmail)
@@ -426,24 +435,72 @@ private fun SenderInfoSection(
     val normalized = displayEmail.trim().lowercase()
     val savedContact = knownContactsByEmail[normalized]
     val resolvedDisplayName = savedContact?.name?.takeIf { it.isNotBlank() } ?: displayName
+    val showAddContactButton = !isSentMail && savedContact == null
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
-        Text(
-            text = if (isSentMail) "To. $resolvedDisplayName" else resolvedDisplayName,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val spacing = 6.dp
+            val buttonSize = 20.dp
+            val textMaxWidth = if (showAddContactButton) {
+                (maxWidth - buttonSize - spacing).coerceAtLeast(0.dp)
+            } else {
+                maxWidth
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing)
+            ) {
+                Text(
+                    text = if (isSentMail) "To. $resolvedDisplayName" else resolvedDisplayName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    modifier = Modifier.widthIn(max = textMaxWidth),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (showAddContactButton) {
+                    IconButton(
+                        modifier = Modifier.size(buttonSize),
+                        onClick = {
+                            val rawName = EmailUtils
+                                .extractSenderName(senderEmail)
+                                .ifBlank { displayEmail }
+                            onAddContactClick(rawName, displayEmail)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PersonAdd,
+                            contentDescription = "연락처 추가",
+                            tint = Blue60,
+                            modifier = Modifier.size(18.dp)
+                        )
+//                        Spacer(modifier = Modifier.width(4.dp))
+//                        Text(
+//                            text = "연락처 추가",
+//                            fontSize = 13.sp,
+//                            color = Blue60,
+//                            fontWeight = FontWeight.Medium
+//                        )
+                    }
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "<$displayEmail>",
             fontSize = 13.sp,
             color = TextSecondary
         )
+
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = date,
