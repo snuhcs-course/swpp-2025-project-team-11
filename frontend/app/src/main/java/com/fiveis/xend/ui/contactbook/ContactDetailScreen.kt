@@ -689,128 +689,134 @@ private fun EditContactDialog(
 
                     Spacer(Modifier.height(16.dp))
 
-                    Text("관계", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        ExposedDropdownMenuBox(
-                            expanded = isSenderExpanded,
-                            onExpandedChange = { if (!isProcessing) isSenderExpanded = !isSenderExpanded },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = when (senderMode) {
-                                    RoleInputMode.PRESET -> senderPreset ?: "나"
-                                    RoleInputMode.MANUAL -> directInputLabel
-                                },
-                                onValueChange = {},
-                                readOnly = true,
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Group,
-                                        contentDescription = null,
-                                        tint = ToolbarIconTint,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSenderExpanded)
-                                },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .height(48.dp),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !isProcessing,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = BackgroundLight,
-                                    unfocusedContainerColor = BackgroundLight,
-                                    unfocusedBorderColor = Gray200,
-                                    focusedBorderColor = Purple60,
-                                    focusedTextColor = Slate900,
-                                    unfocusedTextColor = Gray600
-                                )
-                            )
-                            ExposedDropdownMenu(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("관계 - 나", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(8.dp))
+                            ExposedDropdownMenuBox(
                                 expanded = isSenderExpanded,
-                                onDismissRequest = { isSenderExpanded = false }
+                                onExpandedChange = { if (!isProcessing) isSenderExpanded = !isSenderExpanded },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                senderRoleOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, fontSize = 13.sp) },
-                                        onClick = {
-                                            isSenderExpanded = false
-                                            if (option == directInputLabel) {
-                                                onSenderModeChange(RoleInputMode.MANUAL)
-                                                onSenderPresetChange(null)
-                                            } else {
-                                                onSenderModeChange(RoleInputMode.PRESET)
-                                                onSenderPresetChange(option)
-                                            }
-                                        }
+                                OutlinedTextField(
+                                    value = when (senderMode) {
+                                        RoleInputMode.PRESET -> senderPreset ?: "나"
+                                        RoleInputMode.MANUAL -> directInputLabel
+                                    },
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Group,
+                                            contentDescription = null,
+                                            tint = ToolbarIconTint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSenderExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .menuAnchor()
+                                        .height(48.dp),
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isProcessing,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = BackgroundLight,
+                                        unfocusedContainerColor = BackgroundLight,
+                                        unfocusedBorderColor = Gray200,
+                                        focusedBorderColor = Purple60,
+                                        focusedTextColor = Slate900,
+                                        unfocusedTextColor = Gray600
                                     )
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = isSenderExpanded,
+                                    onDismissRequest = { isSenderExpanded = false }
+                                ) {
+                                    senderRoleOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option, fontSize = 13.sp) },
+                                            onClick = {
+                                                isSenderExpanded = false
+                                                if (option == directInputLabel) {
+                                                    onSenderModeChange(RoleInputMode.MANUAL)
+                                                    onSenderPresetChange(null)
+                                                } else {
+                                                    onSenderModeChange(RoleInputMode.PRESET)
+                                                    onSenderPresetChange(option)
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(Modifier.width(8.dp))
-
-                        ExposedDropdownMenuBox(
-                            expanded = isRecipientExpanded,
-                            onExpandedChange = { if (!isProcessing) isRecipientExpanded = !isRecipientExpanded },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = when (recipientMode) {
-                                    RoleInputMode.PRESET -> recipientPreset ?: "상대방"
-                                    RoleInputMode.MANUAL -> directInputLabel
-                                },
-                                onValueChange = {},
-                                readOnly = true,
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Group,
-                                        contentDescription = null,
-                                        tint = ToolbarIconTint,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientExpanded)
-                                },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .height(48.dp),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !isProcessing,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = BackgroundLight,
-                                    unfocusedContainerColor = BackgroundLight,
-                                    unfocusedBorderColor = Gray200,
-                                    focusedBorderColor = Purple60,
-                                    focusedTextColor = Slate900,
-                                    unfocusedTextColor = Gray600
-                                )
-                            )
-                            ExposedDropdownMenu(
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("관계 - 상대방", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(8.dp))
+                            ExposedDropdownMenuBox(
                                 expanded = isRecipientExpanded,
-                                onDismissRequest = { isRecipientExpanded = false }
+                                onExpandedChange = { if (!isProcessing) isRecipientExpanded = !isRecipientExpanded },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                recipientRoleOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, fontSize = 13.sp) },
-                                        onClick = {
-                                            isRecipientExpanded = false
-                                            if (option == directInputLabel) {
-                                                onRecipientModeChange(RoleInputMode.MANUAL)
-                                                onRecipientPresetChange(null)
-                                            } else {
-                                                onRecipientModeChange(RoleInputMode.PRESET)
-                                                onRecipientPresetChange(option)
-                                            }
-                                        }
+                                OutlinedTextField(
+                                    value = when (recipientMode) {
+                                        RoleInputMode.PRESET -> recipientPreset ?: "상대방"
+                                        RoleInputMode.MANUAL -> directInputLabel
+                                    },
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Group,
+                                            contentDescription = null,
+                                            tint = ToolbarIconTint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .menuAnchor()
+                                        .height(48.dp),
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isProcessing,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = BackgroundLight,
+                                        unfocusedContainerColor = BackgroundLight,
+                                        unfocusedBorderColor = Gray200,
+                                        focusedBorderColor = Purple60,
+                                        focusedTextColor = Slate900,
+                                        unfocusedTextColor = Gray600
                                     )
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = isRecipientExpanded,
+                                    onDismissRequest = { isRecipientExpanded = false }
+                                ) {
+                                    recipientRoleOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option, fontSize = 13.sp) },
+                                            onClick = {
+                                                isRecipientExpanded = false
+                                                if (option == directInputLabel) {
+                                                    onRecipientModeChange(RoleInputMode.MANUAL)
+                                                    onRecipientPresetChange(null)
+                                                } else {
+                                                    onRecipientModeChange(RoleInputMode.PRESET)
+                                                    onRecipientPresetChange(option)
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
