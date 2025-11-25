@@ -1501,7 +1501,7 @@ private fun parseSenderEmail(senderEmail: String): Pair<String, String> {
     return if (matchResult != null) {
         val name = matchResult.groupValues[1].trim()
         val email = matchResult.groupValues[2].trim()
-        "$name ($email)" to email
+        name to email
     } else {
         senderEmail.trim() to senderEmail.trim()
     }
