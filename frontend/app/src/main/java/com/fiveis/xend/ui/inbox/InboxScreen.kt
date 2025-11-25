@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.inbox
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -306,7 +305,6 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
                     .clip(CircleShape)
                     .clickable(
                         onClick = {
-                            Log.d("InboxScreen", "Profile icon clicked!")
                             onProfile()
                         },
                         indication = ripple(bounded = true, radius = 20.dp),
@@ -424,22 +422,11 @@ private fun EmailList(
                     false
                 } else {
                     // Trigger when last visible item is within 3 items from the end
-                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
-                    if (shouldLoad) {
-                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
-                    }
-                    shouldLoad
+                    lastVisibleItem.index >= totalItems - 4
                 }
             }.collect { shouldLoadMore ->
-                Log.d(
-                    "InboxScreen",
-                    "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
-                )
                 if (shouldLoadMore && !isLoadingMore) {
-                    Log.d("InboxScreen", "Triggering loadMore")
                     onLoadMore()
-                } else {
-                    Log.d("InboxScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }
@@ -532,7 +519,7 @@ private fun EmailRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .semantics { contentDescription = "메일 항목: ${item.subject}" },
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -543,11 +530,17 @@ private fun EmailRow(
                         .size(6.dp)
                         .background(Color(0xFFEA4335), CircleShape)
                 )
+            } else {
+                Spacer(
+                    modifier = Modifier
+                        .padding(top = 3.dp, end = 8.dp)
+                        .size(6.dp)
+                )
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

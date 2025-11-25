@@ -190,39 +190,58 @@ class XendRichEditor @JvmOverloads constructor(
 
         val js = """
             (function() {
-                // Remove existing suggestion if any
+                if (window._xendSuggestionGuard) {
+                    document.removeEventListener('selectionchange', window._xendSuggestionGuard);
+                    window._xendSuggestionGuard = null;
+                }
                 var existing = document.getElementById('ai-suggestion');
                 if (existing) {
                     existing.remove();
                 }
                 var sel = window.getSelection();
                 if (!sel.rangeCount) return;
-                var range = sel.getRangeAt(0).cloneRange();
-                // Check if there's any text AFTER the cursor
-                var afterRange = range.cloneRange();
+                var caretRange = sel.getRangeAt(0).cloneRange();
+                caretRange.collapse(false);
+                var afterRange = caretRange.cloneRange();
                 afterRange.selectNodeContents(document.body);
-                afterRange.setStart(range.endContainer, range.endOffset);
+                afterRange.setStart(caretRange.endContainer, caretRange.endOffset);
                 var textAfterCursor = afterRange.toString().trim();
-                // Only show suggestion if cursor is at the END (no text after)
                 if (textAfterCursor.length > 0) {
-                    return;  // Don't show suggestion if there's text after cursor
+                    return;
                 }
-                range.collapse(false);  // Collapse to end of selection
-                // Create suggestion text span (no button)
+                var insertRange = caretRange.cloneRange();
+                insertRange.collapse(false);
                 var textSpan = document.createElement('span');
                 textSpan.id = 'ai-suggestion';
                 textSpan.contentEditable = 'false';
                 textSpan.style.color = '#9CA3AF';
                 textSpan.style.fontSize = '14px';
                 textSpan.style.userSelect = 'none';
+                textSpan.style.pointerEvents = 'none';
                 textSpan.textContent = ' ' + '$escapedText';
-                // Insert at current cursor position
-                range.insertNode(textSpan);
-                // Restore cursor position (before the suggestion)
-                range.setStartBefore(textSpan);
-                range.collapse(true);
+                insertRange.insertNode(textSpan);
+                window._xendSuggestionGuard = function() {
+                    var suggestion = document.getElementById('ai-suggestion');
+                    if (!suggestion) return;
+                    var sel = window.getSelection();
+                    if (!sel.rangeCount) return;
+                    var caretRange = sel.getRangeAt(0);
+                    var suggestionRange = document.createRange();
+                    suggestionRange.selectNode(suggestion);
+                    // If caret is at or after the end of the suggestion, snap it before the span
+                    var compareEnd = caretRange.compareBoundaryPoints(Range.START_TO_END, suggestionRange);
+                    var anchorInside = suggestion.contains(sel.anchorNode);
+                    if (anchorInside || compareEnd >= 0) {
+                        var guardRange = document.createRange();
+                        guardRange.setStartBefore(suggestion);
+                        guardRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(guardRange);
+                    }
+                };
+                document.addEventListener('selectionchange', window._xendSuggestionGuard);
                 sel.removeAllRanges();
-                sel.addRange(range);
+                sel.addRange(caretRange);
             })();
         """.trimIndent()
         evaluateJavascript(js, null)
@@ -237,6 +256,10 @@ class XendRichEditor @JvmOverloads constructor(
                 var existing = document.getElementById('ai-suggestion');
                 if (existing) {
                     existing.remove();
+                }
+                if (window._xendSuggestionGuard) {
+                    document.removeEventListener('selectionchange', window._xendSuggestionGuard);
+                    window._xendSuggestionGuard = null;
                 }
             })();
         """.trimIndent()

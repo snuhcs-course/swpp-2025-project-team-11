@@ -358,6 +358,14 @@ class InboxViewModel(
         groupId: Long?
     ) {
         viewModelScope.launch {
+            // 닫기/초기화: 버튼 누르자마자 다이얼로그가 닫혀야 하므로 먼저 상태를 정리한다.
+            _uiState.update {
+                it.copy(
+                    showAddContactDialog = false,
+                    selectedEmailForContact = null,
+                    addContactError = null
+                )
+            }
             try {
                 Log.d("InboxViewModel", "Adding contact: name=$name, email=$email")
                 contactRepository.addContact(
