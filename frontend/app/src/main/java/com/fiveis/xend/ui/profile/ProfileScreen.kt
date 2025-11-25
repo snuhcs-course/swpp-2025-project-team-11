@@ -68,7 +68,7 @@ import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 
-private data class LanguageOption(
+data class LanguageOption(
     val value: String,
     val displayName: String,
     val flagEmoji: String
@@ -76,7 +76,7 @@ private data class LanguageOption(
     val label: String get() = "$flagEmoji  $displayName"
 }
 
-private val languageOptions = listOf(
+val languageOptions = listOf(
     LanguageOption("Korean", "Korean", "\uD83C\uDDF0\uD83C\uDDF7"),
     LanguageOption("English", "English", "\uD83C\uDDFA\uD83C\uDDF8"),
     LanguageOption("Spanish", "Spanish", "\uD83C\uDDEA\uD83C\uDDF8"),
@@ -87,7 +87,7 @@ private val languageOptions = listOf(
     LanguageOption("Portuguese", "Portuguese", "\uD83C\uDDF5\uD83C\uDDF9")
 )
 
-private fun languageDisplayText(value: String): String {
+fun languageDisplayText(value: String): String {
     if (value.isBlank()) return ""
     return languageOptions.firstOrNull { it.value.equals(value, ignoreCase = true) }?.label ?: value
 }
@@ -441,7 +441,7 @@ private fun ProfileInfoCard(
 }
 
 @Composable
-private fun LanguageDialog(
+fun LanguageDialog(
     selectedLanguage: String,
     onLanguageSelected: (String) -> Unit,
     onDismiss: () -> Unit,

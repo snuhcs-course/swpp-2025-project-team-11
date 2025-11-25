@@ -58,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.ui.profile.LanguageDialog
+import com.fiveis.xend.ui.profile.languageDisplayText
 import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
@@ -107,6 +109,7 @@ fun AddContactScreen(
     onSenderRoleChange: (String?) -> Unit,
     onRecipientRoleChange: (String?) -> Unit,
     onPersonalPromptChange: (String?) -> Unit,
+    onLanguagePreferenceChange: (String) -> Unit = {},
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onGmailContactsSync: () -> Unit,
@@ -138,6 +141,8 @@ fun AddContactScreen(
     var personalPrompt by rememberSaveable { mutableStateOf("") }
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
+    var languagePreference by rememberSaveable { mutableStateOf("") }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     val savable = name.isNotBlank() && email.contains("@")
     val sortedGroups = remember(groups) { groups.sortedBy { it.name } }
 
@@ -615,11 +620,58 @@ fun AddContactScreen(
                     }
                 }
 
+                FormBlock(label = "메일 작성 언어") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showLanguageDialog = true }
+                    ) {
+                        OutlinedTextField(
+                            value = languageDisplayText(languagePreference),
+                            onValueChange = {},
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            placeholder = {
+                                Text(
+                                    text = "프로필 기본값",
+                                    style = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                                    color = TextPrimary
+                                )
+                            },
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 15.sp),
+                            singleLine = true,
+                            readOnly = true,
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = TextPrimary,
+                                focusedTextColor = TextPrimary,
+                                disabledBorderColor = BorderGray,
+                                unfocusedBorderColor = BorderGray,
+                                focusedBorderColor = Purple60,
+                                focusedContainerColor = Color.White
+                            )
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(8.dp))
             }
 
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (showLanguageDialog) {
+        LanguageDialog(
+            selectedLanguage = languagePreference,
+            onLanguageSelected = { selected ->
+                languagePreference = selected
+                onLanguagePreferenceChange(selected)
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
     }
 }
 

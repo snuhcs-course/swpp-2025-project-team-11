@@ -188,13 +188,16 @@ class ContactBookRepository(
         groupId: Long?,
         senderRole: String?,
         recipientRole: String,
-        personalPrompt: String?
+        personalPrompt: String?,
+        languagePreference: String? = null
     ): ContactResponse {
         val requestContext = AddContactRequestContext(
             senderRole = senderRole ?: "",
             recipientRole = recipientRole,
-            personalPrompt = personalPrompt ?: ""
+            personalPrompt = personalPrompt ?: "",
+            languagePreference = languagePreference ?: ""
         )
+
         val request = AddContactRequest(name = name, email = email, groupId = groupId, context = requestContext)
         val res = api.addContact(request)
         if (!res.isSuccessful) {
