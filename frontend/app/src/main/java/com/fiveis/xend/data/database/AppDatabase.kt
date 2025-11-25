@@ -20,6 +20,7 @@ import com.fiveis.xend.data.model.EmailItem
  * v2 -> v3: body 필드 DEFAULT 값 추가 (스키마만 변경, 마이그레이션 불필요)
  * v3 -> v4: drafts 테이블 추가
  * v4 -> v5: groups 테이블에 emoji 필드 추가, EmailItem에 toEmail/attachments 컬럼 추가
+ * v5 -> v6: emails 테이블에 dateTimestamp 필드 추가 (정렬용 epoch timestamp)
  */
 @Database(
     entities = [
@@ -31,7 +32,7 @@ import com.fiveis.xend.data.model.EmailItem
         PromptOptionEntity::class,
         GroupPromptOptionCrossRef::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -185,6 +186,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from v5 to v6:
+         * - Add dateTimestamp column to emails table for proper chronological sorting
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN dateTimestamp INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 val newInstance = Room.databaseBuilder(
@@ -192,7 +205,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "xend_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration() // Add this line
                     .build()
                 instance = newInstance

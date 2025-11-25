@@ -4,6 +4,8 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailListResponse
+import com.fiveis.xend.data.model.ReadStatusUpdateRequest
+import com.fiveis.xend.data.model.ReadStatusUpdateResponse
 import com.fiveis.xend.network.MailApiService
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -202,10 +204,14 @@ class InboxRepositoryTest {
 
     @Test
     fun update_read_status_calls_dao_with_correct_parameters() = runTest {
+        coEvery {
+            mailApiService.updateReadStatus("1", ReadStatusUpdateRequest(isRead = true))
+        } returns Response.success(ReadStatusUpdateResponse(id = "1", labelIds = listOf("INBOX")))
         coEvery { emailDao.updateReadStatus("1", false) } returns Unit
 
         repository.updateReadStatus("1", false)
 
+        coVerify { mailApiService.updateReadStatus("1", ReadStatusUpdateRequest(isRead = true)) }
         coVerify { emailDao.updateReadStatus("1", false) }
     }
 

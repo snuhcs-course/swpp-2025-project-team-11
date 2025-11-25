@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +81,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlin.math.absoluteValue
 
 @Composable
 fun InboxScreen(
@@ -99,6 +101,7 @@ fun InboxScreen(
 
     // 스크롤 상태 감지
     var showBottomBar by remember { mutableStateOf(true) }
+    val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -118,19 +121,19 @@ fun InboxScreen(
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (currentIndex, currentOffset) ->
-            // 맨 위에 있을 때는 항상 표시
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
             } else if (listState.isScrollInProgress) {
-                // 스크롤 중일 때만 방향 감지
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
 
-                // 아래로 스크롤 중이면 숨기기
-                showBottomBar = !isScrollingDown
+                if (offsetDelta > scrollThresholdPx) {
+                    showBottomBar = !isScrollingDown
+                }
             }
 
             previousIndex = currentIndex

@@ -611,6 +611,10 @@ private fun NewTemplateDialog(
                 )
 
                 // 버튼
+                val canSave =
+                    title.isNotBlank() && description.isNotBlank() &&
+                        mailSubject.isNotBlank() && mailBody.isNotBlank()
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -621,16 +625,17 @@ private fun NewTemplateDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            if (title.isNotBlank() && description.isNotBlank() &&
-                                mailSubject.isNotBlank() && mailBody.isNotBlank()
-                            ) {
+                            if (canSave) {
                                 onSave(selectedCategory, title, description, mailSubject, mailBody)
                                 onDismiss()
                             }
                         },
+                        enabled = canSave,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = TemplateSelectedTabBg,
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            disabledContainerColor = TemplateSelectedTabBg.copy(alpha = 0.4f),
+                            disabledContentColor = Color.White.copy(alpha = 0.6f)
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {

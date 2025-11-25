@@ -2,12 +2,32 @@ package com.fiveis.xend.ui.view
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,8 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -27,6 +52,7 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
+import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.compose.MailComposeViewModel
 import com.fiveis.xend.ui.compose.SendMailViewModel
@@ -35,6 +61,13 @@ import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.mail.MailActivity
+import com.fiveis.xend.ui.theme.Blue60
+import com.fiveis.xend.ui.theme.Blue80
+import com.fiveis.xend.ui.theme.ComposeSurface
+import com.fiveis.xend.ui.theme.StableColor
+import com.fiveis.xend.ui.theme.TextPrimary
+import com.fiveis.xend.ui.theme.TextSecondary
+import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.utils.EmailUtils
 import kotlinx.coroutines.launch
@@ -112,6 +145,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 var canUndo by rememberSaveable { mutableStateOf(false) }
                 var canRedo by rememberSaveable { mutableStateOf(false) }
                 var showAddContactDialog by remember { mutableStateOf(false) }
+                var showAiPromptDialog by remember { mutableStateOf(false) }
                 var selectedContactForDialog by remember { mutableStateOf<Contact?>(null) }
                 var availableGroups by remember { mutableStateOf<List<Group>>(emptyList()) }
                 var recipientGroupNames by remember { mutableStateOf(groupNames.toList()) }
@@ -215,7 +249,12 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             type = com.fiveis.xend.ui.compose.BannerType.INFO
                         )
                     } else {
-                        null
+                        // 등록된 연락처인 경우 - AI 작성 방식 안내
+                        com.fiveis.xend.ui.compose.BannerState(
+                            message = "AI가 연락처 정보를 활용해 메일을 작성해요. 자세히 보기",
+                            type = com.fiveis.xend.ui.compose.BannerType.INFO,
+                            onActionClick = { showAiPromptDialog = true }
+                        )
                     }
                 }
 
@@ -398,6 +437,16 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         )
                     }
                 }
+
+                // Show AI Prompt Preview Dialog
+                if (showAiPromptDialog) {
+                    recipientContact?.let { contact ->
+                        AiPromptPreviewDialog(
+                            contacts = listOf(contact),
+                            onDismiss = { showAiPromptDialog = false }
+                        )
+                    }
+                }
             }
         }
     }
@@ -448,4 +497,173 @@ private fun String.toHtmlPreservingLineBreaks(): String {
         index++
     }
     return sb.toString()
+}
+
+@Composable
+private fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var promptData by remember { mutableStateOf<com.fiveis.xend.network.PromptPreviewResponse?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Fetch prompt preview data
+    LaunchedEffect(contacts) {
+        isLoading = true
+        errorMessage = null
+        try {
+            val aiApiService = RetrofitClient.getAiApiService(context)
+            val requestEmails = contacts.map { it.email }
+            Log.d("AiPromptPreview", "Requesting prompt preview for emails: $requestEmails")
+
+            val response = aiApiService.getPromptPreview(
+                com.fiveis.xend.network.PromptPreviewRequest(
+                    to = requestEmails
+                )
+            )
+
+            Log.d("AiPromptPreview", "Response code: ${response.code()}")
+
+            if (response.isSuccessful) {
+                promptData = response.body()
+                Log.d("AiPromptPreview", "Success! Data: $promptData")
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e("AiPromptPreview", "Error ${response.code()}: $errorBody")
+                errorMessage = "프롬프트 정보를 불러오는데 실패했습니다.\n코드: ${response.code()}\n${errorBody?.take(200) ?: ""}"
+            }
+        } catch (e: Exception) {
+            Log.e("AiPromptPreview", "Exception: ${e.message}", e)
+            errorMessage = "네트워크 오류: ${e.message}"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "AI 작성 방식",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Recipient info
+                Text(
+                    text = "받는 사람",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = ToolbarIconTint
+                    )
+                )
+                contacts.forEach { contact ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ComposeSurface)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(StableColor.forId(contact.id)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = (contact.name?.firstOrNull() ?: '?').uppercaseChar().toString(),
+                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = contact.name ?: "",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextPrimary
+                                )
+                            )
+                            Text(
+                                text = contact.email,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+                }
+
+                // Loading/Error/Data state
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Blue60)
+                        }
+                    }
+                    errorMessage != null -> {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = errorMessage ?: "오류가 발생했습니다",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                    promptData != null -> {
+                        Text(
+                            text = "AI는 다음 정보를 활용해요",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = ToolbarIconTint
+                            )
+                        )
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Blue80.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, Blue80.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = promptData?.previewText?.takeIf { it.isNotBlank() }
+                                    ?: "해당 수신자에 대한 프롬프트 정보를 아직 준비하지 못했습니다.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "확인",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = Blue60,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+    )
 }
