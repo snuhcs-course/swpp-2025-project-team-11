@@ -147,4 +147,239 @@ class GroupDetailViewModelTest {
 
         coVerify(exactly = 1) { repository.updateContactGroup(42L, null) }
     }
+
+    @Test
+    fun remove_member_from_group_failure_sets_error() = runTest {
+        viewModel = GroupDetailViewModel(application, repository)
+        coEvery { repository.updateContactGroup(42L, null) } throws Exception("Failed to remove member")
+
+        viewModel.removeMemberFromGroup(42L)
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun add_members_to_group_invokes_repository() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateContactGroup(any(), any()) } returns Unit
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.addMembersToGroup(listOf(1L, 2L, 3L))
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.updateContactGroup(1L, groupId) }
+        coVerify(exactly = 1) { repository.updateContactGroup(2L, groupId) }
+        coVerify(exactly = 1) { repository.updateContactGroup(3L, groupId) }
+    }
+
+    @Test
+    fun add_members_to_group_failure_sets_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateContactGroup(any(), any()) } throws Exception("Failed to add member")
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.addMembersToGroup(listOf(1L))
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun rename_group_success() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateGroup(groupId, "New Name", "New Description", "", true) } returns mockk()
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.renameGroup("New Name", "New Description", "")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isRenaming)
+        assertNull(viewModel.uiState.value.renameError)
+        coVerify { repository.updateGroup(groupId, "New Name", "New Description", "", true) }
+    }
+
+    @Test
+    fun rename_group_with_blank_name_sets_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.renameGroup("   ", "Description", "")
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.renameError)
+    }
+
+    @Test
+    fun rename_group_failure_sets_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateGroup(any(), any(), any(), any(), any()) } throws Exception("Rename failed")
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.renameGroup("New Name", "New Description", "")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isRenaming)
+        assertNotNull(viewModel.uiState.value.renameError)
+    }
+
+    @Test
+    fun clear_rename_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.renameGroup("", "Description", "")
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.renameError)
+
+        viewModel.clearRenameError()
+
+        assertNull(viewModel.uiState.value.renameError)
+    }
+
+    @Test
+    fun refresh_group_success() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.error)
+        coVerify(exactly = 2) { repository.refreshGroupAndMembers(groupId) }
+    }
+
+    @Test
+    fun refresh_group_failure_sets_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit andThenThrows Exception("Refresh failed")
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun update_group_prompt_options_success() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateGroup(groupId = groupId, optionIds = listOf(1L, 2L)) } returns mockk()
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.updateGroupPromptOptions(listOf(1L, 2L))
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isPromptSaving)
+        assertNull(viewModel.uiState.value.promptOptionsError)
+        coVerify { repository.updateGroup(groupId = groupId, optionIds = listOf(1L, 2L)) }
+    }
+
+    @Test
+    fun update_group_prompt_options_failure_sets_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateGroup(groupId = any(), optionIds = any()) } throws Exception("Update failed")
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.updateGroupPromptOptions(listOf(1L, 2L))
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isPromptSaving)
+        assertNotNull(viewModel.uiState.value.promptOptionsError)
+    }
+
+    @Test
+    fun clear_prompt_options_error() = runTest {
+        val groupId = 1L
+        val mockGroup = Group(id = groupId, name = "VIP", description = "Important")
+
+        every { repository.observeGroup(groupId) } returns kotlinx.coroutines.flow.flowOf(mockGroup)
+        coEvery { repository.refreshGroupAndMembers(groupId) } returns Unit
+        coEvery { repository.updateGroup(groupId = any(), optionIds = any()) } throws Exception("Update failed")
+
+        viewModel = GroupDetailViewModel(application, repository)
+        viewModel.load(groupId)
+        advanceUntilIdle()
+
+        viewModel.updateGroupPromptOptions(listOf(1L))
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.promptOptionsError)
+
+        viewModel.clearPromptOptionsError()
+
+        assertNull(viewModel.uiState.value.promptOptionsError)
+    }
 }

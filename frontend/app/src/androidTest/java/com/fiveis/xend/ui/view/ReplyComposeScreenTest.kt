@@ -29,6 +29,7 @@ class ReplyComposeScreenTest {
         }
 
         // Then
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("답장 작성").assertIsDisplayed()
     }
 

@@ -292,4 +292,19 @@ class AddContactViewModelTest {
         assertEquals(null, state.error)
         assertEquals(null, state.lastSuccessMsg)
     }
+
+    @Test
+    fun factory_creates_view_model_successfully() {
+        val factory = AddContactViewModel.Factory(application)
+        val createdViewModel = factory.create(AddContactViewModel::class.java)
+
+        assertNotNull(createdViewModel)
+        assertTrue(createdViewModel is AddContactViewModel)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun factory_throws_exception_for_wrong_class() {
+        val factory = AddContactViewModel.Factory(application)
+        factory.create(ContactBookViewModel::class.java)
+    }
 }
