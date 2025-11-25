@@ -534,9 +534,10 @@ class MailComposeViewModelTest {
         viewModel = MailComposeViewModel(api, wsClient)
 
         viewModel.enableRealtimeMode(true)
+        advanceUntilIdle()
 
         assertTrue(viewModel.ui.value.isRealtimeEnabled)
-        verify { wsClient.connect(any(), any(), any()) }
+        verify { wsClient.connect(any(), any(), any(), any()) }
     }
 
     @Test
@@ -650,12 +651,13 @@ class MailComposeViewModelTest {
         val wsClient = mockk<com.fiveis.xend.network.MailComposeWebSocketClient>(relaxed = true)
         val onErrorSlot = slot<(String) -> Unit>()
 
-        every { wsClient.connect(any(), capture(onErrorSlot), any()) } answers {
+        every { wsClient.connect(any(), capture(onErrorSlot), any(), any()) } answers {
             onErrorSlot.captured("WebSocket error")
         }
 
         viewModel = MailComposeViewModel(api, wsClient)
         viewModel.enableRealtimeMode(true)
+        advanceUntilIdle()
 
         assertEquals("WebSocket error", viewModel.ui.value.error)
     }
@@ -665,12 +667,13 @@ class MailComposeViewModelTest {
         val wsClient = mockk<com.fiveis.xend.network.MailComposeWebSocketClient>(relaxed = true)
         val onCloseSlot = slot<() -> Unit>()
 
-        every { wsClient.connect(any(), any(), capture(onCloseSlot)) } answers {
+        every { wsClient.connect(any(), any(), capture(onCloseSlot), any()) } answers {
             onCloseSlot.captured()
         }
 
         viewModel = MailComposeViewModel(api, wsClient)
         viewModel.enableRealtimeMode(true)
+        advanceUntilIdle()
 
         assertFalse(viewModel.ui.value.isRealtimeEnabled)
     }

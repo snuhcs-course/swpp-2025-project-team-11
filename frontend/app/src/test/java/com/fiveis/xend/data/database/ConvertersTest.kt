@@ -95,4 +95,69 @@ class ConvertersTest {
         val finalList = converters.toStringList(json)
         assertEquals(originalList, finalList)
     }
+
+    @Test
+    fun from_attachment_list_with_null_returns_empty_json_array() {
+        val result = converters.fromAttachmentList(null)
+        assertEquals("[]", result)
+    }
+
+    @Test
+    fun from_attachment_list_with_empty_list_returns_empty_json_array() {
+        val list = emptyList<com.fiveis.xend.data.model.Attachment>()
+        val result = converters.fromAttachmentList(list)
+        assertEquals("[]", result)
+    }
+
+    @Test
+    fun from_attachment_list_with_attachments_returns_correct_json() {
+        val list = listOf(
+            com.fiveis.xend.data.model.Attachment("att1", "file1.pdf", "application/pdf", 1024L),
+            com.fiveis.xend.data.model.Attachment("att2", "file2.txt", "text/plain", 512L)
+        )
+        val result = converters.fromAttachmentList(list)
+        assertTrue(result.contains("file1.pdf"))
+        assertTrue(result.contains("application/pdf"))
+    }
+
+    @Test
+    fun to_attachment_list_with_blank_string_returns_empty_list() {
+        val result = converters.toAttachmentList("")
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun to_attachment_list_with_empty_json_array_returns_empty_list() {
+        val result = converters.toAttachmentList("[]")
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun to_attachment_list_with_valid_json_returns_correct_list() {
+        val json = """[{"attachment_id":"att1","filename":"file1.pdf","mime_type":"application/pdf","size":1024}]"""
+        val result = converters.toAttachmentList(json)
+        assertEquals(1, result.size)
+        assertEquals("file1.pdf", result[0].filename)
+        assertEquals("application/pdf", result[0].mimeType)
+        assertEquals(1024L, result[0].size)
+    }
+
+    @Test
+    fun to_attachment_list_with_null_json_returns_empty_list() {
+        val result = converters.toAttachmentList("null")
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun from_attachment_list_and_to_attachment_list_roundtrip() {
+        val originalList = listOf(
+            com.fiveis.xend.data.model.Attachment("att1", "test.pdf", "application/pdf", 2048L)
+        )
+        val json = converters.fromAttachmentList(originalList)
+        val finalList = converters.toAttachmentList(json)
+        assertEquals(originalList.size, finalList.size)
+        assertEquals(originalList[0].filename, finalList[0].filename)
+        assertEquals(originalList[0].mimeType, finalList[0].mimeType)
+        assertEquals(originalList[0].size, finalList[0].size)
+    }
 }

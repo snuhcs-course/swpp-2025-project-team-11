@@ -149,4 +149,52 @@ class MailComposeSseClientTest {
         val token = mockTokenManager.getAccessToken()
         assertTrue(token == "test-token")
     }
+
+    @Test
+    fun `start with network failure invokes error callback`() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.DISCONNECT_AT_START))
+
+        var errorReceived = false
+        val payload = JSONObject()
+
+        sseClient.start(
+            payload = payload,
+            onSubject = {},
+            onBodyDelta = { _, _ -> },
+            onDone = {},
+            onError = { errorReceived = true }
+        )
+
+        delay(500)
+
+        assertTrue(errorReceived)
+    }
+
+    @Test
+    fun `stop while streaming closes connection gracefully`() = runBlocking {
+        val sseResponse = """
+            event: body.delta
+            data: {"seq":1,"text":"Test"}
+
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setBody(sseResponse).setResponseCode(200))
+
+        val payload = JSONObject()
+
+        sseClient.start(
+            payload = payload,
+            onSubject = {},
+            onBodyDelta = { _, _ -> },
+            onDone = {},
+            onError = {}
+        )
+
+        delay(100)
+        sseClient.stop()
+        delay(100)
+
+        // Should not crash
+        assertTrue(true)
+    }
 }

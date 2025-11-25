@@ -10,9 +10,11 @@ import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.RetrofitClient
 import java.io.IOException
 
-class MailSendRepository(context: Context) {
+class MailSendRepository(
+    context: Context,
+    private val mailApiService: MailApiService = RetrofitClient.getMailApiService(context.applicationContext)
+) {
     private val appContext = context.applicationContext
-    private val mailApiService: MailApiService = RetrofitClient.getMailApiService(appContext)
 
     suspend fun sendEmail(
         to: List<String>,
