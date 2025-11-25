@@ -18,6 +18,7 @@ data class ProfileUiState(
     val userEmail: String = "",
     val displayName: String = "",
     val info: String = "",
+    val languagePreference: String = "",
     val isLoading: Boolean = false,
     val isEditing: Boolean = false,
     val isSaving: Boolean = false,
@@ -29,7 +30,8 @@ data class ProfileUiState(
     val profileError: String? = null,
     val saveSuccess: Boolean = false,
     val originalDisplayName: String? = null,
-    val originalInfo: String? = null
+    val originalInfo: String? = null,
+    val originalLanguagePreference: String? = null
 )
 
 class ProfileViewModel(
@@ -61,7 +63,8 @@ class ProfileViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         displayName = result.data.displayName ?: "",
-                        info = result.data.info ?: ""
+                        info = result.data.info ?: "",
+                        languagePreference = result.data.languagePreference ?: ""
                     )
                 }
                 is ProfileResult.Failure -> {
@@ -82,13 +85,20 @@ class ProfileViewModel(
                 profileError = null,
                 saveSuccess = false,
                 originalDisplayName = current.displayName,
-                originalInfo = current.info
+                originalInfo = current.info,
+                originalLanguagePreference = current.languagePreference
             )
         } else {
             val shouldRestore = !current.saveSuccess
             val restoredDisplayName =
                 if (shouldRestore) current.originalDisplayName ?: current.displayName else current.displayName
             val restoredInfo = if (shouldRestore) current.originalInfo ?: current.info else current.info
+            val restoredLanguagePreference =
+                if (shouldRestore) {
+                    current.originalLanguagePreference ?: current.languagePreference
+                } else {
+                    current.languagePreference
+                }
 
             _uiState.value = current.copy(
                 isEditing = false,
@@ -96,8 +106,10 @@ class ProfileViewModel(
                 saveSuccess = false,
                 displayName = restoredDisplayName,
                 info = restoredInfo,
+                languagePreference = restoredLanguagePreference,
                 originalDisplayName = null,
-                originalInfo = null
+                originalInfo = null,
+                originalLanguagePreference = null
             )
         }
     }
@@ -110,23 +122,30 @@ class ProfileViewModel(
         _uiState.value = _uiState.value.copy(info = info)
     }
 
+    fun updateLanguagePreference(language: String) {
+        _uiState.value = _uiState.value.copy(languagePreference = language)
+    }
+
     fun saveProfile() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, profileError = null, saveSuccess = false)
 
-            val displayName = _uiState.value.displayName.ifBlank { null }
-            val info = _uiState.value.info.ifBlank { null }
+            val displayName = _uiState.value.displayName
+            val info = _uiState.value.info
+            val languagePreference = _uiState.value.languagePreference
 
-            when (val result = profileRepository.updateProfile(displayName, info)) {
+            when (val result = profileRepository.updateProfile(displayName, info, languagePreference)) {
                 is ProfileResult.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
                         isEditing = false,
                         displayName = result.data.displayName ?: "",
                         info = result.data.info ?: "",
+                        languagePreference = result.data.languagePreference ?: "",
                         saveSuccess = true,
                         originalDisplayName = null,
-                        originalInfo = null
+                        originalInfo = null,
+                        originalLanguagePreference = null
                     )
                 }
                 is ProfileResult.Failure -> {

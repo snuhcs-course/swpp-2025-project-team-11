@@ -32,9 +32,13 @@ class ProfileRepository(private val context: Context) {
         }
     }
 
-    suspend fun updateProfile(displayName: String?, info: String?): ProfileResult {
+    suspend fun updateProfile(displayName: String?, info: String?, languagePreference: String?): ProfileResult {
         return try {
-            val request = UpdateProfileRequest(displayName = displayName, info = info)
+            val request = UpdateProfileRequest(
+                displayName = displayName,
+                info = info,
+                languagePreference = languagePreference
+            )
             val response = apiService.patchProfile(request)
 
             if (response.isSuccessful) {
