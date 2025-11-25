@@ -158,4 +158,96 @@ class ContactBookViewModelTest {
         // Verify loading state was updated
         assertFalse(viewModel.uiState.value.isLoading)
     }
+
+    @Test
+    fun on_contact_delete_failure_sets_error() = runTest {
+        val mockGroups = listOf(Group(id = 1L, name = "Group 1"))
+
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
+        coEvery { repository.deleteContact(1L) } throws Exception("Delete failed")
+
+        viewModel = ContactBookViewModel(application, repository)
+        advanceUntilIdle()
+
+        viewModel.onContactDelete(1L)
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun on_group_delete_failure_sets_error() = runTest {
+        val mockGroups = listOf(Group(id = 1L, name = "Group 1"))
+
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
+        coEvery { repository.deleteGroup(1L) } throws Exception("Delete failed")
+
+        viewModel = ContactBookViewModel(application, repository)
+        advanceUntilIdle()
+
+        viewModel.onGroupDelete(1L)
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun refresh_all_success() = runTest {
+        val mockGroups = listOf(Group(id = 1L, name = "Group 1"))
+
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(mockGroups)
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } returns Unit
+        coEvery { repository.refreshContacts() } returns Unit
+
+        viewModel = ContactBookViewModel(application, repository)
+        advanceUntilIdle()
+
+        viewModel.refreshAll()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        coVerify(atLeast = 2) { repository.refreshGroups() }
+        coVerify(atLeast = 2) { repository.refreshContacts() }
+    }
+
+    @Test
+    fun refresh_all_failure_sets_error() = runTest {
+        every { repository.observeGroups() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        every { repository.observeContacts() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshGroups() } returns Unit andThenThrows Exception("Refresh failed")
+        coEvery { repository.refreshContacts() } returns Unit
+
+        viewModel = ContactBookViewModel(application, repository)
+        advanceUntilIdle()
+
+        viewModel.refreshAll()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun factory_creates_view_model_successfully() {
+        val factory = ContactBookViewModel.Factory(application)
+        val createdViewModel = factory.create(ContactBookViewModel::class.java)
+
+        assertNotNull(createdViewModel)
+        assertEquals(ContactBookViewModel::class.java, createdViewModel::class.java)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun factory_throws_exception_for_wrong_class() {
+        val factory = ContactBookViewModel.Factory(application)
+        factory.create(AddContactViewModel::class.java)
+    }
 }

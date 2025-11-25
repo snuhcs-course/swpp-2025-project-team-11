@@ -18,6 +18,7 @@ import com.fiveis.xend.utils.EmailUtils
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,7 +64,8 @@ class MailDetailViewModel(
     private val appContext: Context,
     private val emailDao: EmailDao,
     private val inboxRepository: InboxRepository,
-    private val messageId: String
+    private val messageId: String,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MailDetailUiState())
@@ -104,7 +106,7 @@ class MailDetailViewModel(
 
     private suspend fun fetchMailDetailFromServer() {
         try {
-            val response = withContext(Dispatchers.IO) {
+            val response = withContext(ioDispatcher) {
                 inboxRepository.getMail(messageId)
             }
             if (!response.isSuccessful) {

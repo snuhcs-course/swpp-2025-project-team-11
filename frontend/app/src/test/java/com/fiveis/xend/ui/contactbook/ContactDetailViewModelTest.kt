@@ -136,4 +136,113 @@ class ContactDetailViewModelTest {
 
         coVerify(exactly = 2) { repository.refreshContact(contactId) }
     }
+
+    @Test
+    fun refresh_contact_success_updates_state() = runTest {
+        val contactId = 1L
+        val mockContact = Contact(id = contactId, name = "John", email = "john@test.com")
+
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
+
+        viewModel = ContactDetailViewModel(application, repository)
+        viewModel.load(contactId)
+        advanceUntilIdle()
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.error)
+        coVerify(exactly = 2) { repository.refreshContact(contactId) }
+    }
+
+    @Test
+    fun refresh_contact_failure_sets_error() = runTest {
+        val contactId = 1L
+        val mockContact = Contact(id = contactId, name = "John", email = "john@test.com")
+
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit andThenThrows Exception("Network error")
+
+        viewModel = ContactDetailViewModel(application, repository)
+        viewModel.load(contactId)
+        advanceUntilIdle()
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNotNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun update_contact_success() = runTest {
+        val contactId = 1L
+        val mockContact = Contact(id = contactId, name = "John", email = "john@test.com")
+
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
+        coEvery {
+            repository.updateContact(contactId, "Jane", "jane@test.com", "sender", "recipient", "prompt", null)
+        } returns Unit
+
+        viewModel = ContactDetailViewModel(application, repository)
+        viewModel.load(contactId)
+        advanceUntilIdle()
+
+        viewModel.updateContact("Jane", "jane@test.com", "sender", "recipient", "prompt", null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isUpdating)
+        assertNull(viewModel.uiState.value.updateError)
+        coVerify { repository.updateContact(contactId, "Jane", "jane@test.com", "sender", "recipient", "prompt", null) }
+    }
+
+    @Test
+    fun update_contact_failure_sets_error() = runTest {
+        val contactId = 1L
+        val mockContact = Contact(id = contactId, name = "John", email = "john@test.com")
+
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
+        coEvery {
+            repository.updateContact(any(), any(), any(), any(), any(), any(), any())
+        } throws Exception("Update failed")
+
+        viewModel = ContactDetailViewModel(application, repository)
+        viewModel.load(contactId)
+        advanceUntilIdle()
+
+        viewModel.updateContact("Jane", "jane@test.com", null, null, null, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isUpdating)
+        assertNotNull(viewModel.uiState.value.updateError)
+    }
+
+    @Test
+    fun clear_update_error() = runTest {
+        val contactId = 1L
+        val mockContact = Contact(id = contactId, name = "John", email = "john@test.com")
+
+        every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
+        coEvery { repository.refreshContact(contactId) } returns Unit
+        coEvery {
+            repository.updateContact(any(), any(), any(), any(), any(), any(), any())
+        } throws Exception("Update failed")
+
+        viewModel = ContactDetailViewModel(application, repository)
+        viewModel.load(contactId)
+        advanceUntilIdle()
+
+        viewModel.updateContact("Jane", "jane@test.com", null, null, null, null)
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.updateError)
+
+        viewModel.clearUpdateError()
+
+        assertNull(viewModel.uiState.value.updateError)
+    }
 }
