@@ -430,39 +430,6 @@ class GmailService:
         except HttpError:
             raise
 
-    def delete_message(self, message_id: str, permanent: bool = False):
-        """
-        Delete (or trash) a message.
-
-        Args:
-            message_id: Gmail message ID
-            permanent: True면 완전 삭제(delete), False면 휴지통으로 이동(trash)
-
-        Returns:
-            dict: {"id": ..., "permanent": ...}
-
-        Raises:
-            HttpError: Gmail API error
-        """
-        try:
-            if permanent:
-                self.service.users().messages().delete(
-                    userId="me",
-                    id=message_id,
-                ).execute()
-            else:
-                self.service.users().messages().trash(
-                    userId="me",
-                    id=message_id,
-                ).execute()
-
-            return {
-                "id": message_id,
-                "permanent": permanent,
-            }
-        except HttpError:
-            raise
-
 
 @google_token_required
 def list_emails_logic(access_token, max_results, page_token, label_ids, q=None):
@@ -576,9 +543,3 @@ def mark_read_logic(access_token, message_id, is_read):
 def get_attachment_logic(access_token, message_id: str, attachment_id: str, filename: str, mime_type: str):
     gmail_service = GmailService(access_token)
     return gmail_service.get_attachment(message_id, attachment_id, filename, mime_type)
-
-
-@google_token_required
-def delete_email_logic(access_token, message_id: str, permanent: bool = False):
-    gmail_service = GmailService(access_token)
-    return gmail_service.delete_message(message_id, permanent=permanent)
