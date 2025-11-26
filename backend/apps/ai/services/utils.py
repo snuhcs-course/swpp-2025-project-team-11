@@ -12,7 +12,7 @@ from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFP
 
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.contact.models import Contact, PromptOption
-from apps.mail.models import SentMail
+from apps.mail.models import AttachmentAnalysis, SentMail
 from apps.user.models import UserProfile
 
 
@@ -226,7 +226,7 @@ def _fetch_analysis_for_group(user, group) -> dict | None:
 DEFAULT_LANGUAGE = "user's original language"
 
 
-def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
+def build_prompt_inputs(ctx: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
     def _clean(s: Any) -> str | None:
         if not isinstance(s, str):
             return None
@@ -243,7 +243,7 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
 
     prompt_text = "\n".join(prompt_lines).strip() or None
 
-    return {
+    base = {
         "recipients": ctx.get("recipients"),
         "group_name": _clean(ctx.get("group_name")),
         "group_description": _clean(ctx.get("group_description")),
@@ -255,6 +255,11 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
         "fewshots": ctx.get("fewshots"),
         "profile": ctx.get("profile"),
     }
+
+    if extra:
+        base.update(extra)
+
+    return base
 
 
 def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
@@ -331,3 +336,30 @@ def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
 
 def hash_bytes(data: bytes) -> str:
     return hashlib.sha1(data).hexdigest()
+
+
+def build_attachment_context_from_qs(qs) -> list[dict]:
+    items = []
+    for obj in qs:
+        items.append(
+            {
+                "filename": obj.filename,
+                "mime_type": obj.mime_type,
+                "summary": obj.summary,
+                "insights": obj.insights,
+                "mail_guide": obj.mail_guide,
+            }
+        )
+    return items
+
+
+def get_attachments_for_message(user, message_id: str) -> list[dict]:
+    qs = AttachmentAnalysis.objects.filter(user=user, message_id=message_id).order_by("-created_at")
+    return build_attachment_context_from_qs(qs)
+
+
+def get_attachments_for_content_keys(user, content_keys: list[str]) -> list[dict]:
+    if not content_keys:
+        return []
+    qs = AttachmentAnalysis.objects.filter(user=user, content_key__in=content_keys).order_by("-created_at")
+    return build_attachment_context_from_qs(qs)

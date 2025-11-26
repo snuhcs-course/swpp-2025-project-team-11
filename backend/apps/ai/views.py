@@ -27,10 +27,10 @@ from .services.mail_generation import (
     stream_mail_generation,
     stream_mail_generation_test,
     stream_mail_generation_with_plan,
-    stream_mail_generation_with_timestamp,
 )
 from .services.prompt_preview import generate_prompt_preview
 from .services.reply import stream_reply_options_llm
+from .services.utils import get_attachments_for_content_keys, get_attachments_for_message
 
 
 class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
@@ -122,93 +122,18 @@ class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        attachment_keys = data.get("attachment_content_keys") or []
+        attachments = get_attachments_for_content_keys(request.user, attachment_keys)
+
         gen = stream_mail_generation(
             user=request.user,
             subject=data.get("subject"),
             body=data.get("body"),
             to_emails=data.get("to_emails"),
+            attachments=attachments,
         )
 
         resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
-        resp["Cache-Control"] = "no-cache"
-        resp["X-Accel-Buffering"] = "no"
-        return resp
-
-
-class MailGenerateStreamWithTimestampView(AuthRequiredMixin, generics.GenericAPIView):
-    serializer_class = MailGenerateRequest
-    renderer_classes = [SSERenderer]
-
-    @extend_schema(
-        operation_id="mail_generate_stream_with_timestamp",
-        summary="Generate mail via streaming (SSE) with timing info",
-        description=(
-            "메일을 **SSE**(text/event-stream)로 스트리밍하며, "
-            "각 이벤트에 서버 타임스탬프와 경과 시간을 포함하는 디버깅용 엔드포인트입니다.\n\n"
-            "- `ready`: `{ ts, server_ts, elapsed_ms }`\n"
-            "- `subject`: `{ title, text, server_ts, elapsed_ms }`\n"
-            "- `body.delta`: `{ seq, text, server_ts, elapsed_ms, delta_ms }`\n"
-            "  - `server_ts`: 서버에서 이벤트를 전송한 시각(Epoch ms)\n"
-            "  - `elapsed_ms`: 스트림 시작 이후 서버 기준 경과 시간(ms)\n"
-            "  - `delta_ms`: 이전 `body.delta` 이벤트와의 서버 기준 간격(ms, 첫 chunk에는 없음)\n"
-            "- `error`, `done` 도 동일하게 `server_ts`, `elapsed_ms` 포함"
-        ),
-        request=MailGenerateRequest,
-        responses={
-            200: (OpenApiTypes.STR, "text/event-stream"),
-        },
-        examples=[
-            OpenApiExample(
-                "SSE success stream with timestamp",
-                response_only=True,
-                value=(
-                    # Ready
-                    "event: ready\n"
-                    'data: {"ts":1731234567890, "server_ts":1731234567890, "elapsed_ms":0}\n'
-                    "retry: 5000\n"
-                    "\n"
-                    # Subject
-                    "event: subject\n"
-                    "id: 0\n"
-                    'data: {"title":"Interview Result for Five I\\u0027s",'
-                    ' "text":"Interview Result for Five I\\u0027s\\n\\n",'
-                    ' "server_ts":1731234568890, "elapsed_ms":1000}\n'
-                    "\n"
-                    # Body delta with timing
-                    "event: body.delta\n"
-                    "id: 1\n"
-                    'data: {"seq":0, "text":"Hello, and thank you for applying to Five I\\u0027s. ",'
-                    ' "server_ts":1731234569890, "elapsed_ms":2000, "delta_ms":1000}\n'
-                    "\n"
-                    "event: body.delta\n"
-                    "id: 2\n"
-                    'data: {"seq":1, "text":"After careful consideration, we ... ",'
-                    ' "server_ts":1731234570890, "elapsed_ms":3000, "delta_ms":1000}\n'
-                    "\n"
-                    "event: done\n"
-                    "id: 3\n"
-                    'data: {"reason":"stop", "server_ts":1731234571890, "elapsed_ms":4000}\n'
-                    "\n"
-                ),
-            ),
-        ],
-    )
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        gen = stream_mail_generation_with_timestamp(
-            user=request.user,
-            subject=data.get("subject"),
-            body=data.get("body"),
-            to_emails=data.get("to_emails"),
-        )
-
-        resp = StreamingHttpResponse(
-            gen,
-            content_type="text/event-stream; charset=utf-8",
-        )
         resp["Cache-Control"] = "no-cache"
         resp["X-Accel-Buffering"] = "no"
         return resp
@@ -322,11 +247,15 @@ class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        attachment_keys = data.get("attachment_content_keys") or []
+        attachments = get_attachments_for_content_keys(request.user, attachment_keys)
+
         gen = stream_mail_generation_with_plan(
             user=request.user,
             subject=data.get("subject"),
             body=data.get("body"),
             to_emails=data.get("to_emails"),
+            attachments=attachments,
         )
 
         resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
@@ -400,12 +329,16 @@ class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        message_id = data.get("message_id") or ""
+        attachments = get_attachments_for_message(request.user, message_id) if message_id else []
+
         resp = StreamingHttpResponse(
             stream_reply_options_llm(
                 user=request.user,
                 subject=data.get("subject"),
                 body=data.get("body"),
                 to_email=data.get("to_email"),
+                attachments=attachments,
             ),
             content_type="text/event-stream; charset=utf-8",
         )
@@ -499,6 +432,7 @@ class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
                             "summary": "회의록 요약: 주요 의사결정은 API 런칭 일정 연기.",
                             "insights": "성능 이슈로 캐시 도입 필요. QA 일정 재조정.",
                             "mail_guide": "PM에게 일정 변경 공지 및 대안(캐시 전략) 제안 메일.",
+                            "content_key": "메일 생성 시 필요한 키",
                         },
                     )
                 ],

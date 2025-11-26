@@ -79,6 +79,7 @@ def analyze_uploaded_file(user, file_obj):
             "summary": cached.summary,
             "insights": cached.insights,
             "mail_guide": cached.mail_guide,
+            "content_key": content_key,
         }
 
     text = extract_text_from_bytes(data, mime_type, filename)
@@ -103,4 +104,6 @@ def analyze_uploaded_file(user, file_obj):
     except Exception:
         pass
 
-    return result.model_dump()
+    result = result.model_dump()
+    result["content_key"] = content_key
+    return result

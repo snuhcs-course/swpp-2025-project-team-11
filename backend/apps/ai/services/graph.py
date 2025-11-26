@@ -12,8 +12,14 @@ State = dict[str, Any]
 def build_context_node(state: State) -> State:
     user = state["user"]
     to_emails = state["to_emails"]
+    attachments = state.get("attachments")
     ctx = collect_prompt_context(user, to_emails)
-    raw_inputs = build_prompt_inputs(ctx)
+    raw_inputs = build_prompt_inputs(
+        ctx,
+        extra={
+            "attachments": attachments or [],
+        },
+    )
     state["raw_inputs"] = raw_inputs
     return state
 
