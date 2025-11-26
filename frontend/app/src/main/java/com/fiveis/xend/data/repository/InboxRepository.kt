@@ -183,6 +183,30 @@ class InboxRepository(
         }
     }
 
+    suspend fun deleteEmail(emailId: String, permanent: Boolean = false) {
+        try {
+            val response = mailApiService.deleteEmail(
+                messageId = emailId,
+                permanent = permanent
+            )
+
+            if (!response.isSuccessful) {
+                val errorBody = response.errorBody()?.string()
+                Log.e(
+                    "InboxRepository",
+                    "Failed to delete email (code=${response.code()} body=$errorBody)"
+                )
+                throw Exception("Failed to delete email: ${response.code()}")
+            }
+
+            emailDao.deleteEmail(emailId)
+            Log.d("InboxRepository", "Successfully deleted email: $emailId (permanent=$permanent)")
+        } catch (e: Exception) {
+            Log.e("InboxRepository", "Error deleting email $emailId", e)
+            throw e
+        }
+    }
+
     suspend fun saveEmailsToCache(emails: List<EmailItem>) {
         Log.d("InboxRepository", "saveEmailsToCache: saving ${emails.size} emails")
         emailDao.insertEmails(emails.withParsedTimestamps())

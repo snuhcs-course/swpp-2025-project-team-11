@@ -33,7 +33,10 @@ data class InboxUiState(
     // 이메일 주소를 key로 하는 연락처 맵 (이름 표시용)
     val contactsByEmail: Map<String, String> = emptyMap(),
     // 임시 저장 성공 배너 표시 여부
-    val showDraftSavedBanner: Boolean = false
+    val showDraftSavedBanner: Boolean = false,
+    // 메일 삭제 관련
+    val deletingEmailId: String? = null,
+    val deleteError: String? = null
 )
 
 /**
@@ -139,7 +142,17 @@ class InboxViewModel(
         viewModelScope.launch {
             repository.getCachedEmails().collect { cachedEmails ->
                 Log.d("InboxViewModel", "Received ${cachedEmails.size} cached emails from DB")
-                _uiState.update { it.copy(emails = cachedEmails) }
+                _uiState.update { currentState ->
+                    val deletingId = currentState.deletingEmailId
+                    val shouldClearDeletingId = deletingId?.let { id ->
+                        cachedEmails.none { it.id == id }
+                    } ?: false
+
+                    currentState.copy(
+                        emails = cachedEmails,
+                        deletingEmailId = if (shouldClearDeletingId) null else deletingId
+                    )
+                }
             }
         }
     }
@@ -395,5 +408,35 @@ class InboxViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * 이메일 삭제 (휴지통으로 이동)
+     */
+    fun deleteEmail(emailId: String, permanent: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(deletingEmailId = emailId, deleteError = null) }
+            try {
+                Log.d("InboxViewModel", "Deleting email: $emailId (permanent=$permanent)")
+                repository.deleteEmail(emailId, permanent)
+                Log.d("InboxViewModel", "Email deleted successfully: $emailId")
+                _uiState.update { it.copy(deleteError = null) }
+            } catch (e: Exception) {
+                Log.e("InboxViewModel", "Failed to delete email: $emailId", e)
+                _uiState.update {
+                    it.copy(
+                        deletingEmailId = null,
+                        deleteError = e.message ?: "메일 삭제 실패"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 삭제 에러 메시지 초기화
+     */
+    fun clearDeleteError() {
+        _uiState.update { it.copy(deleteError = null) }
     }
 }

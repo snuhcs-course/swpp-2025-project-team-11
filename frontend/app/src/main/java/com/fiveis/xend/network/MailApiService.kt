@@ -11,6 +11,7 @@ import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
@@ -51,4 +52,10 @@ interface MailApiService {
         @Path("message_id") messageId: String,
         @Body request: ReadStatusUpdateRequest
     ): Response<ReadStatusUpdateResponse>
+
+    @DELETE("api/mail/emails/{message_id}/")
+    suspend fun deleteEmail(
+        @Path("message_id") messageId: String,
+        @Query("permanent") permanent: Boolean = false
+    ): Response<Unit>
 }

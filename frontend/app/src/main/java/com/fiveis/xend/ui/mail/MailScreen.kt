@@ -90,6 +90,7 @@ fun MailScreen(
     onDismissSuccessBanner: () -> Unit = {},
     showDraftSavedBanner: Boolean,
     onDismissDraftSavedBanner: () -> Unit,
+    onInboxDeleteEmail: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(MailTab.INBOX) }
@@ -278,7 +279,9 @@ fun MailScreen(
                         },
                         contactEmails = inboxUiState.contactEmails,
                         contactsByEmail = inboxUiState.contactsByEmail,
-                        listState = inboxListState
+                        listState = inboxListState,
+                        onDeleteEmail = onInboxDeleteEmail,
+                        deletingEmailId = inboxUiState.deletingEmailId
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
