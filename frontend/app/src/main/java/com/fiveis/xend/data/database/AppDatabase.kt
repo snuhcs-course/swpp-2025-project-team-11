@@ -11,6 +11,7 @@ import com.fiveis.xend.data.database.entity.ContactContextEntity
 import com.fiveis.xend.data.database.entity.ContactEntity
 import com.fiveis.xend.data.database.entity.GroupEntity
 import com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef
+import com.fiveis.xend.data.database.entity.ProfileEntity
 import com.fiveis.xend.data.database.entity.PromptOptionEntity
 import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.EmailItem
@@ -30,9 +31,10 @@ import com.fiveis.xend.data.model.EmailItem
         ContactEntity::class,
         ContactContextEntity::class,
         PromptOptionEntity::class,
-        GroupPromptOptionCrossRef::class
+        GroupPromptOptionCrossRef::class,
+        ProfileEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -41,6 +43,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun groupDao(): GroupDao
     abstract fun contactDao(): ContactDao
     abstract fun promptOptionDao(): PromptOptionDao
+    abstract fun profileDao(): ProfileDao
 
     companion object {
         @Volatile
@@ -198,6 +201,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from v6 to v7:
+         * - Create profile table for caching profile data
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `profile` (
+                        `id` INTEGER NOT NULL,
+                        `displayName` TEXT,
+                        `info` TEXT,
+                        `languagePreference` TEXT,
+                        PRIMARY KEY(`id`)
+                    )"""
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 val newInstance = Room.databaseBuilder(
@@ -205,7 +226,14 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "xend_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
+                    )
                     .fallbackToDestructiveMigration() // Add this line
                     .build()
                 instance = newInstance

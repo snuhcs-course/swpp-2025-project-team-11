@@ -3,10 +3,12 @@ package com.fiveis.xend.data.database
 import com.fiveis.xend.data.database.entity.ContactContextEntity
 import com.fiveis.xend.data.database.entity.ContactEntity
 import com.fiveis.xend.data.database.entity.GroupEntity
+import com.fiveis.xend.data.database.entity.ProfileEntity
 import com.fiveis.xend.data.database.entity.PromptOptionEntity
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.ContactContext
 import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.data.model.ProfileData
 import com.fiveis.xend.data.model.PromptOption
 
 /**
@@ -122,4 +124,17 @@ fun PromptOption.asEntity(): PromptOptionEntity = PromptOptionEntity(
     prompt = prompt,
     createdAt = createdAt,
     updatedAt = updatedAt
+)
+
+fun ProfileEntity.asDomain(): ProfileData = ProfileData(
+    displayName = displayName,
+    info = info,
+    languagePreference = languagePreference
+)
+
+fun ProfileData.asEntity(): ProfileEntity = ProfileEntity(
+    id = 0,
+    displayName = displayName,
+    info = info,
+    languagePreference = languagePreference
 )

@@ -2,14 +2,26 @@ package com.fiveis.xend.data.repository
 
 import android.content.Context
 import android.util.Log
+import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.database.asDomain
+import com.fiveis.xend.data.database.asEntity
 import com.fiveis.xend.data.model.ProfileData
 import com.fiveis.xend.data.model.UpdateProfileRequest
 import com.fiveis.xend.network.ProfileApiService
 import com.fiveis.xend.network.RetrofitClient
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class ProfileRepository(private val context: Context) {
 
     private val apiService: ProfileApiService = RetrofitClient.getProfileApiService(context)
+    private val profileDao = AppDatabase.getDatabase(context).profileDao()
+
+    fun observeProfile(): Flow<ProfileData?> {
+        return profileDao.observeProfile().map { entity ->
+            entity?.asDomain()
+        }
+    }
 
     suspend fun getProfile(): ProfileResult {
         return try {
@@ -18,6 +30,7 @@ class ProfileRepository(private val context: Context) {
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
+                    profileDao.upsert(body.asEntity())
                     ProfileResult.Success(body)
                 } else {
                     ProfileResult.Failure("프로필 정보가 없습니다")
@@ -44,6 +57,7 @@ class ProfileRepository(private val context: Context) {
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
+                    profileDao.upsert(body.asEntity())
                     ProfileResult.Success(body)
                 } else {
                     ProfileResult.Failure("프로필 업데이트 응답이 없습니다")

@@ -12,6 +12,7 @@ import com.fiveis.xend.data.source.TokenManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class ProfileUiState(
@@ -46,12 +47,28 @@ class ProfileViewModel(
 
     init {
         loadUserInfo()
+        observeProfile()
         loadProfile()
     }
 
     private fun loadUserInfo() {
         val email = tokenManager.getUserEmail() ?: ""
         _uiState.value = _uiState.value.copy(userEmail = email)
+    }
+
+    private fun observeProfile() {
+        viewModelScope.launch {
+            profileRepository.observeProfile().collectLatest { profile ->
+                profile?.let {
+                    _uiState.value = _uiState.value.copy(
+                        displayName = it.displayName.orEmpty(),
+                        info = it.info.orEmpty(),
+                        languagePreference = it.languagePreference.orEmpty(),
+                        isLoading = false
+                    )
+                }
+            }
+        }
     }
 
     fun loadProfile() {
@@ -61,10 +78,7 @@ class ProfileViewModel(
             when (val result = profileRepository.getProfile()) {
                 is ProfileResult.Success -> {
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        displayName = result.data.displayName ?: "",
-                        info = result.data.info ?: "",
-                        languagePreference = result.data.languagePreference ?: ""
+                        isLoading = false
                     )
                 }
                 is ProfileResult.Failure -> {
