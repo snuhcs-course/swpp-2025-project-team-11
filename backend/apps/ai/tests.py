@@ -1,7 +1,7 @@
 import json
 import re
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
@@ -12,9 +12,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.ai.services import pii_masker as pm
+from apps.ai.services.attachment_analysis import analyze_gmail_attachment, analyze_uploaded_file
 from apps.ai.services.mail_generation import (
+    debug_mail_generation_analysis,
     stream_mail_generation,
     stream_mail_generation_test,
+    stream_mail_generation_with_plan,
+    stream_mail_generation_with_timestamp,
 )
 from apps.ai.services.utils import (
     _fetch_analysis_for_group,
@@ -426,6 +430,149 @@ class StreamMailGenerationTestCase(TestCase):
         self.assertIn("event: ready", order[0])
         self.assertIn("event: subject", order[1])
         self.assertIn("event: done", order[-1])
+
+
+class TestStreamMailGenerationWithTimestamp(unittest.IsolatedAsyncioTestCase):
+
+    @patch("apps.ai.services.mail_generation.sse_event")
+    @patch("apps.ai.services.mail_generation.heartbeat")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="REQ_TS")
+    @patch("apps.ai.services.mail_generation.build_prompt_inputs")
+    @patch("apps.ai.services.mail_generation.collect_prompt_context")
+    async def test_stream_mail_generation_with_timestamp(
+        self,
+        mock_collect,
+        mock_build_inputs,
+        mock_req_id,
+        MockMasker,
+        mock_subject_chain,
+        mock_body_chain,
+        mock_unmask,
+        mock_heartbeat,
+        mock_sse,
+    ):
+        mock_collect.return_value = {"user": "u"}
+        mock_build_inputs.return_value = {"language": "ko", "recipients": ["a@a.com"]}
+        masker_instance = MockMasker.return_value
+        masker_instance.mask_inputs.return_value = ({"body": "MASKED_BODY"}, {"a": "b"})
+        mock_subject_chain.invoke.return_value = "MASKED_TITLE"
+        mock_body_chain.stream.return_value = iter(["BODY1", "BODY2"])
+        mock_unmask.side_effect = lambda x, *_: x
+        mock_sse.side_effect = lambda evt, data, eid=None, retry_ms=None: f"SSE:{evt}"
+
+        gen = stream_mail_generation_with_timestamp(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
+        )
+
+        result = []
+        async for ev in gen:
+            result.append(ev)
+
+        self.assertIn("SSE:ready", result[0])
+        self.assertIn("SSE:subject", result[1])
+        self.assertIn("SSE:body.delta", result[2])
+        self.assertIn("SSE:body.delta", result[3])
+        self.assertIn("SSE:done", result[-1])
+
+
+class TestStreamMailGenerationWithPlan(unittest.IsolatedAsyncioTestCase):
+
+    @patch("apps.ai.services.mail_generation.sse_event")
+    @patch("apps.ai.services.mail_generation.heartbeat")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.plan_chain")
+    @patch("apps.ai.services.mail_generation.validator_chain")
+    @patch("apps.ai.services.mail_generation.mail_graph")
+    async def test_stream_mail_generation_with_plan(
+        self,
+        mock_graph,
+        mock_validator,
+        mock_plan_chain,
+        mock_body_chain,
+        mock_unmask,
+        mock_heartbeat,
+        mock_sse,
+    ):
+        mock_graph.invoke.return_value = {
+            "req_id": "REQ_PLAN",
+            "mask_mapping": {"a": "b"},
+            "masked_inputs": {"body": "MASKED_BODY"},
+            "body_inputs": {"body": "MASKED_BODY"},
+            "locked_title": "MASKED_TITLE",
+        }
+        mock_plan_chain.stream.return_value = iter(["PLAN1", "PLAN2"])
+        mock_body_chain.stream.return_value = iter(["BODY1", "BODY2"])
+        mock_unmask.side_effect = lambda x, *_: x
+        mock_validator.invoke.return_value = MagicMock(passed=True)
+        mock_sse.side_effect = lambda evt, data, eid=None, retry_ms=None: f"SSE:{evt}"
+
+        gen = stream_mail_generation_with_plan(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
+        )
+
+        result = []
+        async for ev in gen:
+            result.append(ev)
+
+        self.assertIn("SSE:ready", result[0])
+        self.assertIn("SSE:plan.start", result[1])
+        self.assertIn("SSE:plan.delta", result[2])
+        self.assertIn("SSE:plan.done", [r for r in result if "SSE:plan.done" in r][0])
+        self.assertIn("SSE:subject", [r for r in result if "SSE:subject" in r][0])
+        self.assertIn("SSE:body.start", [r for r in result if "SSE:body.start" in r][0])
+        self.assertIn("SSE:body.delta", [r for r in result if "SSE:body.delta" in r][0])
+        self.assertIn("SSE:done", result[-1])
+
+
+class TestDebugMailGenerationAnalysis(unittest.TestCase):
+
+    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="REQ_DBG")
+    @patch("apps.ai.services.mail_generation.build_prompt_inputs")
+    @patch("apps.ai.services.mail_generation.collect_prompt_context")
+    def test_debug_mail_generation_analysis(
+        self,
+        mock_collect,
+        mock_build_inputs,
+        mock_req_id,
+        MockMasker,
+        mock_body_chain,
+        mock_subject_chain,
+    ):
+        mock_collect.return_value = {"analysis": "ANALYSIS", "fewshots": "FEWSHOTS"}
+        mock_build_inputs.return_value = {"language": "ko", "recipients": ["a@a.com"]}
+        masker_instance = MockMasker.return_value
+        masker_instance.mask_inputs.return_value = ({"body": "MASKED_BODY"}, {"a": "b"})
+        mock_subject_chain.invoke.return_value = "MASKED_TITLE"
+        mock_body_chain.invoke.return_value = "BODY_CONTENT"
+
+        result = debug_mail_generation_analysis(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
+        )
+
+        self.assertIn("analysis", result)
+        self.assertIn("fewshots", result)
+        self.assertIn("without_analysis", result)
+        self.assertIn("with_analysis", result)
+        self.assertIn("with_fewshots", result)
+        self.assertEqual(result["without_analysis"]["subject"], "MASKED_TITLE")
+        self.assertEqual(result["without_analysis"]["body"], "BODY_CONTENT")
 
 
 class PiiMaskerAndUnmaskTest(SimpleTestCase):
@@ -1598,3 +1745,88 @@ class CollectPromptContextTest(TestCase):
         self.assertIsNone(out["language"])
         # anlaysis 기본 None
         self.assertEqual(out["analysis"], None)
+
+
+class TestAttachmentAnalysis(TestCase):
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_attachment")
+    @patch("apps.ai.services.attachment_analysis.get_attachment_logic")
+    @patch("apps.ai.services.attachment_analysis.extract_text_from_bytes")
+    @patch("apps.ai.services.attachment_analysis.attachment_analysis_chain")
+    def test_analyze_gmail_attachment_new(self, mock_chain, mock_extract, mock_get_attachment, mock_cached):
+        mock_cached.return_value = None
+        mock_get_attachment.return_value = {"data": b"dummy data", "filename": "test.txt", "mime_type": "text/plain"}
+        mock_extract.return_value = "extracted text"
+        mock_result = MagicMock()
+        mock_result.summary = "summary"
+        mock_result.insights = "insights"
+        mock_result.mail_guide = "guide"
+        mock_result.model_dump.return_value = {"summary": "summary", "insights": "insights", "mail_guide": "guide"}
+        mock_chain.invoke.return_value = mock_result
+
+        user_id = 1
+        result = analyze_gmail_attachment(user_id, "msg1", "att1", "test.txt", "text/plain")
+
+        self.assertEqual(result["summary"], "summary")
+        self.assertEqual(result["insights"], "insights")
+        self.assertEqual(result["mail_guide"], "guide")
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_attachment")
+    def test_analyze_gmail_attachment_cached(self, mock_cached):
+        mock_cached.return_value = MagicMock(summary="cached_summary", insights="cached_insights", mail_guide="cached_guide")
+
+        user_id = 1
+        result = analyze_gmail_attachment(user_id, "msg1", "att1", "test.txt", "text/plain")
+
+        self.assertEqual(result["summary"], "cached_summary")
+        self.assertEqual(result["insights"], "cached_insights")
+        self.assertEqual(result["mail_guide"], "cached_guide")
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_content_key")
+    @patch("apps.ai.services.attachment_analysis.extract_text_from_bytes")
+    @patch("apps.ai.services.attachment_analysis.attachment_analysis_chain")
+    def test_analyze_uploaded_file_new(self, mock_chain, mock_extract, mock_cached):
+        mock_cached.return_value = None
+        mock_extract.return_value = "extracted text"
+        mock_result = MagicMock()
+        mock_result.summary = "summary"
+        mock_result.insights = "insights"
+        mock_result.mail_guide = "guide"
+        mock_result.model_dump.return_value = {"summary": "summary", "insights": "insights", "mail_guide": "guide"}
+        mock_chain.invoke.return_value = mock_result
+
+        class DummyFile:
+            name = "upload.txt"
+
+            def read(self):
+                return b"dummy data"
+
+            content_type = "text/plain"
+
+        user_id = 1
+        file_obj = DummyFile()
+        result = analyze_uploaded_file(user_id, file_obj)
+
+        self.assertEqual(result["summary"], "summary")
+        self.assertEqual(result["insights"], "insights")
+        self.assertEqual(result["mail_guide"], "guide")
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_content_key")
+    def test_analyze_uploaded_file_cached(self, mock_cached):
+        mock_cached.return_value = MagicMock(summary="cached_summary", insights="cached_insights", mail_guide="cached_guide")
+
+        class DummyFile:
+            name = "upload.txt"
+
+            def read(self):
+                return b"dummy data"
+
+            content_type = "text/plain"
+
+        user_id = 1
+        file_obj = DummyFile()
+        result = analyze_uploaded_file(user_id, file_obj)
+
+        self.assertEqual(result["summary"], "cached_summary")
+        self.assertEqual(result["insights"], "cached_insights")
+        self.assertEqual(result["mail_guide"], "cached_guide")
