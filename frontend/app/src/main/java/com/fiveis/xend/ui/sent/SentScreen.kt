@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.sent
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -28,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -71,12 +71,6 @@ import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.utils.EmailUtils
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
 import kotlin.math.absoluteValue
 
 @Composable
@@ -98,6 +92,7 @@ fun SentScreen(
     var previousIndex by remember { mutableStateOf(0) }
     var previousScrollOffset by remember { mutableStateOf(0) }
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
+    var accumulatedDelta by remember { mutableStateOf(0f) }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -105,15 +100,18 @@ fun SentScreen(
         }.collect { (currentIndex, currentOffset) ->
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
+                accumulatedDelta = 0f
             } else {
-                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue.toFloat()
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
-                if (offsetDelta > scrollThresholdPx) {
+                accumulatedDelta += offsetDelta
+                if (accumulatedDelta > scrollThresholdPx) {
                     showBottomBar = !isScrollingDown
+                    accumulatedDelta = 0f
                 }
             }
             previousIndex = currentIndex
@@ -335,22 +333,11 @@ private fun EmailList(
                     false
                 } else {
                     // Trigger when last visible item is within 3 items from the end
-                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
-                    if (shouldLoad) {
-                        Log.d("SentScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
-                    }
-                    shouldLoad
+                    lastVisibleItem.index >= totalItems - 4
                 }
             }.collect { shouldLoadMore ->
-                Log.d(
-                    "SentScreen",
-                    "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
-                )
                 if (shouldLoadMore && !isLoadingMore) {
-                    Log.d("SentScreen", "Triggering loadMore")
                     onLoadMore()
-                } else {
-                    Log.d("SentScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }
@@ -370,10 +357,9 @@ fun EmailListContent(
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
     onScrollStopped: () -> Unit = {},
-    contactsByEmail: Map<String, String> = emptyMap()
+    contactsByEmail: Map<String, String> = emptyMap(),
+    listState: LazyListState = rememberLazyListState()
 ) {
-    val listState = rememberLazyListState()
-
     // 스크롤 멈춤 감지
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -417,6 +403,12 @@ fun EmailListContent(
 
 @Composable
 private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onClick: () -> Unit) {
+    val recipientDisplay = remember(item.toEmail, contactsByEmail) {
+        formatRecipientDisplay(item.toEmail, contactsByEmail)
+    }
+    val formattedDate = remember(item.displayDate, item.dateTimestamp, item.date) {
+        item.displayDate.ifBlank { EmailUtils.formatDisplayDate(item.dateTimestamp, item.date) }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -426,7 +418,7 @@ private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onCl
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .semantics { contentDescription = "메일 항목: ${item.subject}" },
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -437,18 +429,23 @@ private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onCl
                         .size(6.dp)
                         .background(Color(0xFFEA4335), CircleShape)
                 )
+            } else {
+                Spacer(
+                    modifier = Modifier
+                        .padding(top = 3.dp, end = 8.dp)
+                        .size(6.dp)
+                )
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val recipientDisplay = formatRecipientDisplay(item.toEmail, contactsByEmail)
                     Text(
                         text = "To: $recipientDisplay",
                         color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
@@ -460,9 +457,8 @@ private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onCl
                     )
 
                     Spacer(Modifier.width(8.dp))
-// 날짜 포매팅 해야함
                     Text(
-                        text = formatDisplayDate(item.date),
+                        text = formattedDate,
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -591,31 +587,4 @@ private fun formatRecipientDisplay(rawToField: String, contactsByEmail: Map<Stri
     val fallbackName = extractDisplayName(primaryRaw)
     val primary = contactName ?: fallbackName
     return if (recipients.size > 1) "$primary 외 ${recipients.size - 1}명" else primary
-}
-
-private fun formatDisplayDate(isoDate: String): String {
-    return try {
-        val parsedDateTime = OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(ZoneId.systemDefault())
-
-        val today = LocalDate.now(ZoneId.systemDefault())
-        val emailDate = parsedDateTime.toLocalDate()
-
-        when {
-            emailDate.isEqual(today) -> {
-                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-            emailDate.year == today.year -> {
-                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
-                formatter.format(parsedDateTime)
-            }
-            else -> {
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-        }
-    } catch (e: Exception) {
-        isoDate
-    }
 }

@@ -99,7 +99,10 @@ class MailActivity : ComponentActivity() {
                     onBottomNavChange = {
                         when (it) {
                             "contacts" -> {
-                                startActivity(Intent(this, ContactBookActivity::class.java))
+                                val intent = Intent(this, ContactBookActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                                }
+                                startActivity(intent)
                                 overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                             }
                         }
@@ -108,7 +111,8 @@ class MailActivity : ComponentActivity() {
                         inboxViewModel.dismissSuccessBanner()
                     },
                     showDraftSavedBanner = inboxViewModel.uiState.value.showDraftSavedBanner,
-                    onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner
+                    onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner,
+                    onInboxDeleteEmail = inboxViewModel::deleteEmail
                 )
 
                 if (inboxUiState.showAddContactDialog) {

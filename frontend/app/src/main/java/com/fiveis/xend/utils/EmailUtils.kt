@@ -2,6 +2,12 @@ package com.fiveis.xend.utils
 
 import android.util.Log
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 /**
@@ -61,6 +67,11 @@ object EmailUtils {
         return 0L
     }
 
+    private val todayTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+    private val sameYearFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
+    private val defaultDateFormatter: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
+    private val systemZone: ZoneId = ZoneId.systemDefault()
+
     /**
      * "이름 <email@example.com>" 또는 "<email@example.com>" 형식에서 이메일만 추출
      *
@@ -96,5 +107,24 @@ object EmailUtils {
         val name = matchResult?.groupValues?.get(1)?.trim()
             ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
         return name.trim('"', '\'')
+    }
+
+    fun formatDisplayDate(timestamp: Long, isoDate: String): String {
+        return try {
+            val zonedDateTime = when {
+                timestamp > 0 -> Instant.ofEpochMilli(timestamp).atZone(systemZone)
+                isoDate.isNotBlank() -> OffsetDateTime.parse(isoDate).atZoneSameInstant(systemZone)
+                else -> return ""
+            }
+            val today = LocalDate.now(systemZone)
+            val emailDate = zonedDateTime.toLocalDate()
+            when {
+                emailDate.isEqual(today) -> todayTimeFormatter.format(zonedDateTime)
+                emailDate.year == today.year -> sameYearFormatter.format(zonedDateTime)
+                else -> defaultDateFormatter.format(zonedDateTime)
+            }
+        } catch (e: Exception) {
+            isoDate.substringBefore("T")
+        }
     }
 }

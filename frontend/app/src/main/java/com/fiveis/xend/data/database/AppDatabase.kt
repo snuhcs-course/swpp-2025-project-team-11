@@ -22,6 +22,8 @@ import com.fiveis.xend.data.model.EmailItem
  * v3 -> v4: drafts 테이블 추가
  * v4 -> v5: groups 테이블에 emoji 필드 추가, EmailItem에 toEmail/attachments 컬럼 추가
  * v5 -> v6: emails 테이블에 dateTimestamp 필드 추가 (정렬용 epoch timestamp)
+ * v6 -> v7: emails 테이블에 displayDate/displaySenderName 필드 추가 (UI 최적화)
+ * v7 -> v8: profile 테이블 추가 (프로필 캐시)
  */
 @Database(
     entities = [
@@ -34,7 +36,7 @@ import com.fiveis.xend.data.model.EmailItem
         GroupPromptOptionCrossRef::class,
         ProfileEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -203,9 +205,24 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * Migration from v6 to v7:
-         * - Create profile table for caching profile data
+         * - Add displayDate and displaySenderName columns for cached UI strings
          */
         private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN displayDate TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN displaySenderName TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
+        /**
+         * Migration from v7 to v8:
+         * - Create profile table for caching profile data
+         */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     """CREATE TABLE IF NOT EXISTS `profile` (
@@ -232,7 +249,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8
                     )
                     .fallbackToDestructiveMigration() // Add this line
                     .build()
