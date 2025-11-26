@@ -94,7 +94,10 @@ class ContactBookActivity : ComponentActivity() {
                     },
                     onBottomNavChange = {
                         if (it == "mail") {
-                            startActivity(Intent(this, MailActivity::class.java))
+                            val intent = Intent(this, MailActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                            }
+                            startActivity(intent)
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
                     },

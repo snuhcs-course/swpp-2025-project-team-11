@@ -1,7 +1,7 @@
 package com.fiveis.xend.ui.inbox
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,12 +31,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Email
@@ -56,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -63,11 +68,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
@@ -75,13 +82,10 @@ import com.fiveis.xend.ui.compose.Banner
 import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
+import com.fiveis.xend.utils.EmailUtils
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 fun InboxScreen(
@@ -95,6 +99,7 @@ fun InboxScreen(
     onBottomNavChange: (String) -> Unit = {},
     onAddContactClick: (EmailItem) -> Unit = {},
     onDismissSuccessBanner: () -> Unit = {},
+    onDeleteEmail: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -104,35 +109,35 @@ fun InboxScreen(
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     LaunchedEffect(listState) {
-        snapshotFlow {
-            listState.isScrollInProgress
-        }.collect { isScrolling ->
-            // 스크롤이 멈추면 항상 네비게이션 바 표시
-            if (!isScrolling) {
-                showBottomBar = true
-            }
-        }
-    }
-
-    LaunchedEffect(listState) {
         var previousIndex = 0
         var previousScrollOffset = 0
+        var accumulatedDelta = 0f
 
         snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (currentIndex, currentOffset) ->
-            if (currentIndex == 0 && currentOffset == 0) {
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }.collect { (isScrolling, currentIndex, currentOffset) ->
+            if (!isScrolling) {
                 showBottomBar = true
-            } else if (listState.isScrollInProgress) {
-                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
+                accumulatedDelta = 0f
+            } else if (currentIndex == 0 && currentOffset == 0) {
+                showBottomBar = true
+                accumulatedDelta = 0f
+            } else {
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue.toFloat()
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
 
-                if (offsetDelta > scrollThresholdPx) {
+                accumulatedDelta += offsetDelta
+                if (accumulatedDelta > scrollThresholdPx) {
                     showBottomBar = !isScrollingDown
+                    accumulatedDelta = 0f
                 }
             }
 
@@ -226,7 +231,9 @@ fun InboxScreen(
                         isLoadingMore = uiState.isLoading,
                         listState = listState,
                         contactEmails = uiState.contactEmails,
-                        contactsByEmail = uiState.contactsByEmail
+                        contactsByEmail = uiState.contactsByEmail,
+                        onDeleteEmail = onDeleteEmail,
+                        deletingEmailId = uiState.deletingEmailId
                     )
                 }
             }
@@ -305,7 +312,6 @@ private fun ScreenHeader(onSearch: () -> Unit, onProfile: () -> Unit) {
                     .clip(CircleShape)
                     .clickable(
                         onClick = {
-                            Log.d("InboxScreen", "Profile icon clicked!")
                             onProfile()
                         },
                         indication = ripple(bounded = true, radius = 20.dp),
@@ -365,8 +371,14 @@ private fun EmailList(
     isLoadingMore: Boolean,
     listState: androidx.compose.foundation.lazy.LazyListState,
     contactEmails: Set<String>,
-    contactsByEmail: Map<String, String> = emptyMap()
+    contactsByEmail: Map<String, String> = emptyMap(),
+    onDeleteEmail: (String) -> Unit = {},
+    deletingEmailId: String? = null
 ) {
+    val visibleEmails = remember(emails, deletingEmailId) {
+        if (deletingEmailId == null) emails else emails.filter { it.id != deletingEmailId }
+    }
+
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
@@ -377,19 +389,25 @@ private fun EmailList(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            items(items = emails, key = { it.id }) { item ->
-                EmailRow(
-                    item = item,
-                    onClick = { onEmailClick(item) },
-                    onAddContactClick = onAddContactClick,
-                    contactEmails = contactEmails,
-                    contactsByEmail = contactsByEmail
-                )
-                HorizontalDivider(
-                    modifier = Modifier,
-                    thickness = DividerDefaults.Thickness,
-                    color = DividerDefaults.color
-                )
+            items(items = visibleEmails, key = { it.id }) { item ->
+                Column(
+                    modifier = Modifier.animateItem()
+                ) {
+                    EmailRow(
+                        item = item,
+                        onClick = { onEmailClick(item) },
+                        onAddContactClick = onAddContactClick,
+                        contactEmails = contactEmails,
+                        contactsByEmail = contactsByEmail,
+                        onDeleteClick = { onDeleteEmail(item.id) },
+                        isDeleting = false
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier,
+                        thickness = DividerDefaults.Thickness,
+                        color = DividerDefaults.color
+                    )
+                }
             }
 
             // Loading indicator at the bottom
@@ -423,22 +441,11 @@ private fun EmailList(
                     false
                 } else {
                     // Trigger when last visible item is within 3 items from the end
-                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
-                    if (shouldLoad) {
-                        Log.d("InboxScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
-                    }
-                    shouldLoad
+                    lastVisibleItem.index >= totalItems - 4
                 }
             }.collect { shouldLoadMore ->
-                Log.d(
-                    "InboxScreen",
-                    "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
-                )
                 if (shouldLoadMore && !isLoadingMore) {
-                    Log.d("InboxScreen", "Triggering loadMore")
                     onLoadMore()
-                } else {
-                    Log.d("InboxScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }
@@ -460,27 +467,23 @@ fun EmailListContent(
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
     onScrollStopped: () -> Unit = {},
     contactEmails: Set<String>,
-    contactsByEmail: Map<String, String> = emptyMap()
+    contactsByEmail: Map<String, String> = emptyMap(),
+    listState: LazyListState = rememberLazyListState(),
+    onDeleteEmail: (String) -> Unit = {},
+    deletingEmailId: String? = null
 ) {
-    val listState = rememberLazyListState()
-
-    // 스크롤 멈춤 감지
     LaunchedEffect(listState) {
         snapshotFlow {
-            listState.isScrollInProgress
-        }.collect { isScrolling ->
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }.collect { (isScrolling, index, offset) ->
+            onScrollChange(index, offset)
             if (!isScrolling) {
                 onScrollStopped()
             }
-        }
-    }
-
-    // 스크롤 위치 변경 감지
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            onScrollChange(index, offset)
         }
     }
 
@@ -503,7 +506,9 @@ fun EmailListContent(
             isLoadingMore = isLoadingMore,
             listState = listState,
             contactEmails = contactEmails,
-            contactsByEmail = contactsByEmail
+            contactsByEmail = contactsByEmail,
+            onDeleteEmail = onDeleteEmail,
+            deletingEmailId = deletingEmailId
         )
     }
 }
@@ -514,102 +519,198 @@ private fun EmailRow(
     onClick: () -> Unit,
     onAddContactClick: (EmailItem) -> Unit,
     contactEmails: Set<String>,
-    contactsByEmail: Map<String, String> = emptyMap()
+    contactsByEmail: Map<String, String> = emptyMap(),
+    onDeleteClick: () -> Unit = {},
+    isDeleting: Boolean = false
 ) {
-    // Extract email from "Name <email>" format
-    val senderEmail = extractSenderEmailFromRow(item.fromEmail)
-    val isContact = senderEmail.lowercase() in contactEmails
+    val senderEmail = remember(item.fromEmail) { extractSenderEmailFromRow(item.fromEmail) }
+    val normalizedSenderEmail = remember(senderEmail) { senderEmail.lowercase() }
+    val isContact = remember(normalizedSenderEmail, contactEmails) {
+        normalizedSenderEmail in contactEmails
+    }
+    val displayName = remember(
+        normalizedSenderEmail,
+        contactsByEmail,
+        item.displaySenderName,
+        item.fromEmail
+    ) {
+        contactsByEmail[normalizedSenderEmail]
+            ?: item.displaySenderName.ifBlank { EmailUtils.extractSenderName(item.fromEmail) }
+    }
+    val formattedDate = remember(item.displayDate, item.dateTimestamp, item.date) {
+        item.displayDate.ifBlank { EmailUtils.formatDisplayDate(item.dateTimestamp, item.date) }
+    }
 
-    // Use contact name if available, otherwise use original sender name
-    val displayName = contactsByEmail[senderEmail.lowercase()] ?: extractSenderName(item.fromEmail)
+    // Swipe state
+    var isRevealed by remember { mutableStateOf(false) }
+    val revealWidth = 80.dp
+    val revealWidthPx = with(LocalDensity.current) { revealWidth.toPx() }
+
+    val offsetX = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    // Animate when isRevealed changes
+    LaunchedEffect(isRevealed) {
+        offsetX.animateTo(
+            targetValue = if (isRevealed) -revealWidthPx else 0f,
+            animationSpec = tween(durationMillis = 300)
+        )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(if (item.isUnread) Color.White else Color(0xFFF8F9FA))
+            .background(Color(0xFFEA4335))
     ) {
-        Row(
+        // Delete button background (always visible when revealed)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(revealWidth)
+                .fillMaxHeight()
+                .clickable(enabled = !isDeleting) {
+                    onDeleteClick()
+                    isRevealed = false
+                }
+                .background(Color(0xFFEA4335)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Delete,
+                contentDescription = "삭제",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        // Email content (swipeable)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .semantics { contentDescription = "메일 항목: ${item.subject}" },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (item.isUnread) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 3.dp, end = 8.dp)
-                        .size(6.dp)
-                        .background(Color(0xFFEA4335), CircleShape)
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f, fill = false),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = displayName,
-                            color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-
-                        // Add Contact Button - only show if not already a contact
-                        if (!isContact) {
-                            IconButton(
-                                onClick = { onAddContactClick(item) },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.PersonAdd,
-                                    contentDescription = "연락처 추가",
-                                    tint = Blue80,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .pointerInput(isDeleting) {
+                    if (!isDeleting) {
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                scope.launch {
+                                    offsetX.stop()
+                                }
+                            },
+                            onDragEnd = {
+                                scope.launch {
+                                    // Snap to revealed or collapsed based on threshold
+                                    val shouldReveal = offsetX.value < -revealWidthPx / 2
+                                    isRevealed = shouldReveal
+                                }
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                scope.launch {
+                                    val newOffset = (offsetX.value + dragAmount).coerceIn(-revealWidthPx, 0f)
+                                    offsetX.snapTo(newOffset)
+                                }
                             }
+                        )
+                    }
+                }
+                .clickable(
+                    enabled = !isDeleting,
+                    onClick = {
+                        if (isRevealed) {
+                            isRevealed = false
+                        } else {
+                            onClick()
                         }
                     }
-
-                    Spacer(Modifier.width(8.dp))
-// 날짜 포매팅 해야함
-                    Text(
-                        text = formatDisplayDate(item.date),
-                        color = Color(0xFF5F6368),
-                        fontSize = 12.sp
+                )
+                .background(if (item.isUnread) Color.White else Color(0xFFF8F9FA))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .semantics { contentDescription = "메일 항목: ${item.subject}" },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (item.isUnread) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 3.dp, end = 8.dp)
+                            .size(6.dp)
+                            .background(Color(0xFFEA4335), CircleShape)
+                    )
+                } else {
+                    Spacer(
+                        modifier = Modifier
+                            .padding(top = 3.dp, end = 8.dp)
+                            .size(6.dp)
                     )
                 }
 
-                Text(
-                    text = item.subject,
-                    color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = displayName,
+                                color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
 
-                Text(
-                    text = item.snippet,
-                    color = if (item.isUnread) Color(0xFF5F6368) else Color(0xFF80868B),
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                            // Add Contact Button - only show if not already a contact
+                            if (!isContact) {
+                                IconButton(
+                                    onClick = { onAddContactClick(item) },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PersonAdd,
+                                        contentDescription = "연락처 추가",
+                                        tint = Blue80,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = formattedDate,
+                            color = Color(0xFF5F6368),
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Text(
+                        text = item.subject,
+                        color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        text = item.snippet,
+                        color = if (item.isUnread) Color(0xFF5F6368) else Color(0xFF80868B),
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -697,48 +798,6 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             }
         }
     }
-}
-
-private fun formatDisplayDate(isoDate: String): String {
-    return try {
-        // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
-        val parsedDateTime = OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(ZoneId.systemDefault())
-
-        val today = LocalDate.now(ZoneId.systemDefault())
-        val emailDate = parsedDateTime.toLocalDate()
-
-        // 2. 조건에 따라 다른 형식으로 변환
-        when {
-            // 오늘 받은 메일이면 시간만 표시
-            emailDate.isEqual(today) -> {
-                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-            // 올해 받은 메일이면 월/일만 표시
-            emailDate.year == today.year -> {
-                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
-                formatter.format(parsedDateTime)
-            }
-            // 작년 또는 그 이전 메일이면 연/월/일 표시
-            else -> {
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-        }
-    } catch (e: Exception) {
-        // 변환 실패 시 날짜 부분만 표시
-        isoDate.substringBefore("T")
-    }
-}
-
-// Helper function to extract sender name from "Name <email>" format
-private fun extractSenderName(fromEmail: String): String {
-    val nameRegex = "(.+?)\\s*<".toRegex()
-    val matchResult = nameRegex.find(fromEmail)
-    val name = matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
-    // Remove surrounding quotes if present
-    return name.trim('"', '\'')
 }
 
 // Helper function to extract email address from "Name <email>" format

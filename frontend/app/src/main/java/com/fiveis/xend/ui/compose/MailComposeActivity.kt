@@ -111,6 +111,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
@@ -1442,7 +1443,11 @@ class MailComposeActivity : ComponentActivity() {
                 LaunchedEffect(editorState.editor) {
                     editorState.editor?.setOnTextChangeListener { html ->
                         if (aiRealtime) {
-                            composeVm.onTextChanged(html)
+                            val plainText = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                                .toString()
+                                .replace("\u00A0", " ")
+                                .trimEnd()
+                            composeVm.onTextChanged(plainText)
                         }
                     }
                 }
