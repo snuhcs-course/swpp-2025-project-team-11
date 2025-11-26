@@ -71,12 +71,6 @@ import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.utils.EmailUtils
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
 import kotlin.math.absoluteValue
 
 @Composable
@@ -98,6 +92,7 @@ fun SentScreen(
     var previousIndex by remember { mutableStateOf(0) }
     var previousScrollOffset by remember { mutableStateOf(0) }
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
+    var accumulatedDelta by remember { mutableStateOf(0f) }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -105,15 +100,18 @@ fun SentScreen(
         }.collect { (currentIndex, currentOffset) ->
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
+                accumulatedDelta = 0f
             } else {
-                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue.toFloat()
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
-                if (offsetDelta > scrollThresholdPx) {
+                accumulatedDelta += offsetDelta
+                if (accumulatedDelta > scrollThresholdPx) {
                     showBottomBar = !isScrollingDown
+                    accumulatedDelta = 0f
                 }
             }
             previousIndex = currentIndex
@@ -405,6 +403,12 @@ fun EmailListContent(
 
 @Composable
 private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onClick: () -> Unit) {
+    val recipientDisplay = remember(item.toEmail, contactsByEmail) {
+        formatRecipientDisplay(item.toEmail, contactsByEmail)
+    }
+    val formattedDate = remember(item.displayDate, item.dateTimestamp, item.date) {
+        item.displayDate.ifBlank { EmailUtils.formatDisplayDate(item.dateTimestamp, item.date) }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -442,7 +446,6 @@ private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onCl
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val recipientDisplay = formatRecipientDisplay(item.toEmail, contactsByEmail)
                     Text(
                         text = "To: $recipientDisplay",
                         color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
@@ -454,9 +457,8 @@ private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onCl
                     )
 
                     Spacer(Modifier.width(8.dp))
-// 날짜 포매팅 해야함
                     Text(
-                        text = formatDisplayDate(item.date),
+                        text = formattedDate,
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -585,31 +587,4 @@ private fun formatRecipientDisplay(rawToField: String, contactsByEmail: Map<Stri
     val fallbackName = extractDisplayName(primaryRaw)
     val primary = contactName ?: fallbackName
     return if (recipients.size > 1) "$primary 외 ${recipients.size - 1}명" else primary
-}
-
-private fun formatDisplayDate(isoDate: String): String {
-    return try {
-        val parsedDateTime = OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(ZoneId.systemDefault())
-
-        val today = LocalDate.now(ZoneId.systemDefault())
-        val emailDate = parsedDateTime.toLocalDate()
-
-        when {
-            emailDate.isEqual(today) -> {
-                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-            emailDate.year == today.year -> {
-                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
-                formatter.format(parsedDateTime)
-            }
-            else -> {
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-        }
-    } catch (e: Exception) {
-        isoDate
-    }
 }

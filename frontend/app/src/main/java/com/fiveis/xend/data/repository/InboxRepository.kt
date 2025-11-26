@@ -12,6 +12,7 @@ import com.fiveis.xend.data.model.ReadStatusUpdateRequest
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.utils.EmailUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import okhttp3.ResponseBody
 import retrofit2.Response
 
@@ -25,12 +26,37 @@ class InboxRepository(
     private fun List<EmailItem>.withParsedTimestamps(): List<EmailItem> {
         return map { email ->
             val timestamp = EmailUtils.parseDateToTimestamp(email.dateRaw)
-            email.copy(dateTimestamp = timestamp)
+            val displayDate = EmailUtils.formatDisplayDate(timestamp, email.date)
+            val displaySenderName = EmailUtils.extractSenderName(email.fromEmail)
+            email.copy(
+                dateTimestamp = timestamp,
+                displayDate = displayDate,
+                displaySenderName = displaySenderName
+            )
         }
     }
 
+    private fun EmailItem.ensureDisplayFields(): EmailItem {
+        val needsDate = displayDate.isBlank()
+        val needsName = displaySenderName.isBlank()
+        if (!needsDate && !needsName) return this
+        val resolvedDate = if (needsDate) {
+            EmailUtils.formatDisplayDate(dateTimestamp, date)
+        } else {
+            displayDate
+        }
+        val resolvedName = if (needsName) {
+            EmailUtils.extractSenderName(fromEmail)
+        } else {
+            displaySenderName
+        }
+        return copy(displayDate = resolvedDate, displaySenderName = resolvedName)
+    }
+
     fun getCachedEmails(): Flow<List<EmailItem>> {
-        return emailDao.getInboxEmails().also {
+        return emailDao.getInboxEmails().map { emails ->
+            emails.map { it.ensureDisplayFields() }
+        }.also {
             Log.d("InboxRepository", "getCachedEmails Flow created for INBOX (excluding SENT)")
         }
     }

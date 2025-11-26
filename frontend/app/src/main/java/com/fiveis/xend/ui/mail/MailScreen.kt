@@ -43,13 +43,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,8 +95,9 @@ fun MailScreen(
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(MailTab.INBOX) }
     var showBottomBar by remember { mutableStateOf(true) }
-    var previousIndex by remember { mutableStateOf(0) }
-    var previousScrollOffset by remember { mutableStateOf(0) }
+    val previousIndex = remember { mutableIntStateOf(0) }
+    val previousScrollOffset = remember { mutableIntStateOf(0) }
+    val scrollDeltaAccumulator = remember { mutableFloatStateOf(0f) }
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     // 각 탭의 스크롤 위치 저장 (Activity 재시작 시에도 복원)
@@ -114,25 +115,6 @@ fun MailScreen(
         initialFirstVisibleItemIndex = sentScrollIndex.value,
         initialFirstVisibleItemScrollOffset = sentScrollOffset.value
     )
-
-    // 스크롤 위치 변경 시 저장
-    LaunchedEffect(inboxListState) {
-        snapshotFlow {
-            inboxListState.firstVisibleItemIndex to inboxListState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            inboxScrollIndex.value = index
-            inboxScrollOffset.value = offset
-        }
-    }
-
-    LaunchedEffect(sentListState) {
-        snapshotFlow {
-            sentListState.firstVisibleItemIndex to sentListState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            sentScrollIndex.value = index
-            sentScrollOffset.value = offset
-        }
-    }
 
     Scaffold(
         bottomBar = {
@@ -257,25 +239,32 @@ fun MailScreen(
                         isLoadingMore = inboxUiState.isLoading,
                         error = inboxUiState.error,
                         onScrollChange = { currentIndex, currentOffset ->
+                            inboxScrollIndex.value = currentIndex
+                            inboxScrollOffset.value = currentOffset
                             if (currentIndex == 0 && currentOffset == 0) {
                                 showBottomBar = true
+                                scrollDeltaAccumulator.floatValue = 0f
                             } else {
-                                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
-                                val isScrollingDown = if (currentIndex != previousIndex) {
-                                    currentIndex > previousIndex
+                                val offsetDelta = (currentOffset - previousScrollOffset.intValue)
+                                    .absoluteValue.toFloat()
+                                scrollDeltaAccumulator.floatValue += offsetDelta
+                                val isScrollingDown = if (currentIndex != previousIndex.intValue) {
+                                    currentIndex > previousIndex.intValue
                                 } else {
-                                    currentOffset > previousScrollOffset
+                                    currentOffset > previousScrollOffset.intValue
                                 }
 
-                                if (offsetDelta > scrollThresholdPx) {
+                                if (scrollDeltaAccumulator.floatValue > scrollThresholdPx) {
                                     showBottomBar = !isScrollingDown
+                                    scrollDeltaAccumulator.floatValue = 0f
                                 }
                             }
-                            previousIndex = currentIndex
-                            previousScrollOffset = currentOffset
+                            previousIndex.intValue = currentIndex
+                            previousScrollOffset.intValue = currentOffset
                         },
                         onScrollStopped = {
                             showBottomBar = true
+                            scrollDeltaAccumulator.floatValue = 0f
                         },
                         contactEmails = inboxUiState.contactEmails,
                         contactsByEmail = inboxUiState.contactsByEmail,
@@ -292,21 +281,31 @@ fun MailScreen(
                         isLoadingMore = sentUiState.isLoading,
                         error = sentUiState.error,
                         onScrollChange = { currentIndex, currentOffset ->
+                            sentScrollIndex.value = currentIndex
+                            sentScrollOffset.value = currentOffset
                             if (currentIndex == 0 && currentOffset == 0) {
                                 showBottomBar = true
+                                scrollDeltaAccumulator.floatValue = 0f
                             } else {
-                                val isScrollingDown = if (currentIndex != previousIndex) {
-                                    currentIndex > previousIndex
+                                val offsetDelta = (currentOffset - previousScrollOffset.intValue)
+                                    .absoluteValue.toFloat()
+                                scrollDeltaAccumulator.floatValue += offsetDelta
+                                val isScrollingDown = if (currentIndex != previousIndex.intValue) {
+                                    currentIndex > previousIndex.intValue
                                 } else {
-                                    currentOffset > previousScrollOffset
+                                    currentOffset > previousScrollOffset.intValue
                                 }
-                                showBottomBar = !isScrollingDown
+                                if (scrollDeltaAccumulator.floatValue > scrollThresholdPx) {
+                                    showBottomBar = !isScrollingDown
+                                    scrollDeltaAccumulator.floatValue = 0f
+                                }
                             }
-                            previousIndex = currentIndex
-                            previousScrollOffset = currentOffset
+                            previousIndex.intValue = currentIndex
+                            previousScrollOffset.intValue = currentOffset
                         },
                         onScrollStopped = {
                             showBottomBar = true
+                            scrollDeltaAccumulator.floatValue = 0f
                         },
                         contactsByEmail = inboxUiState.contactsByEmail,
                         listState = sentListState

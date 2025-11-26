@@ -82,12 +82,7 @@ import com.fiveis.xend.ui.compose.Banner
 import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
+import com.fiveis.xend.utils.EmailUtils
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -114,35 +109,35 @@ fun InboxScreen(
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     LaunchedEffect(listState) {
-        snapshotFlow {
-            listState.isScrollInProgress
-        }.collect { isScrolling ->
-            // 스크롤이 멈추면 항상 네비게이션 바 표시
-            if (!isScrolling) {
-                showBottomBar = true
-            }
-        }
-    }
-
-    LaunchedEffect(listState) {
         var previousIndex = 0
         var previousScrollOffset = 0
+        var accumulatedDelta = 0f
 
         snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (currentIndex, currentOffset) ->
-            if (currentIndex == 0 && currentOffset == 0) {
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }.collect { (isScrolling, currentIndex, currentOffset) ->
+            if (!isScrolling) {
                 showBottomBar = true
-            } else if (listState.isScrollInProgress) {
-                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue
+                accumulatedDelta = 0f
+            } else if (currentIndex == 0 && currentOffset == 0) {
+                showBottomBar = true
+                accumulatedDelta = 0f
+            } else {
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue.toFloat()
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
 
-                if (offsetDelta > scrollThresholdPx) {
+                accumulatedDelta += offsetDelta
+                if (accumulatedDelta > scrollThresholdPx) {
                     showBottomBar = !isScrollingDown
+                    accumulatedDelta = 0f
                 }
             }
 
@@ -380,8 +375,9 @@ private fun EmailList(
     onDeleteEmail: (String) -> Unit = {},
     deletingEmailId: String? = null
 ) {
-    // Filter out emails that are being deleted for optimistic UI update
-    val visibleEmails = emails.filter { it.id != deletingEmailId }
+    val visibleEmails = remember(emails, deletingEmailId) {
+        if (deletingEmailId == null) emails else emails.filter { it.id != deletingEmailId }
+    }
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -476,23 +472,18 @@ fun EmailListContent(
     onDeleteEmail: (String) -> Unit = {},
     deletingEmailId: String? = null
 ) {
-    // 스크롤 멈춤 감지
     LaunchedEffect(listState) {
         snapshotFlow {
-            listState.isScrollInProgress
-        }.collect { isScrolling ->
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }.collect { (isScrolling, index, offset) ->
+            onScrollChange(index, offset)
             if (!isScrolling) {
                 onScrollStopped()
             }
-        }
-    }
-
-    // 스크롤 위치 변경 감지
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            onScrollChange(index, offset)
         }
     }
 
@@ -532,12 +523,23 @@ private fun EmailRow(
     onDeleteClick: () -> Unit = {},
     isDeleting: Boolean = false
 ) {
-    // Extract email from "Name <email>" format
-    val senderEmail = extractSenderEmailFromRow(item.fromEmail)
-    val isContact = senderEmail.lowercase() in contactEmails
-
-    // Use contact name if available, otherwise use original sender name
-    val displayName = contactsByEmail[senderEmail.lowercase()] ?: extractSenderName(item.fromEmail)
+    val senderEmail = remember(item.fromEmail) { extractSenderEmailFromRow(item.fromEmail) }
+    val normalizedSenderEmail = remember(senderEmail) { senderEmail.lowercase() }
+    val isContact = remember(normalizedSenderEmail, contactEmails) {
+        normalizedSenderEmail in contactEmails
+    }
+    val displayName = remember(
+        normalizedSenderEmail,
+        contactsByEmail,
+        item.displaySenderName,
+        item.fromEmail
+    ) {
+        contactsByEmail[normalizedSenderEmail]
+            ?: item.displaySenderName.ifBlank { EmailUtils.extractSenderName(item.fromEmail) }
+    }
+    val formattedDate = remember(item.displayDate, item.dateTimestamp, item.date) {
+        item.displayDate.ifBlank { EmailUtils.formatDisplayDate(item.dateTimestamp, item.date) }
+    }
 
     // Swipe state
     var isRevealed by remember { mutableStateOf(false) }
@@ -685,9 +687,8 @@ private fun EmailRow(
                         }
 
                         Spacer(Modifier.width(8.dp))
-// 날짜 포매팅 해야함
                         Text(
-                            text = formatDisplayDate(item.date),
+                            text = formattedDate,
                             color = Color(0xFF5F6368),
                             fontSize = 12.sp
                         )
@@ -797,48 +798,6 @@ private fun BottomNavBar(selected: String, onSelect: (String) -> Unit) {
             }
         }
     }
-}
-
-private fun formatDisplayDate(isoDate: String): String {
-    return try {
-        // 1. ISO 날짜 문자열을 사용자 시간대에 맞춰 파싱
-        val parsedDateTime = OffsetDateTime.parse(isoDate)
-            .atZoneSameInstant(ZoneId.systemDefault())
-
-        val today = LocalDate.now(ZoneId.systemDefault())
-        val emailDate = parsedDateTime.toLocalDate()
-
-        // 2. 조건에 따라 다른 형식으로 변환
-        when {
-            // 오늘 받은 메일이면 시간만 표시
-            emailDate.isEqual(today) -> {
-                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-            // 올해 받은 메일이면 월/일만 표시
-            emailDate.year == today.year -> {
-                val formatter = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
-                formatter.format(parsedDateTime)
-            }
-            // 작년 또는 그 이전 메일이면 연/월/일 표시
-            else -> {
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                    .format(parsedDateTime)
-            }
-        }
-    } catch (e: Exception) {
-        // 변환 실패 시 날짜 부분만 표시
-        isoDate.substringBefore("T")
-    }
-}
-
-// Helper function to extract sender name from "Name <email>" format
-private fun extractSenderName(fromEmail: String): String {
-    val nameRegex = "(.+?)\\s*<".toRegex()
-    val matchResult = nameRegex.find(fromEmail)
-    val name = matchResult?.groupValues?.get(1)?.trim() ?: fromEmail.substringBefore("<").trim().ifEmpty { fromEmail }
-    // Remove surrounding quotes if present
-    return name.trim('"', '\'')
 }
 
 // Helper function to extract email address from "Name <email>" format
