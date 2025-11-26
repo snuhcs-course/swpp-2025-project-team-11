@@ -129,7 +129,7 @@ class MailDetailActivity : ComponentActivity() {
                         senderEmail = pendingContactEmail,
                         groups = availableGroups,
                         onDismiss = { showAddContactDialog = false },
-                        onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                        onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                             coroutineScope.launch {
                                 try {
                                     contactRepository.addContact(
@@ -138,7 +138,8 @@ class MailDetailActivity : ComponentActivity() {
                                         groupId = groupId,
                                         senderRole = senderRole,
                                         recipientRole = recipientRole,
-                                        personalPrompt = personalPrompt
+                                        personalPrompt = personalPrompt,
+                                        languagePreference = language
                                     )
                                     Toast.makeText(context, "연락처를 추가했습니다.", Toast.LENGTH_SHORT).show()
                                     showAddContactDialog = false

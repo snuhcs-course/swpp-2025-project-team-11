@@ -343,7 +343,8 @@ class InboxViewModel(
         senderRole: String?,
         recipientRole: String,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -354,7 +355,8 @@ class InboxViewModel(
                     groupId = groupId,
                     senderRole = senderRole,
                     recipientRole = recipientRole,
-                    personalPrompt = personalPrompt
+                    personalPrompt = personalPrompt,
+                    languagePreference = languagePreference
                 )
                 Log.d("InboxViewModel", "Contact added successfully")
                 _uiState.update {

@@ -96,14 +96,15 @@ class InboxActivity : ComponentActivity() {
                             senderEmail = EmailUtils.extractEmailAddress(email.fromEmail),
                             groups = uiState.groups,
                             onDismiss = { viewModel.dismissAddContactDialog() },
-                            onConfirm = { name, emailAddr, senderRole, recipientRole, personalPrompt, groupId ->
+                            onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                                 viewModel.addContact(
                                     name,
-                                    emailAddr,
+                                    email,
                                     senderRole,
                                     recipientRole,
                                     personalPrompt,
-                                    groupId
+                                    groupId,
+                                    language
                                 )
                             }
                         )

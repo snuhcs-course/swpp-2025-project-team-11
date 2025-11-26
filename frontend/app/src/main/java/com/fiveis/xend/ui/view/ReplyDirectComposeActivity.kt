@@ -404,7 +404,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                                 showAddContactDialog = false
                                 selectedContactForDialog = null
                             },
-                            onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                            onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                                 coroutineScope.launch {
                                     try {
                                         contactRepository.addContact(
@@ -413,7 +413,8 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                                             groupId = groupId,
                                             senderRole = senderRole,
                                             recipientRole = recipientRole,
-                                            personalPrompt = personalPrompt
+                                            personalPrompt = personalPrompt,
+                                            languagePreference = language
                                         )
                                         showAddContactDialog = false
                                         selectedContactForDialog = null

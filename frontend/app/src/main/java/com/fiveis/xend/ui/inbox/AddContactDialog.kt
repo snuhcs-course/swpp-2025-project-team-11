@@ -1,6 +1,7 @@
 package com.fiveis.xend.ui.inbox
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,8 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.ui.contactbook.RoleInputMode
 import com.fiveis.xend.ui.contactbook.recipientRoleOptionExamples
 import com.fiveis.xend.ui.contactbook.senderRoleOptionExamples
+import com.fiveis.xend.ui.profile.LanguageDialog
+import com.fiveis.xend.ui.profile.languageDisplayText
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray200
@@ -81,7 +84,8 @@ fun AddContactDialog(
         senderRole: String?,
         recipientRole: String,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String?
     ) -> Unit
 ) {
     val directInputLabel = "직접 입력"
@@ -105,6 +109,8 @@ fun AddContactDialog(
     var personalPrompt by rememberSaveable { mutableStateOf("") }
     var isGroupExpanded by remember { mutableStateOf(false) }
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
+    var languagePreference by rememberSaveable { mutableStateOf("") }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     val savable = name.isNotBlank() && email.isNotBlank()
 
@@ -556,6 +562,43 @@ fun AddContactDialog(
 
                 Spacer(Modifier.height(20.dp))
 
+                Text("메일 작성 언어", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLanguageDialog = true }
+                ) {
+                    OutlinedTextField(
+                        value = languageDisplayText(languagePreference),
+                        onValueChange = {},
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        placeholder = {
+                            Text(
+                                text = "프로필 기본값",
+                                style = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                color = Gray600
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                        singleLine = true,
+                        readOnly = true,
+                        enabled = false,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = TextPrimary,
+                            focusedTextColor = TextPrimary,
+                            disabledBorderColor = BorderGray,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60,
+                            disabledContainerColor = Color.White,
+                            focusedContainerColor = Color.White
+                        )
+                    )
+                }
+
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -586,7 +629,8 @@ fun AddContactDialog(
                                 finalSenderRole,
                                 finalRecipientRole,
                                 personalPrompt.ifBlank { null },
-                                selectedGroup?.id
+                                selectedGroup?.id,
+                                languagePreference.ifBlank { null }
                             )
                         },
                         enabled = savable,
@@ -602,5 +646,13 @@ fun AddContactDialog(
                 }
             }
         }
+    }
+
+    if (showLanguageDialog) {
+        LanguageDialog(
+            selectedLanguage = languagePreference,
+            onLanguageSelected = { selected -> languagePreference = selected },
+            onDismiss = { showLanguageDialog = false }
+        )
     }
 }

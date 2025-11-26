@@ -72,6 +72,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.profile.LanguageDialog
+import com.fiveis.xend.ui.profile.languageDisplayText
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray200
@@ -92,7 +94,7 @@ fun ContactDetailScreen(
     onRefresh: () -> Unit,
     onOpenGroup: (Long) -> Unit,
     onComposeMail: (Contact) -> Unit,
-    onUpdateContact: (String, String, String?, String?, String?, Long?) -> Unit,
+    onUpdateContact: (String, String, String?, String?, String?, Long?, String?) -> Unit,
     onClearEditError: () -> Unit
 ) {
     val contact = uiState.contact
@@ -109,6 +111,7 @@ fun ContactDetailScreen(
     var editRecipientManual by rememberSaveable { mutableStateOf("") }
     var editPersonalPromptField by rememberSaveable { mutableStateOf("") }
     var editSelectedGroupId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editLanguagePreference by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(uiState.isUpdating, uiState.updateError, showEditDialog) {
         if (!showEditDialog) return@LaunchedEffect
@@ -238,6 +241,7 @@ fun ContactDetailScreen(
                                 }
                                 editPersonalPromptField = contact.context?.personalPrompt.orEmpty()
                                 editSelectedGroupId = contact.group?.id
+                                editLanguagePreference = contact.context?.languagePreference.orEmpty()
                                 editSubmitted = false
                                 onClearEditError()
                                 showEditDialog = true
@@ -363,6 +367,7 @@ fun ContactDetailScreen(
     if (showEditDialog) {
         val trimmedName = editNameField.trim()
         val trimmedEmail = editEmailField.trim()
+        val currentLanguagePreference = editLanguagePreference.trim()
         val finalSenderRole = when (editSenderMode) {
             RoleInputMode.PRESET -> editSenderPreset?.trim()
             RoleInputMode.MANUAL -> editSenderManual.trim()
@@ -392,6 +397,7 @@ fun ContactDetailScreen(
             errorMessage = uiState.updateError,
             isProcessing = uiState.isUpdating,
             isConfirmEnabled = isConfirmEnabled,
+            languagePreference = editLanguagePreference,
             onNameChange = {
                 editNameField = it
                 if (uiState.updateError != null) onClearEditError()
@@ -422,6 +428,7 @@ fun ContactDetailScreen(
             onRecipientManualChange = { editRecipientManual = it },
             onPersonalPromptChange = { editPersonalPromptField = it },
             onGroupSelected = { editSelectedGroupId = it },
+            onLanguagePreferenceChange = { editLanguagePreference = it },
             onDismiss = {
                 if (!uiState.isUpdating) {
                     showEditDialog = false
@@ -437,7 +444,8 @@ fun ContactDetailScreen(
                     finalSenderRole,
                     finalRecipientRole,
                     editPersonalPromptField.trim(),
-                    editSelectedGroupId
+                    editSelectedGroupId,
+                    currentLanguagePreference
                 )
             }
         )
@@ -561,6 +569,7 @@ private fun EditContactDialog(
     personalPrompt: String,
     selectedGroupName: String,
     groups: List<Group>,
+    languagePreference: String,
     errorMessage: String?,
     isProcessing: Boolean,
     isConfirmEnabled: Boolean,
@@ -574,6 +583,7 @@ private fun EditContactDialog(
     onRecipientManualChange: (String) -> Unit,
     onPersonalPromptChange: (String) -> Unit,
     onGroupSelected: (Long?) -> Unit,
+    onLanguagePreferenceChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -584,6 +594,7 @@ private fun EditContactDialog(
     var isSenderExpanded by remember { mutableStateOf(false) }
     var isRecipientExpanded by remember { mutableStateOf(false) }
     var isGroupExpanded by remember { mutableStateOf(false) }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -990,6 +1001,44 @@ private fun EditContactDialog(
                         }
                     }
 
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("메일 작성 언어", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isProcessing) { if (!isProcessing) showLanguageDialog = true }
+                    ) {
+                        OutlinedTextField(
+                            value = languageDisplayText(languagePreference),
+                            onValueChange = {},
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            placeholder = {
+                                Text(
+                                    text = "프로필 기본값",
+                                    style = LocalTextStyle.current.copy(fontSize = 12.sp),
+                                    color = Gray400
+                                )
+                            },
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            singleLine = true,
+                            readOnly = true,
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = TextPrimary,
+                                disabledBorderColor = BorderGray,
+                                focusedBorderColor = Purple60,
+                                unfocusedBorderColor = BorderGray,
+                                disabledContainerColor = Color.White,
+                                focusedContainerColor = Color.White
+                            )
+                        )
+                    }
+
                     if (!errorMessage.isNullOrBlank()) {
                         Spacer(Modifier.height(12.dp))
                         Text(
@@ -1039,5 +1088,13 @@ private fun EditContactDialog(
                 }
             }
         }
+    }
+
+    if (showLanguageDialog) {
+        LanguageDialog(
+            selectedLanguage = languagePreference,
+            onLanguageSelected = { selected -> onLanguagePreferenceChange(selected) },
+            onDismiss = { showLanguageDialog = false }
+        )
     }
 }
