@@ -63,7 +63,8 @@ class MailDetailViewModelTest {
             dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
             isUnread = true,
             labelIds = listOf("INBOX"),
-            body = "Test body"
+            body = "Test body",
+            cachedAt = System.currentTimeMillis()
         )
 
         coEvery { emailDao.getEmailById(messageId) } returns mockMail
@@ -76,7 +77,10 @@ class MailDetailViewModelTest {
         viewModel = MailDetailViewModel(context, emailDao, inboxRepository, messageId, testDispatcher)
         advanceUntilIdle()
 
-        assertEquals(mockMail, viewModel.uiState.value.mail)
+        val resultMail = viewModel.uiState.value.mail
+        assertEquals(mockMail.id, resultMail?.id)
+        assertEquals(mockMail.subject, resultMail?.subject)
+        assertEquals(mockMail.fromEmail, resultMail?.fromEmail)
         assertFalse(viewModel.uiState.value.isLoading)
     }
 

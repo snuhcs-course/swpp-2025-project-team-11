@@ -423,7 +423,7 @@ private fun SenderInfoSection(
     } else {
         parseSenderEmail(senderEmail)
     }
-    val normalized = displayEmail.trim().lowercase()
+    val normalized = displayEmail.trim().lowercase(Locale.ROOT)
     val savedContact = knownContactsByEmail[normalized]
     val resolvedDisplayName = savedContact?.name?.takeIf { it.isNotBlank() } ?: displayName
 

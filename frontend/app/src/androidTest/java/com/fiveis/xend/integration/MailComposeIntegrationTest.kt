@@ -79,7 +79,7 @@ class MailComposeIntegrationTest {
             body = "Test Body"
         )
 
-        val result = mailApiService.sendEmail(request.toMultipartParts(context))
+        val result = mailApiService.sendEmail(request.toMultipartParts(context, emptyList()))
 
         assertTrue(result.isSuccessful)
         assertEquals(201, result.code())
@@ -249,7 +249,7 @@ class MailComposeIntegrationTest {
             body = "Test"
         )
 
-        val result = mailApiService.sendEmail(request.toMultipartParts(context))
+        val result = mailApiService.sendEmail(request.toMultipartParts(context, emptyList()))
 
         assertFalse(result.isSuccessful)
         assertEquals(400, result.code())
@@ -325,7 +325,7 @@ class MailComposeIntegrationTest {
             body = "Test Body"
         )
 
-        val result = mailApiService.sendEmail(request.toMultipartParts(context))
+        val result = mailApiService.sendEmail(request.toMultipartParts(context, emptyList()))
 
         assertTrue(result.isSuccessful)
         assertEquals("msg789", result.body()?.id)
