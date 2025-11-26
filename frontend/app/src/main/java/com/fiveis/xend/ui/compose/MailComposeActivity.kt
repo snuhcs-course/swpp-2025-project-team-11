@@ -1612,16 +1612,17 @@ class MailComposeActivity : ComponentActivity() {
                                             showAddContactDialog = false
                                             selectedContactForDialog = null
                                         },
-                                        onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                                        onConfirm = { name, email, sRole, rRole, personalPrompt, groupId, language ->
                                             coroutineScope.launch {
                                                 try {
                                                     val added = contactRepository.addContact(
                                                         name = name,
                                                         email = email,
                                                         groupId = groupId,
-                                                        senderRole = senderRole,
-                                                        recipientRole = recipientRole,
-                                                        personalPrompt = personalPrompt
+                                                        senderRole = sRole,
+                                                        recipientRole = rRole,
+                                                        personalPrompt = personalPrompt,
+                                                        languagePreference = language
                                                     ).toDomain()
                                                     contacts = if (contacts.any
                                                             { it.email.equals(added.email, ignoreCase = true) }

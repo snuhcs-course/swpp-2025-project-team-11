@@ -80,12 +80,24 @@ class ContactDetailViewModel(
         senderRole: String?,
         recipientRole: String?,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String?
     ) {
         val id = currentId ?: return
         ui.update { it.copy(isUpdating = true, updateError = null) }
         viewModelScope.launch {
-            runCatching { repo.updateContact(id, name, email, senderRole, recipientRole, personalPrompt, groupId) }
+            runCatching {
+                repo.updateContact(
+                    contactId = id,
+                    name = name,
+                    email = email,
+                    senderRole = senderRole,
+                    recipientRole = recipientRole,
+                    personalPrompt = personalPrompt,
+                    groupId = groupId,
+                    languagePreference = languagePreference
+                )
+            }
                 .onSuccess { ui.update { it.copy(isUpdating = false, updateError = null) } }
                 .onFailure { e ->
                     ui.update {

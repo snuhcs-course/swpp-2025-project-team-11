@@ -76,6 +76,9 @@ class ProfileActivity : ComponentActivity() {
                     onUpdateInfo = { info ->
                         viewModel.updateInfo(info)
                     },
+                    onUpdateLanguagePreference = { language ->
+                        viewModel.updateLanguagePreference(language)
+                    },
                     onSaveProfile = {
                         viewModel.saveProfile()
                     },

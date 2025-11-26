@@ -58,6 +58,7 @@ class AddContactActivity : ComponentActivity() {
                 var recipientRole by rememberSaveable { mutableStateOf<String?>(null) }
                 var personalPrompt by rememberSaveable { mutableStateOf<String?>(null) }
                 var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
+                var languagePreference by rememberSaveable { mutableStateOf("") }
 
                 AddContactScreen(
                     groups = bookUiState.groups,
@@ -66,6 +67,7 @@ class AddContactActivity : ComponentActivity() {
                     onSenderRoleChange = { senderRole = it },
                     onRecipientRoleChange = { recipientRole = it },
                     onPersonalPromptChange = { personalPrompt = it },
+                    onLanguagePreferenceChange = { languagePreference = it },
                     onGroupChange = { selectedGroup = it },
                     onBack = {
                         finish()
@@ -78,7 +80,8 @@ class AddContactActivity : ComponentActivity() {
                             senderRole = senderRole,
                             recipientRole = recipientRole ?: "",
                             personalPrompt = personalPrompt,
-                            group = selectedGroup
+                            group = selectedGroup,
+                            languagePreference = languagePreference
                         )
                     },
                     onGmailContactsSync = {

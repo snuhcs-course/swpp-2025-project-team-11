@@ -368,7 +368,8 @@ class InboxViewModel(
         senderRole: String?,
         recipientRole: String,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String? = null
     ) {
         viewModelScope.launch {
             // 닫기/초기화: 버튼 누르자마자 다이얼로그가 닫혀야 하므로 먼저 상태를 정리한다.
@@ -387,7 +388,8 @@ class InboxViewModel(
                     groupId = groupId,
                     senderRole = senderRole,
                     recipientRole = recipientRole,
-                    personalPrompt = personalPrompt
+                    personalPrompt = personalPrompt,
+                    languagePreference = languagePreference
                 )
                 Log.d("InboxViewModel", "Contact added successfully")
                 _uiState.update {

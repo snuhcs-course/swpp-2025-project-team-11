@@ -188,13 +188,16 @@ class ContactBookRepository(
         groupId: Long?,
         senderRole: String?,
         recipientRole: String,
-        personalPrompt: String?
+        personalPrompt: String?,
+        languagePreference: String? = null
     ): ContactResponse {
         val requestContext = AddContactRequestContext(
             senderRole = senderRole ?: "",
             recipientRole = recipientRole,
-            personalPrompt = personalPrompt ?: ""
+            personalPrompt = personalPrompt ?: "",
+            languagePreference = languagePreference ?: ""
         )
+
         val request = AddContactRequest(name = name, email = email, groupId = groupId, context = requestContext)
         val res = api.addContact(request)
         if (!res.isSuccessful) {
@@ -248,7 +251,8 @@ class ContactBookRepository(
         senderRole: String?,
         recipientRole: String?,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String?
     ) {
         val payload = mutableMapOf<String, Any?>(
             "name" to name,
@@ -259,6 +263,7 @@ class ContactBookRepository(
         if (senderRole != null) contextPayload["sender_role"] = senderRole
         if (recipientRole != null) contextPayload["recipient_role"] = recipientRole
         if (personalPrompt != null) contextPayload["personal_prompt"] = personalPrompt
+        if (languagePreference != null) contextPayload["language_preference"] = languagePreference
         if (contextPayload.isNotEmpty()) {
             payload["context"] = contextPayload
         }

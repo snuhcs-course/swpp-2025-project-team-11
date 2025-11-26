@@ -28,7 +28,8 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
         senderRole: String?,
         recipientRole: String,
         personalPrompt: String?,
-        group: Group?
+        group: Group?,
+        languagePreference: String? = null
     ) {
         if (name.isBlank()) {
             _uiState.value = AddContactUiState(isLoading = false, error = "이름을 입력해 주세요.")
@@ -42,7 +43,15 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = AddContactUiState(isLoading = true)
         viewModelScope.launch {
             try {
-                val res = repository.addContact(name, email, group?.id, senderRole, recipientRole, personalPrompt)
+                val res = repository.addContact(
+                    name = name,
+                    email = email,
+                    groupId = group?.id,
+                    senderRole = senderRole,
+                    recipientRole = recipientRole,
+                    personalPrompt = personalPrompt,
+                    languagePreference = languagePreference
+                )
                 _uiState.value = AddContactUiState(
                     isLoading = false,
                     lastSuccessMsg = "추가 성공(연락처 ID: ${res.id})",
