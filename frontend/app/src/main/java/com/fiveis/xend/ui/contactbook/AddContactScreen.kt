@@ -665,7 +665,7 @@ fun AddContactScreen(
 
     if (showLanguageDialog) {
         LanguageDialog(
-            selectedLanguage = languagePreference,
+            selectedLanguage = if (languagePreference == "KOR") "Korean" else languagePreference,
             onLanguageSelected = { selected ->
                 languagePreference = selected
                 onLanguagePreferenceChange(selected)

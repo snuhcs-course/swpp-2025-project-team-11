@@ -89,6 +89,7 @@ val languageOptions = listOf(
 
 fun languageDisplayText(value: String): String {
     if (value.isBlank()) return ""
+    if (value == "KOR") return languageOptions[0].label
     return languageOptions.firstOrNull { it.value.equals(value, ignoreCase = true) }?.label ?: value
 }
 
@@ -269,7 +270,7 @@ private fun ProfileInfoCard(
 
     if (showLanguageDialog) {
         LanguageDialog(
-            selectedLanguage = uiState.languagePreference,
+            selectedLanguage = if (uiState.languagePreference == "KOR") "Korean" else uiState.languagePreference,
             onLanguageSelected = {
                 onUpdateLanguagePreference(it)
             },

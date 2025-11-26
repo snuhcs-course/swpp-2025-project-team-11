@@ -650,7 +650,7 @@ fun AddContactDialog(
 
     if (showLanguageDialog) {
         LanguageDialog(
-            selectedLanguage = languagePreference,
+            selectedLanguage = if (languagePreference == "KOR") "Korean" else languagePreference,
             onLanguageSelected = { selected -> languagePreference = selected },
             onDismiss = { showLanguageDialog = false }
         )

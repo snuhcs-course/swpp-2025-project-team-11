@@ -326,6 +326,46 @@ fun ContactDetailScreen(
                             }
                         }
                     }
+
+                    Spacer(Modifier.height(4.dp))
+                    HorizontalDivider()
+
+                    contact.context?.languagePreference
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { language ->
+                            Column {
+                                Text(
+                                    text = "메일 작성 언어",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = languageDisplayText(language),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+
+                    if (contact.context?.languagePreference.isNullOrBlank()) {
+                        Column {
+                            Text(
+                                text = "메일 작성 언어",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "프로필 기본값",
+                                fontSize = 16.sp,
+                                color = TextPrimary
+                            )
+                        }
+                    }
                 }
             }
 //            uiState.contact.group?.let { g ->
@@ -1092,7 +1132,7 @@ private fun EditContactDialog(
 
     if (showLanguageDialog) {
         LanguageDialog(
-            selectedLanguage = languagePreference,
+            selectedLanguage = if (languagePreference == "KOR") "Korean" else languagePreference,
             onLanguageSelected = { selected -> onLanguagePreferenceChange(selected) },
             onDismiss = { showLanguageDialog = false }
         )
