@@ -1,5 +1,6 @@
 import json
 import re
+import unittest
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -11,6 +12,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.ai.services import pii_masker as pm
+from apps.ai.services.mail_generation import (
+    stream_mail_generation,
+    stream_mail_generation_test,
+)
 from apps.ai.services.utils import (
     _fetch_analysis_for_group,
     _fetch_analysis_for_single,
@@ -326,6 +331,101 @@ class ReplyOptionsStreamViewTest(TestCase):
 
 def _drain(gen):
     return list(gen)
+
+
+class TestStreamMailGeneration(unittest.IsolatedAsyncioTestCase):
+
+    @patch("apps.ai.services.mail_generation.sse_event")
+    @patch("apps.ai.services.mail_generation.heartbeat")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="REQ1")
+    @patch("apps.ai.services.mail_generation.build_prompt_inputs")
+    @patch("apps.ai.services.mail_generation.collect_prompt_context")
+    async def test_stream_mail_generation(
+        self,
+        mock_collect,
+        mock_build_inputs,
+        mock_req_id,
+        MockMasker,
+        mock_subject_chain,
+        mock_body_chain,
+        mock_unmask,
+        mock_heartbeat,
+        mock_sse,
+    ):
+        mock_collect.return_value = {"user": "u"}
+        mock_build_inputs.return_value = {"language": "ko", "recipients": ["a@a.com"]}
+        masker_instance = MockMasker.return_value
+        masker_instance.mask_inputs.return_value = ({"body": "MASKED_BODY"}, {"a": "b"})
+        mock_subject_chain.invoke.return_value = "MASKED_TITLE"
+        mock_body_chain.stream.return_value = iter(["BODY1", "BODY2"])
+        mock_unmask.side_effect = lambda x, *_: x
+        mock_sse.side_effect = lambda evt, data, eid=None, retry_ms=None: f"SSE:{evt}"
+
+        gen = stream_mail_generation(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
+        )
+
+        result = []
+        async for ev in gen:
+            result.append(ev)
+
+        self.assertIn("SSE:ready", result[0])
+        self.assertIn("SSE:subject", result[1])
+        self.assertIn("SSE:body.delta", result[2])
+        self.assertIn("SSE:body.delta", result[3])
+        self.assertIn("SSE:done", result[-1])
+        mock_collect.assert_called_once()
+        mock_build_inputs.assert_called_once()
+        mock_subject_chain.invoke.assert_called_once()
+        mock_body_chain.stream.assert_called_once()
+
+
+class StreamMailGenerationTestCase(TestCase):
+
+    def test_stream_mail_generation_test(self):
+        gen = stream_mail_generation_test()
+
+        events = list(gen)
+        self.assertGreater(len(events), 5, "스트림 이벤트가 너무 적음 — 제대로 작동하지 않는 것 같음")
+
+        first = events[0]
+        self.assertIn("event: ready", first)
+        self.assertIn("data:", first)
+        self.assertIn("ts", first)
+
+        second = events[1]
+        self.assertIn("event: subject", second)
+        self.assertIn("Important Update", second)
+
+        body_events = [ev for ev in events if "event: body.delta" in ev]
+        self.assertGreater(len(body_events), 3, "body.delta 이벤트가 충분히 출력되지 않음")
+
+        sample_body = body_events[0]
+        self.assertIn("data:", sample_body)
+        self.assertIn("seq", sample_body)
+        self.assertIn("text", sample_body)
+
+        last = events[-1]
+        self.assertIn("event: done", last)
+        self.assertIn("reason", last)
+
+        order = []
+        for ev in events:
+            for line in ev.split("\n"):
+                if line.startswith("event:"):
+                    order.append(line)
+                    break
+
+        self.assertIn("event: ready", order[0])
+        self.assertIn("event: subject", order[1])
+        self.assertIn("event: done", order[-1])
 
 
 class PiiMaskerAndUnmaskTest(SimpleTestCase):
