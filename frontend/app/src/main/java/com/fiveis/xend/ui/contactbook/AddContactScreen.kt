@@ -58,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.ui.compose.Banner
+import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.profile.LanguageDialog
 import com.fiveis.xend.ui.profile.languageDisplayText
 import com.fiveis.xend.ui.theme.AddButtonBackground
@@ -115,7 +117,12 @@ fun AddContactScreen(
     onGmailContactsSync: () -> Unit,
     onBottomNavChange: (String) -> Unit = {},
     onGroupChange: (Group?) -> Unit = {},
-    onAddGroupClick: () -> Unit = {}
+    onAddGroupClick: () -> Unit = {},
+    showSuccessBanner: Boolean = false,
+    successMessage: String? = null,
+    onDismissSuccessBanner: () -> Unit = {},
+    errorMessage: String? = null,
+    onDismissError: () -> Unit = {}
 ) {
     val directInputLabel = "직접 입력"
 
@@ -194,6 +201,25 @@ fun AddContactScreen(
                 .background(BackgroundLight)
         ) {
             Spacer(Modifier.height(8.dp))
+            if (showSuccessBanner && successMessage != null) {
+                Banner(
+                    message = successMessage,
+                    type = BannerType.SUCCESS,
+                    onDismiss = onDismissSuccessBanner,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            if (errorMessage != null) {
+                Banner(
+                    message = errorMessage,
+                    type = BannerType.ERROR,
+                    onDismiss = onDismissError,
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp)
+                )
+                Spacer(Modifier.height(12.dp))
+            }
 
             Column(
                 modifier = Modifier

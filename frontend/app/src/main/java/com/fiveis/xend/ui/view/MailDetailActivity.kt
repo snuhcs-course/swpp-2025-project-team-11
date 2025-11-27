@@ -141,7 +141,7 @@ class MailDetailActivity : ComponentActivity() {
                                         personalPrompt = personalPrompt,
                                         languagePreference = language
                                     )
-                                    Toast.makeText(context, "연락처를 추가했습니다.", Toast.LENGTH_SHORT).show()
+                                    // 연락처 추가 성공 - 다이얼로그 닫기
                                     showAddContactDialog = false
                                 } catch (e: Exception) {
                                     Toast.makeText(

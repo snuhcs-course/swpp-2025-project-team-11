@@ -175,7 +175,7 @@ class AddGroupActivity : ComponentActivity() {
                 }
 
                 // 결과 피드백
-                LaunchedEffect(addUiState.error, addUiState.lastSuccessMsg) {
+                LaunchedEffect(addUiState.error, addUiState.showSuccessBanner) {
                     addUiState.error?.let {
                         Toast.makeText(
                             this@AddGroupActivity,
@@ -183,12 +183,8 @@ class AddGroupActivity : ComponentActivity() {
                             Toast.LENGTH_LONG
                         ).show()
                     }
-                    addUiState.lastSuccessMsg?.let {
-                        Toast.makeText(
-                            this@AddGroupActivity,
-                            it,
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    if (addUiState.showSuccessBanner) {
+                        // 성공 시 바로 종료
                         setResult(RESULT_OK)
                         finish()
                         overridePendingTransition(

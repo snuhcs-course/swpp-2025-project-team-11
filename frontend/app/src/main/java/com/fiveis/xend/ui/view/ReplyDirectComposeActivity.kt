@@ -2,6 +2,7 @@ package com.fiveis.xend.ui.view
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -158,6 +159,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
 
                 // Track if generatedBody has been applied
                 var generatedBodyApplied by remember { mutableStateOf(false) }
+                var allowAiOverwrite by rememberSaveable { mutableStateOf(generatedBody.isEmpty()) }
 
                 // Enable/disable realtime mode
                 LaunchedEffect(aiRealtime) {
@@ -199,25 +201,25 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     }
                 }
 
-                // Sync AI generated content (only when no Intent-provided content)
-                LaunchedEffect(composeUi.subject) {
+                // Sync AI generated content (respect overwrite flag)
+                LaunchedEffect(composeUi.subject, allowAiOverwrite) {
                     android.util.Log.d(
                         "ReplyDirectCompose",
                         "LaunchedEffect(subject): subj='${composeUi.subject}', " +
                             "genEmpty=${generatedBody.isEmpty()}"
                     )
-                    if (composeUi.subject.isNotBlank() && generatedBody.isEmpty()) {
+                    if (composeUi.subject.isNotBlank() && (generatedBody.isEmpty() || allowAiOverwrite)) {
                         currentSubject = composeUi.subject
                     }
                 }
-                LaunchedEffect(composeUi.bodyRendered, generatedBody) {
+                LaunchedEffect(composeUi.bodyRendered, allowAiOverwrite) {
                     android.util.Log.d(
                         "ReplyDirectCompose",
                         "LaunchedEffect(bodyRendered): bodyLen=${composeUi.bodyRendered.length}, " +
                             "genLen=${generatedBody.length}, editor=${editorState.editor}"
                     )
-                    // Only apply AI-streamed body if there's no Intent-provided body
-                    if (composeUi.bodyRendered.isNotEmpty() && generatedBody.isEmpty()) {
+                    // Apply AI-streamed body only when allowed
+                    if (composeUi.bodyRendered.isNotEmpty() && allowAiOverwrite) {
                         android.util.Log.d("ReplyDirectCompose", "Setting HTML from bodyRendered")
                         editorState.setHtml(composeUi.bodyRendered)
                     }
@@ -308,89 +310,96 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     }
                 }
 
-                if (showTemplateScreen) {
-                    // 템플릿 선택 화면
-                    TemplateSelectionScreen(
-                        onBack = { showTemplateScreen = false },
-                        onTemplateSelected = { template ->
-                            currentSubject = template.subject
-                            editorState.setHtml(template.body)
-                            showTemplateScreen = false
+                Box(modifier = Modifier.fillMaxSize()) {
+                    ReplyDirectComposeScreen(
+                        recipientEmail = recipientEmail,
+                        recipientName = resolvedRecipientName,
+                        subject = currentSubject,
+                        groups = recipientGroupNames,
+                        onBack = { finish() },
+                        onSend = { bodyText ->
+                            // 이메일 전송
+                            sendVm.sendEmail(
+                                to = listOf(recipientEmail),
+                                subject = currentSubject,
+                                body = bodyText
+                            )
+                        },
+                        onTemplateClick = { showTemplateScreen = true },
+                        onSubjectChange = { currentSubject = it },
+                        editorState = editorState,
+                        senderEmail = senderEmail,
+                        date = date,
+                        originalBody = originalBody,
+                        sendUiState = sendUiState,
+                        // AI 관련 파라미터
+                        isStreaming = composeUi.isStreaming,
+                        suggestionText = composeUi.suggestionText,
+                        aiRealtime = aiRealtime,
+                        onUndo = undoAction,
+                        onRedo = redoAction,
+                        onAiComplete = {
+                            // Save current state before AI generation
+                            composeVm.saveUndoSnapshot(
+                                subject = currentSubject,
+                                bodyHtml = editorState.getHtml()
+                            )
+                            canUndo = true
+                            canRedo = false
+                            allowAiOverwrite = true
+
+                            val payload = JSONObject().apply {
+                                put("subject", currentSubject.ifBlank { "제목 생성" })
+                                put("body", editorState.getHtml().ifBlank { "간단한 답장 내용" })
+                                put("to_emails", JSONArray(listOf(recipientEmail)))
+                                // 답장이므로 원본 메일 정보 포함
+                                if (originalBody.isNotEmpty()) {
+                                    put("reply_body", originalBody)
+                                }
+                            }
+                            composeVm.startStreaming(payload)
+                        },
+                        onStopStreaming = { composeVm.stopStreaming() },
+                        onAcceptSuggestion = acceptSuggestion,
+                        onAiRealtimeToggle = { aiRealtime = it },
+                        bannerState = bannerState,
+                        onDismissBanner = { bannerState = null },
+                        showInlineSwipeBar = false,
+                        canUndo = canUndo,
+                        canRedo = canRedo,
+                        showAddContactButton = recipientContact == null,
+                        onAddContactClick = {
+                            selectedContactForDialog = Contact(
+                                id = -1L,
+                                name = resolvedRecipientName.substringBefore("<").trim().ifBlank { recipientEmail },
+                                email = recipientEmail,
+                                group = null
+                            )
+                            showAddContactDialog = true
                         }
                     )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        ReplyDirectComposeScreen(
-                            recipientEmail = recipientEmail,
-                            recipientName = resolvedRecipientName,
-                            subject = currentSubject,
-                            groups = recipientGroupNames,
-                            onBack = { finish() },
-                            onSend = { bodyText ->
-                                // 이메일 전송
-                                sendVm.sendEmail(
-                                    to = listOf(recipientEmail),
-                                    subject = currentSubject,
-                                    body = bodyText
-                                )
-                            },
-                            onTemplateClick = { showTemplateScreen = true },
-                            onSubjectChange = { currentSubject = it },
-                            editorState = editorState,
-                            senderEmail = senderEmail,
-                            date = date,
-                            originalBody = originalBody,
-                            sendUiState = sendUiState,
-                            // AI 관련 파라미터
-                            isStreaming = composeUi.isStreaming,
-                            suggestionText = composeUi.suggestionText,
-                            aiRealtime = aiRealtime,
-                            onUndo = undoAction,
-                            onRedo = redoAction,
-                            onAiComplete = {
-                                // Save current state before AI generation
-                                composeVm.saveUndoSnapshot(
-                                    subject = currentSubject,
-                                    bodyHtml = editorState.getHtml()
-                                )
-                                canUndo = true
-                                canRedo = false
 
-                                val payload = JSONObject().apply {
-                                    put("subject", currentSubject.ifBlank { "제목 생성" })
-                                    put("body", editorState.getHtml().ifBlank { "간단한 답장 내용" })
-                                    put("to_emails", JSONArray(listOf(recipientEmail)))
-                                    // 답장이므로 원본 메일 정보 포함
-                                    if (originalBody.isNotEmpty()) {
-                                        put("reply_body", originalBody)
-                                    }
+                    SwipeSuggestionOverlay(
+                        visible = composeUi.suggestionText.isNotEmpty(),
+                        onSwipe = acceptSuggestion
+                    )
+
+                    if (showTemplateScreen) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.4f))
+                        ) {
+                            TemplateSelectionScreen(
+                                onBack = { showTemplateScreen = false },
+                                onTemplateSelected = { template ->
+                                    currentSubject = template.subject
+                                    val htmlBody = convertTemplateBodyToHtml(template.body)
+                                    editorState.setHtml(htmlBody)
+                                    showTemplateScreen = false
                                 }
-                                composeVm.startStreaming(payload)
-                            },
-                            onStopStreaming = { composeVm.stopStreaming() },
-                            onAcceptSuggestion = acceptSuggestion,
-                            onAiRealtimeToggle = { aiRealtime = it },
-                            bannerState = bannerState,
-                            onDismissBanner = { bannerState = null },
-                            showInlineSwipeBar = false,
-                            canUndo = canUndo,
-                            canRedo = canRedo,
-                            showAddContactButton = recipientContact == null,
-                            onAddContactClick = {
-                                selectedContactForDialog = Contact(
-                                    id = -1L,
-                                    name = resolvedRecipientName.substringBefore("<").trim().ifBlank { recipientEmail },
-                                    email = recipientEmail,
-                                    group = null
-                                )
-                                showAddContactDialog = true
-                            }
-                        )
-
-                        SwipeSuggestionOverlay(
-                            visible = composeUi.suggestionText.isNotEmpty(),
-                            onSwipe = acceptSuggestion
-                        )
+                            )
+                        }
                     }
                 }
 
@@ -498,6 +507,16 @@ private fun String.toHtmlPreservingLineBreaks(): String {
         index++
     }
     return sb.toString()
+}
+
+private fun convertTemplateBodyToHtml(rawText: String): String {
+    return rawText.lines()
+        .joinToString("<br>") { line ->
+            val trimmed = line.trimEnd()
+            val encoded = TextUtils.htmlEncode(trimmed)
+            if (encoded.isEmpty()) "&nbsp;" else encoded
+        }
+        .replace(Regex("(<br>)+$"), "")
 }
 
 @Composable

@@ -82,6 +82,7 @@ fun ContactBookScreen(
     uiState: ContactBookUiState,
     onRefresh: () -> Unit = {},
     onTabSelected: (ContactBookTab) -> Unit,
+    onDismissSuccessBanner: () -> Unit = {},
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
@@ -202,6 +203,16 @@ fun ContactBookScreen(
                             }
                         }
                     )
+
+                    // Success Banner
+                    if (uiState.showSuccessBanner && uiState.successMessage != null) {
+                        com.fiveis.xend.ui.compose.Banner(
+                            message = uiState.successMessage,
+                            type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
+                            onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
 
                     // 탭
                     Row(

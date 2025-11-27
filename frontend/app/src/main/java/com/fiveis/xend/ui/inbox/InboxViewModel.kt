@@ -34,6 +34,8 @@ data class InboxUiState(
     val contactsByEmail: Map<String, String> = emptyMap(),
     // 임시 저장 성공 배너 표시 여부
     val showDraftSavedBanner: Boolean = false,
+    // 메일 전송 성공 배너 표시 여부
+    val showMailSentBanner: Boolean = false,
     // 메일 삭제 관련
     val deletingEmailId: String? = null,
     val deleteError: String? = null
@@ -357,6 +359,20 @@ class InboxViewModel(
      */
     fun dismissDraftSavedBanner() {
         _uiState.update { it.copy(showDraftSavedBanner = false) }
+    }
+
+    /**
+     * 메일 전송 성공 배너 표시
+     */
+    fun showMailSentBanner() {
+        _uiState.update { it.copy(showMailSentBanner = true) }
+    }
+
+    /**
+     * 메일 전송 성공 배너 닫기
+     */
+    fun dismissMailSentBanner() {
+        _uiState.update { it.copy(showMailSentBanner = false) }
     }
 
     /**

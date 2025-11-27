@@ -397,28 +397,61 @@ private fun DirectComposeActionRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedButton(
-                onClick = onAiComplete,
-                modifier = Modifier.size(width = 96.dp, height = 35.dp),
-                enabled = !isStreaming,
-                contentPadding = PaddingValues(horizontal = 15.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Blue60),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Blue60,
-                    disabledContentColor = Blue60.copy(alpha = 0.4f)
-                )
-            ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+            if (isStreaming) {
                 Text(
-                    "AI 완성",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    text = "AI 플래너가 메일 구조를 설계 중입니다",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue60
+                )
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "AI 중지",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "중지",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFEF4444)
+                        )
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onAiComplete,
+                    enabled = true,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Blue60),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Blue60
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = "AI 완성",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "AI 완성",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
             }
         }
     }
@@ -571,39 +604,34 @@ private fun SubjectControlRow(
             }
 
             if (isStreaming) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "AI 플래너가 메일 구조를 설계 중입니다",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue60
+                )
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onStopStreaming,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Stop,
-                            contentDescription = "AI 중지",
-                            tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "중지",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFFEF4444)
-                            )
-                        )
-                    }
-                    Text(
-                        text = "AI 플래너가 메일 구조를 설계 중입니다",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "AI 중지",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(16.dp)
                     )
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = Blue60
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "중지",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFEF4444)
+                        )
                     )
                 }
             } else {
