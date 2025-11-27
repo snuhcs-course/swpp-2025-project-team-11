@@ -1053,7 +1053,13 @@ private fun extractEmailAddress(formattedEmail: String): String {
 private fun extractName(formattedString: String): String {
     val nameRegex = "(.+?)\\s*<".toRegex() // Matches everything before <
     val matchResult = nameRegex.find(formattedString)
-    return matchResult?.groupValues?.get(1)?.trim() ?: formattedString.substringBefore("<").trim().ifEmpty {
-        formattedString
+    val extracted = matchResult?.groupValues?.get(1)?.trim() ?: formattedString.substringBefore("<").trim()
+
+    // If extracted name is empty, it means we have format like "<email@example.com>"
+    // In that case, extract and return the email address
+    return if (extracted.isEmpty()) {
+        extractEmailAddress(formattedString)
+    } else {
+        extracted
     }
 }

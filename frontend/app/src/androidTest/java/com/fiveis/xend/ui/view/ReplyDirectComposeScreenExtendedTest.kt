@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -47,13 +48,11 @@ class ReplyDirectComposeScreenExtendedTest {
                 onBack = {}, onSend = {}
             )
         }
-        // Should fallback to empty string for name or partial? 
-        // Code: "(.+?)\s*<" regex for name. 
-        // "<a@b.com>" might not match name group properly or match empty.
-        // Actually logic: extractName("<a@b.com>") -> matchResult null -> substringBefore("<") -> ""
-        // If name is empty, RecipientInfoSection just displays it (empty string).
-        // But let's check email is displayed.
-        composeTestRule.onNodeWithText("a@b.com").assertIsDisplayed()
+        // When name is "<a@b.com>", extractName returns "a@b.com" (fallback to email)
+        // and extractEmailAddress also returns "a@b.com"
+        // So "a@b.com" appears twice in the UI (once as name, once as email)
+        // Use onAllNodesWithText to verify it appears at least once
+        composeTestRule.onAllNodesWithText("a@b.com")[0].assertIsDisplayed()
     }
 
     @Test

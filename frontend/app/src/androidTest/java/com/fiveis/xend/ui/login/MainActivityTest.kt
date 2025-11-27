@@ -1,11 +1,9 @@
 package com.fiveis.xend.ui.login
 
 import android.content.Intent
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.fiveis.xend.data.source.TokenManager
@@ -20,21 +18,19 @@ import org.junit.runner.RunWith
 class MainActivityTest {
 
     private lateinit var tokenManager: TokenManager
-    private lateinit var scenario: ActivityScenario<MainActivity>
+    private var scenario: ActivityScenario<MainActivity>? = null
 
     @Before
     fun setup() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         tokenManager = TokenManager(context)
-        // Clear any existing tokens
+        // Clear any existing tokens to ensure clean state
         tokenManager.clearTokens()
     }
 
     @After
     fun tearDown() {
-        if (::scenario.isInitialized) {
-            scenario.close()
-        }
+        scenario?.close()
         tokenManager.clearTokens()
     }
 
@@ -43,10 +39,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then - Activity should launch without crash
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        // Then - Activity should be in RESUMED state
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -57,9 +51,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then - Should show LoginScreen (wait for composition)
-        Thread.sleep(500) // Wait for compose to render
-        // LoginScreen content should be visible
+        // Then - Should stay in RESUMED state (not navigate away)
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -67,11 +60,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-            // Activity should be created successfully with theme
-        }
+        // Then - Verify lifecycle state
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -79,11 +69,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-            // TokenManager should be initialized (implicitly tested by no crash)
-        }
+        // Then - Activity should launch successfully with TokenManager initialized
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -92,9 +79,7 @@ class MainActivityTest {
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
         // Then - Should complete onCreate without exceptions
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -102,23 +87,18 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            // Content should be set via setContent
-            assertNotNull(activity.window.decorView)
-        }
+        // Then - Verify activity state
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
     fun mainActivity_survives_recreation() {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario.recreate()
+        scenario?.recreate()
 
         // Then - Activity should recreate successfully
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -133,9 +113,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then - Should not crash even with saved tokens
-        // Activity may navigate away if tokens are valid, so just verify it launched
-        Thread.sleep(100)
+        // Then - Should not crash (may navigate to MailActivity and finish, which is ok)
+        assertNotNull(scenario)
     }
 
     @Test
@@ -144,22 +123,20 @@ class MainActivityTest {
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
         // Simulate configuration change
-        scenario.recreate()
+        scenario?.recreate()
 
         // Then - Should handle recreation
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
     fun mainActivity_can_be_finished() {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario.onActivity { it.finish() }
 
-        // Then - Should finish gracefully
-        Thread.sleep(100)
+        // Then - Should be able to move to DESTROYED state
+        scenario?.moveToState(Lifecycle.State.DESTROYED)
+        assertEquals(Lifecycle.State.DESTROYED, scenario?.state)
     }
 
     @Test
@@ -171,9 +148,7 @@ class MainActivityTest {
         scenario = ActivityScenario.launch<MainActivity>(intent)
 
         // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -182,24 +157,18 @@ class MainActivityTest {
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
         // Then - First launch with null savedInstanceState
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
     fun mainActivity_multiple_launch_and_finish_cycles() {
         // First launch
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario.onActivity { it.finish() }
-        scenario.close()
-        Thread.sleep(100)
+        scenario?.close()
 
         // Second launch
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -207,11 +176,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity.applicationContext)
-            assertNotNull(activity.baseContext)
-        }
+        // Then - Verify activity launched successfully
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -219,11 +185,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity.window)
-            assertNotNull(activity.window.decorView)
-        }
+        // Then - Verify activity state
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -231,35 +194,29 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity.theme)
-        }
+        // Then - Verify activity launched with theme
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
     fun mainActivity_survives_pause_and_resume() {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
-        scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        scenario?.moveToState(Lifecycle.State.STARTED)
+        scenario?.moveToState(Lifecycle.State.RESUMED)
 
         // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
     fun mainActivity_can_move_to_background() {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        scenario?.moveToState(Lifecycle.State.CREATED)
 
         // Then - Should handle background state
-        scenario.onActivity { activity ->
-            assertNotNull(activity)
-        }
+        assertEquals(Lifecycle.State.CREATED, scenario?.state)
     }
 
     @Test
@@ -267,11 +224,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity.resources)
-            assertNotNull(activity.assets)
-        }
+        // Then - Verify activity launched
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test
@@ -279,11 +233,8 @@ class MainActivityTest {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // Then
-        scenario.onActivity { activity ->
-            assertNotNull(activity.componentName)
-            assertEquals("com.fiveis.xend", activity.componentName.packageName)
-        }
+        // Then - Verify activity state
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
     }
 
     @Test

@@ -29,7 +29,8 @@ class AiPromptPreviewDialogTest {
             AiPromptPreviewDialog(contacts = contacts, onDismiss = {})
         }
 
-        // Then
+        // Then - Wait for composition and verify contact info is displayed
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Alice").assertIsDisplayed()
         composeTestRule.onNodeWithText("alice@test.com").assertIsDisplayed()
         composeTestRule.onNodeWithText("Bob").assertIsDisplayed()
@@ -49,11 +50,15 @@ class AiPromptPreviewDialogTest {
             AiPromptPreviewDialog(contacts = contacts, onDismiss = { dismissClicked = true })
         }
 
-        // Then
+        // Wait for initial composition
+        composeTestRule.waitForIdle()
+
+        // Then - Click confirm button immediately (before network completes to avoid crash)
         composeTestRule.onNodeWithText("확인").performClick()
-        assert(dismissClicked)
+
+        assert(dismissClicked) { "Dismiss callback should have been called" }
     }
-    
+
     // Note: Testing the network loading state of AiPromptPreviewDialog is hard here because
     // it calls RetrofitClient internally within a LaunchedEffect.
     // To test loading/error/success states, we would need to mock the network response.
