@@ -78,8 +78,15 @@ class ReplyDirectComposeScreenTest {
             )
         }
 
+        // Wait for the UI to settle
+        composeTestRule.waitForIdle()
+
         // Then
         composeTestRule.onNodeWithContentDescription("전송").performClick()
+
+        // Wait for callback to be invoked
+        composeTestRule.waitForIdle()
+
         assert(sendCalled)
     }
 

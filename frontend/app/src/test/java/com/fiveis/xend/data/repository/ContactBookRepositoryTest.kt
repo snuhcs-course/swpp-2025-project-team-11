@@ -1288,4 +1288,83 @@ class ContactBookRepositoryTest {
         coVerify { contactApiService.updateContact(contactId, mapOf("group_id" to groupId)) }
         coVerify { contactDao.upsertContacts(any()) }
     }
+
+    @Test
+    fun update_group_with_all_params_succeeds() = runTest {
+        val groupId = 1L
+        val updatedGroup = GroupResponse(
+            id = groupId,
+            name = "Updated Name",
+            description = "Updated Desc",
+            emoji = "🔥",
+            options = emptyList()
+        )
+
+        coEvery { contactApiService.updateGroup(groupId, any()) } returns Response.success(updatedGroup)
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.deleteCrossRefsByGroup(groupId) } returns Unit
+
+        val result = repository.updateGroup(
+            groupId = groupId,
+            name = "Updated Name",
+            description = "Updated Desc",
+            emoji = "🔥",
+            emojiProvided = true,
+            optionIds = emptyList()
+        )
+
+        assertEquals(updatedGroup, result)
+        coVerify { contactApiService.updateGroup(groupId, match {
+            it["name"] == "Updated Name" &&
+            it["description"] == "Updated Desc" &&
+            it["emoji"] == "🔥" &&
+            it["option_ids"] == emptyList<Long>()
+        }) }
+    }
+
+    @Test
+    fun search_contacts_returns_filtered_flow() = runTest {
+        val allContacts = listOf(
+            com.fiveis.xend.data.database.ContactWithGroupAndContext(
+                contact = com.fiveis.xend.data.database.entity.ContactEntity(1L, null, "Alice", "alice@test.com"),
+                group = null,
+                context = null
+            ),
+            com.fiveis.xend.data.database.ContactWithGroupAndContext(
+                contact = com.fiveis.xend.data.database.entity.ContactEntity(2L, null, "Bob", "bob@test.com"),
+                group = null,
+                context = null
+            )
+        )
+
+        every { contactDao.observeAllWithGroup() } returns flowOf(allContacts)
+
+        val result = repository.searchContacts("ali")
+
+        result.collect { contacts ->
+            assertEquals(1, contacts.size)
+            assertEquals("Alice", contacts[0].name)
+        }
+    }
+
+    @Test
+    fun contact_data_and_group_data_classes_work() {
+        val contact = com.fiveis.xend.data.model.Contact(
+            id = 1L,
+            name = "John",
+            email = "john@example.com"
+        )
+        val contactData = com.fiveis.xend.data.repository.ContactData(listOf(contact))
+        assertEquals(1, contactData.contacts.size)
+        assertEquals("John", contactData.contacts[0].name)
+
+        val group = com.fiveis.xend.data.model.Group(
+            id = 1L,
+            name = "Team",
+            description = "Description"
+        )
+        val groupData = com.fiveis.xend.data.repository.GroupData(listOf(group))
+        assertEquals(1, groupData.groups.size)
+        assertEquals("Team", groupData.groups[0].name)
+    }
 }

@@ -79,7 +79,7 @@ class MailComposeIntegrationTest {
             body = "Test Body"
         )
 
-        val result = mailApiService.sendEmail(request.toMultipartParts())
+        val result = mailApiService.sendEmail(request.toMultipartParts(context))
 
         assertTrue(result.isSuccessful)
         assertEquals(201, result.code())
@@ -129,7 +129,7 @@ class MailComposeIntegrationTest {
         Thread.sleep(100)
 
         assertTrue(viewModel.ui.value.isRealtimeEnabled)
-        verify { wsClient.connect(any(), any(), any()) }
+        verify { wsClient.connect(any(), any(), any(), any()) }
     }
 
     @Test(timeout = 5000)
@@ -156,7 +156,7 @@ class MailComposeIntegrationTest {
         viewModel.onTextChanged("Test message")
         Thread.sleep(100)
 
-        verify { wsClient.connect(any(), any(), any()) }
+        verify { wsClient.connect(any(), any(), any(), any()) }
     }
 
     @Test(timeout = 5000)
@@ -249,7 +249,7 @@ class MailComposeIntegrationTest {
             body = "Test"
         )
 
-        val result = mailApiService.sendEmail(request.toMultipartParts())
+        val result = mailApiService.sendEmail(request.toMultipartParts(context))
 
         assertFalse(result.isSuccessful)
         assertEquals(400, result.code())
@@ -289,7 +289,7 @@ class MailComposeIntegrationTest {
         Thread.sleep(50)
 
         // Connect is called twice (once for each enable), disconnect is called twice (once for disable, once on second enable)
-        verify(atLeast = 2) { wsClient.connect(any(), any(), any()) }
+        verify(atLeast = 2) { wsClient.connect(any(), any(), any(), any()) }
         verify(atLeast = 1) { wsClient.disconnect() }
     }
 
@@ -325,7 +325,7 @@ class MailComposeIntegrationTest {
             body = "Test Body"
         )
 
-        val result = mailApiService.sendEmail(request.toMultipartParts())
+        val result = mailApiService.sendEmail(request.toMultipartParts(context))
 
         assertTrue(result.isSuccessful)
         assertEquals("msg789", result.body()?.id)

@@ -131,11 +131,12 @@ class MailComposeWebSocketClient(
                                 // 토큰 만료 에러 처리
                                 if (message == "token_invalid" && !isRetrying.get()) {
                                     Log.w(TAG, "Token invalid error received, attempting refresh...")
-                                    disconnect()
 
-                                    if (refreshTokenAndRetry()) {
-                                        return
+                                    if (!refreshTokenAndRetry()) {
+                                        // 토큰 갱신 실패 시 연결 종료
+                                        disconnect()
                                     }
+                                    return
                                 }
 
                                 // 기타 에러는 콜백으로 전달

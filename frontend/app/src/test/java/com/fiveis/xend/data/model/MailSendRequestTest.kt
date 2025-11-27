@@ -1,11 +1,15 @@
 package com.fiveis.xend.data.model
 
+import android.content.Context
+import io.mockk.mockk
 import okhttp3.MultipartBody
 import okio.Buffer
 import org.junit.Assert.*
 import org.junit.Test
 
 class MailSendRequestTest {
+
+    private val mockContext: Context = mockk(relaxed = true)
 
     @Test
     fun create_mail_send_request_with_required_fields_only() {
@@ -172,7 +176,7 @@ class MailSendRequestTest {
             isHtml = true
         )
 
-        val parts = request.toMultipartParts()
+        val parts = request.toMultipartParts(mockContext)
         assertEquals("Multipart Subject", parts.valueFor("subject"))
         assertEquals("<p>Body</p>", parts.valueFor("body"))
         assertEquals("true", parts.valueFor("is_html"))
@@ -189,7 +193,7 @@ class MailSendRequestTest {
             body = "Body"
         )
 
-        val parts = request.toMultipartParts()
+        val parts = request.toMultipartParts(mockContext)
         assertEquals(listOf("cc1@example.com", "cc2@example.com"), parts.valuesFor("cc"))
         assertEquals(listOf("bcc@example.com"), parts.valuesFor("bcc"))
     }
