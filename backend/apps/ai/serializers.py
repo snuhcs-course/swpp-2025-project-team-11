@@ -13,12 +13,18 @@ class MailGenerateRequest(serializers.Serializer):
         allow_empty=False,
         required=True,
     )
+    attachment_content_keys = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+    )
 
 
 class ReplyGenerateRequest(serializers.Serializer):
     subject = serializers.CharField(allow_blank=True, required=True)
     body = serializers.CharField(allow_blank=True, required=True)
     to_email = serializers.EmailField(required=True, allow_blank=False)
+    message_id = serializers.CharField(required=False, allow_blank=True)
 
 
 class PromptPreviewRequestSerializer(serializers.Serializer):
@@ -53,6 +59,7 @@ class AttachmentAnalysisResponseSerializer(serializers.Serializer):
     summary = serializers.CharField(help_text="첨부파일 요약")
     insights = serializers.CharField(help_text="핵심 인사이트")
     mail_guide = serializers.CharField(help_text="이메일 작성 가이드")
+    content_key = serializers.CharField(required=False, allow_null=True)
 
 
 class _MailGenResultSerializer(serializers.Serializer):

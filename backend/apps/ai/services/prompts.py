@@ -11,6 +11,8 @@ Core rules:
 - Stay true to the user’s intended purpose; do not invent new facts.
 - Translate into {{ language }} unless proper nouns should remain unchanged.
 - Keep placeholders of the form {{'{{PII:<...>}}'}} exactly as they appear.
+- If attachment analysis is provided, use it only when it meaningfully clarifies the purpose of the email.  
+  Do not restate, quote, or summarize the attachment in detail.
 """.strip()
 
 SUBJECT_USER = """
@@ -42,12 +44,24 @@ You are writing this email as the {{ sender_role }} addressing the {{ recipient_
 Adjust formality and tone accordingly.
 {%- endif %}
 
+{%- if attachments %}
+Below is the analysis of files attached or referenced for this email.  
+Use this information only if it helps refine the subject’s clarity or purpose.  
+Do NOT restate the attachment or overfit to it.
+
+<attachments>
+{%- for att in attachments %}
+- {{ att.filename }}: {{ att.summary }}
+{%- endfor %}
+</attachments>
+{%- endif %}
+
 The user provided the following drafts:
 Subject draft: "{{ subject }}"
 Body draft:
 "{{ body }}"
 
-Use both drafts as reference for meaning and purpose.
+Use both drafts as reference for meaning and purpose.  
 Return only the final subject line in {{ language }}.
 """.strip()
 
@@ -64,6 +78,7 @@ Core constraints:
   <locked_subject>{{ locked_subject }}</locked_subject>
 - If the draft conflicts with the subject, resolve toward the subject’s intent.
 - Do not introduce unrelated topics.
+- If attachment analysis is provided, use it ONLY when it helps clarify the message; never copy, paraphrase, or dump attachment text.
 """.strip()
 
 BODY_USER = """
@@ -182,6 +197,18 @@ Body: {{ fs.body }}
 </fewshots>
 {%- endif %}
 
+{%- if attachments %}
+<attachments>
+{%- for att in attachments %}
+Attachment: {{ att.filename }}
+Summary: {{ att.summary }}
+Guidance: {{ att.mail_guide or att.insights }}
+{%- endfor %}
+</attachments>
+Use this information only when it helps clarify or support the message.  
+Do NOT restate attachment text or over-describe it.
+{%- endif %}
+
 {%- if recipients %}
 This email will be sent to:
 {%- for r in recipients %}
@@ -246,6 +273,9 @@ Rules:
 - Titles in {{ language }}, about 3–8 words.
 - Suggestions must be meaningfully different in intent/tone/purpose.
 - No invented facts; stay grounded in the email content.
+- If attachment analysis is provided, use it only to inform the type/title  
+  (e.g., acknowledging attached report).  
+  Do not restate or summarize the attachment.
 """.strip()
 
 REPLY_PLAN_USER = """
@@ -273,6 +303,14 @@ User's tone/style preferences:
 You are the {{ sender_role }} writing to the {{ recipient_role }}.
 {%- endif %}
 
+{%- if attachments %}
+Attachment context (for planning only):
+{%- for att in attachments %}
+- {{ att.filename }}: {{ att.summary }}
+{%- endfor %}
+Do not restate this content; use only to guide the reply direction.
+{%- endif %}
+
 Output exactly 2–4 options.
 """.strip()
 
@@ -291,6 +329,9 @@ If essential details are missing, use those plain placeholders.
 The following reply type and title are locked:
 <locked_type>{{ locked_type }}</locked_type>
 <locked_title>{{ locked_title }}</locked_title>
+
+If attachment analysis is provided, incorporate it only when necessary to clarify the reply,  
+never to quote or paraphrase the attachment content.
 """.strip()
 
 
@@ -408,6 +449,18 @@ Subject: {{ fs.subject }}
 Body: {{ fs.body }}
 {%- endfor %}
 </fewshots>
+{%- endif %}
+
+{%- if attachments %}
+<attachments>
+{%- for att in attachments %}
+Attachment: {{ att.filename }}
+Summary: {{ att.summary }}
+Guidance: {{ att.mail_guide or att.insights }}
+{%- endfor %}
+</attachments>
+Use this information only to support the reply.  
+Do NOT restate attachment content or details.
 {%- endif %}
 
 {%- if recipients %}
