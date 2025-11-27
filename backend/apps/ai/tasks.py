@@ -80,16 +80,20 @@ def unified_analysis(self, n=10):
         contact_pairs = MailAnalysisResult.objects.values("user", "contact").distinct()
 
         for pair in contact_pairs:
-            user = pair["user"]
-            contact = pair["contact"]
+            user_id = pair["user_id"]
+            contact_id = pair["contact_id"]
 
-            results_qs = MailAnalysisResult.objects.filter(user=user, contact=contact).order_by("-id")  # id 기준 최신순 정렬
+            results_qs = MailAnalysisResult.objects.filter(user_id=user_id, contact_id=contact_id).order_by("-id")
+            latest = results_qs.first()
+            if not latest:
+                continue
 
-            # 최근 MailAnalysisResult 중 가장 최신 id
-            latest_mail_id = results_qs.first().id
+            latest_mail_id = latest.id
 
-            # ContactAnalysisResult 객체 가져오거나 생성 -> 반드시 존재함
-            contact_result, _ = ContactAnalysisResult.objects.get_or_create(user=user, contact=contact)
+            contact_result, _ = ContactAnalysisResult.objects.get_or_create(
+                user_id=user_id,
+                contact_id=contact_id,
+            )
 
             # 이미 최신 분석이 적용된 경우 skip
             if contact_result.last_analysis_id == latest_mail_id:
@@ -125,16 +129,25 @@ def unified_analysis(self, n=10):
         group_pairs = MailAnalysisResult.objects.values("user", "contact__group").distinct()
 
         for pair in group_pairs:
-            user = pair["user"]
-            group = pair["contact__group"]
+            user_id = pair["user_id"]
+            group_id = pair["contact__group_id"]
 
-            results_qs = MailAnalysisResult.objects.filter(user=user, contact__group=group).order_by("-id")  # id 기준 최신순 정렬
+            # 그룹이 없는 경우(None) 스킵
+            if group_id is None:
+                continue
 
-            # 최근 MailAnalysisResult 중 가장 최신 id
-            latest_mail_id = results_qs.first().id
+            results_qs = MailAnalysisResult.objects.filter(user_id=user_id, contact__group_id=group_id).order_by("-id")
+            latest = results_qs.first()
+            if not latest:
+                continue
+
+            latest_mail_id = latest.id
 
             # GroupAnalysisResult 객체 가져오거나 생성 -> 반드시 존재함
-            group_result, _ = GroupAnalysisResult.objects.get_or_create(user=user, group=group)
+            group_result, _ = GroupAnalysisResult.objects.get_or_create(
+                user_id=user_id,
+                group_id=group_id,
+            )
 
             # 이미 최신 분석이 적용된 경우 skip
             if group_result.last_analysis_id == latest_mail_id:

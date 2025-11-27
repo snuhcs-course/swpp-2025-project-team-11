@@ -39,7 +39,6 @@ from .serializers import (
 )
 from .services import (
     GmailService,
-    delete_email_logic,
     get_attachment_logic,
     get_email_detail_logic,
     list_emails_logic,
@@ -81,7 +80,7 @@ class EmailListView(AuthRequiredMixin, generics.GenericAPIView):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description='Comma-separated labels (e.g., "INBOX,UNREAD,SENT,TRASH"). Default: "INBOX"',
+                description='Comma-separated labels (e.g., "INBOX,UNREAD,SENT"). Default: "INBOX"',
             ),
             OpenApiParameter(
                 name="since_date",
@@ -220,58 +219,6 @@ class EmailDetailView(AuthRequiredMixin, generics.GenericAPIView):
 
         serializer = EmailDetailSerializer(message)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @extend_schema_with_common_errors(
-        summary="Delete email",
-        description=(
-            "Gmail에서 해당 메일을 삭제합니다.\n\n"
-            "- 기본값: 휴지통으로 이동 (Trash)\n"
-            "- `?permanent=true` 를 지정하면 완전 삭제 (영구 삭제, 복구 불가)"
-        ),
-        request=None,
-        parameters=[
-            OpenApiParameter(
-                name="permanent",
-                type=OpenApiTypes.BOOL,
-                location=OpenApiParameter.QUERY,
-                required=False,
-                description="true이면 완전 삭제(delete), 생략 또는 false이면 휴지통으로 이동(trash).",
-            ),
-        ],
-        responses={
-            204: OpenApiResponse(description="Email deleted successfully"),
-        },
-    )
-    def delete(self, request, message_id):
-        user = request.user
-
-        raw = (request.query_params.get("permanent") or "").lower()
-        permanent = raw in ("1", "true", "yes", "y")
-
-        try:
-            delete_email_logic(user, message_id, permanent=permanent)
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except ValueError as e:
-            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-        except HttpError as e:
-            if e.resp.status == 404:
-                return Response({"detail": "Message not found"}, status=status.HTTP_404_NOT_FOUND)
-            elif e.resp.status == 403:
-                return Response(
-                    {"detail": "Permission denied or rate limit exceeded"},
-                    status=status.HTTP_429_TOO_MANY_REQUESTS,
-                )
-            elif e.resp.status == 401:
-                return Response({"detail": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
-            return Response(
-                {"detail": f"Gmail API error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        except Exception as e:
-            return Response(
-                {"detail": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
 
 class EmailSendView(AuthRequiredMixin, generics.GenericAPIView):
