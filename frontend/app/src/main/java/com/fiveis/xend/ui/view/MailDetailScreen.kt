@@ -38,7 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Visibility
@@ -73,9 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -85,6 +82,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
 import com.fiveis.xend.data.model.Attachment
 import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.Contact
@@ -97,6 +95,7 @@ import com.fiveis.xend.ui.theme.Blue40
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
+import com.fiveis.xend.ui.theme.Gray600
 import com.fiveis.xend.ui.theme.MailDetailBodyBg
 import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.TextPrimary
@@ -130,7 +129,6 @@ fun MailDetailScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
     var attachmentToDownload by remember { mutableStateOf<Attachment?>(null) }
 
     LaunchedEffect(uiState.downloadSuccessMessage) {
@@ -240,11 +238,7 @@ fun MailDetailScreen(
             isLoading = uiState.isAnalyzingAttachment,
             result = uiState.analysisResult,
             errorMessage = uiState.analysisErrorMessage,
-            onDismiss = onDismissAnalysis,
-            onCopyGuide = { text ->
-                clipboardManager.setText(AnnotatedString(text))
-                Toast.makeText(context, "답장 가이드가 복사되었습니다.", Toast.LENGTH_SHORT).show()
-            }
+            onDismiss = onDismissAnalysis
         )
     }
 
@@ -898,8 +892,7 @@ private fun AttachmentAnalysisPopup(
     isLoading: Boolean,
     result: AttachmentAnalysisResponse?,
     errorMessage: String?,
-    onDismiss: () -> Unit,
-    onCopyGuide: (String) -> Unit
+    onDismiss: () -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -929,8 +922,7 @@ private fun AttachmentAnalysisPopup(
                     AnalysisContent(
                         isLoading = isLoading,
                         result = result,
-                        errorMessage = errorMessage,
-                        onCopyGuide = onCopyGuide
+                        errorMessage = errorMessage
                     )
                 }
             }
@@ -984,12 +976,7 @@ private fun AnalysisHeader(attachment: Attachment, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun AnalysisContent(
-    isLoading: Boolean,
-    result: AttachmentAnalysisResponse?,
-    errorMessage: String?,
-    onCopyGuide: (String) -> Unit
-) {
+private fun AnalysisContent(isLoading: Boolean, result: AttachmentAnalysisResponse?, errorMessage: String?) {
     when {
         isLoading -> {
             Column(
@@ -1058,43 +1045,11 @@ private fun AnalysisContent(
                     contentLines = result.mailGuide.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val guideText = result.mailGuide
-                    val copyEnabled = guideText.isNotBlank()
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        color = Color(0xFFF1F5F9),
-                        modifier = Modifier.clickable(
-                            enabled = copyEnabled,
-                            onClick = { if (copyEnabled) onCopyGuide(guideText) }
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "답장 가이드 복사",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "답장 가이드 복사",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = "답장 작성 가이드는 답장 생성 시 자동으로 반영돼요.",
+                    fontSize = 13.sp,
+                    color = Gray600
+                )
             }
         }
     }
@@ -1367,11 +1322,7 @@ private fun PdfPagePreview(renderer: PdfRenderer, pageIndex: Int) {
         bitmap = null
         val renderedBitmap = withContext(Dispatchers.IO) {
             renderer.openPage(pageIndex).use { page ->
-                val rendered = Bitmap.createBitmap(
-                    page.width * 2,
-                    page.height * 2,
-                    Bitmap.Config.ARGB_8888
-                )
+                val rendered = createBitmap(page.width * 2, page.height * 2)
                 page.render(rendered, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                 rendered
             }
