@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -657,13 +658,15 @@ private fun EditContactDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.90f)
-                .widthIn(max = 720.dp),
+                .widthIn(max = 720.dp)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(
                 modifier = Modifier
                     .background(Color.White)
                     .padding(20.dp)
+                    .fillMaxHeight()
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -694,6 +697,7 @@ private fun EditContactDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f, fill = true)
                         .verticalScroll(scrollState)
                 ) {
                     Text("이름", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)

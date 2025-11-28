@@ -61,6 +61,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -88,6 +89,7 @@ import com.fiveis.xend.data.model.PromptOption
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray400
+import com.fiveis.xend.ui.theme.Gray600
 import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.Red60
 import com.fiveis.xend.ui.theme.StableColor
@@ -1249,7 +1251,13 @@ private fun RenameGroupDialog(
                             )
                         },
                         singleLine = true,
-                        enabled = !isProcessing
+                        enabled = !isProcessing,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = BackgroundLight,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
+                        )
                     )
                 }
 
@@ -1296,7 +1304,13 @@ private fun RenameGroupDialog(
                             )
                         },
                         enabled = !isProcessing,
-                        minLines = 4
+                        minLines = 4,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = BackgroundLight,
+                            unfocusedBorderColor = BorderGray,
+                            focusedBorderColor = Purple60
+                        )
                     )
                 }
 
@@ -1313,14 +1327,15 @@ private fun RenameGroupDialog(
             TextButton(
                 onClick = onConfirm,
                 enabled = isConfirmEnabled && !isProcessing
-            ) { Text("저장") }
+            ) { Text("저장", color = Purple60) }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
                 enabled = !isProcessing
-            ) { Text("취소") }
-        }
+            ) { Text("취소", color = Gray600) }
+        },
+        containerColor = Color.White
     )
 }
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -111,6 +112,7 @@ fun AddContactDialog(
     var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
     var languagePreference by rememberSaveable { mutableStateOf("") }
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     val savable = name.isNotBlank() && email.isNotBlank()
 
@@ -121,13 +123,15 @@ fun AddContactDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.90f)
-                .widthIn(max = 720.dp),
+                .widthIn(max = 720.dp)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(
                 modifier = Modifier
                     .background(Color.White)
                     .padding(20.dp)
+                    .fillMaxHeight()
             ) {
                 // Header
                 Row(
@@ -159,7 +163,8 @@ fun AddContactDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                        .weight(1f, fill = true)
+                        .verticalScroll(scrollState)
                 ) {
                     // 이름 + 이메일
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -558,46 +563,48 @@ fun AddContactDialog(
                             }
                         }
                     }
-                }
 
-                Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                Text("메일 작성 언어", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(8.dp))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showLanguageDialog = true }
-                ) {
-                    OutlinedTextField(
-                        value = languageDisplayText(languagePreference),
-                        onValueChange = {},
+                    Text("메일 작성 언어", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                        placeholder = {
-                            Text(
-                                text = "프로필 기본값",
-                                style = LocalTextStyle.current.copy(fontSize = 13.sp),
-                                color = Gray600
+                            .clickable { showLanguageDialog = true }
+                    ) {
+                        OutlinedTextField(
+                            value = languageDisplayText(languagePreference),
+                            onValueChange = {},
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            placeholder = {
+                                Text(
+                                    text = "프로필 기본값",
+                                    style = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                    color = Gray600
+                                )
+                            },
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                            singleLine = true,
+                            readOnly = true,
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = TextPrimary,
+                                focusedTextColor = TextPrimary,
+                                disabledBorderColor = BorderGray,
+                                unfocusedBorderColor = BorderGray,
+                                focusedBorderColor = Purple60,
+                                disabledContainerColor = Color.White,
+                                focusedContainerColor = Color.White
                             )
-                        },
-                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
-                        singleLine = true,
-                        readOnly = true,
-                        enabled = false,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = TextPrimary,
-                            focusedTextColor = TextPrimary,
-                            disabledBorderColor = BorderGray,
-                            unfocusedBorderColor = BorderGray,
-                            focusedBorderColor = Purple60,
-                            disabledContainerColor = Color.White,
-                            focusedContainerColor = Color.White
                         )
-                    )
+                    }
                 }
+
+                Spacer(Modifier.height(16.dp))
 
                 // Buttons
                 Row(
