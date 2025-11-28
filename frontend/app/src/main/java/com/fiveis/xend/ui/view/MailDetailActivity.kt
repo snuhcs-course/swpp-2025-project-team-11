@@ -85,6 +85,7 @@ class MailDetailActivity : ComponentActivity() {
                                 putExtra("date", mail.date)
                                 putExtra("subject", addReplyPrefix(mail.subject))
                                 putExtra("body", mail.body)
+                                putExtra("message_id", mail.id)
                             }
                             startActivity(intent)
                         }
