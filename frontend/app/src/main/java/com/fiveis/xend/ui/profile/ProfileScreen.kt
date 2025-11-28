@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -470,7 +470,8 @@ fun LanguageDialog(
             modifier = Modifier
                 .padding(24.dp)
                 .fillMaxWidth()
-                .widthIn(max = 440.dp),
+                .widthIn(max = 440.dp)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -478,6 +479,7 @@ fun LanguageDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight()
                     .padding(24.dp)
             ) {
                 Text(
@@ -493,7 +495,7 @@ fun LanguageDialog(
                     color = TextSecondary
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 val selectedOption = languages.firstOrNull { option ->
                     option.value.equals(pendingSelection, ignoreCase = true)
@@ -504,7 +506,7 @@ fun LanguageDialog(
                     onClearSelection = { pendingSelection = "" }
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = searchQuery,
@@ -518,6 +520,19 @@ fun LanguageDialog(
                             tint = Color(0xFF12110D)
                         )
                     },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { searchQuery = "" }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "검색어 지우기",
+                                    tint = Color(0xFF12110D)
+                                )
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(28.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -529,13 +544,11 @@ fun LanguageDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val listModifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp)
-
                 if (filteredLanguages.isEmpty()) {
                     Box(
-                        modifier = listModifier,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -545,7 +558,9 @@ fun LanguageDialog(
                     }
                 } else {
                     LazyColumn(
-                        modifier = listModifier
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true)
                     ) {
                         items(filteredLanguages) { option ->
                             val isOptionSelected = option.value.equals(pendingSelection, ignoreCase = true)
@@ -560,7 +575,7 @@ fun LanguageDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
                     onClick = {
@@ -569,7 +584,7 @@ fun LanguageDialog(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(55.dp),
+                        .height(50.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Blue60,
                         disabledContainerColor = Color(0xFFE0E0E0)
