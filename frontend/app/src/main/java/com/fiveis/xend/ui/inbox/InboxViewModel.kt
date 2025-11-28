@@ -438,7 +438,7 @@ class InboxViewModel(
                 Log.d("InboxViewModel", "Deleting email: $emailId (permanent=$permanent)")
                 repository.deleteEmail(emailId, permanent)
                 Log.d("InboxViewModel", "Email deleted successfully: $emailId")
-                _uiState.update { it.copy(deleteError = null) }
+                _uiState.update { it.copy(deletingEmailId = null, deleteError = null) }
             } catch (e: Exception) {
                 Log.e("InboxViewModel", "Failed to delete email: $emailId", e)
                 _uiState.update {

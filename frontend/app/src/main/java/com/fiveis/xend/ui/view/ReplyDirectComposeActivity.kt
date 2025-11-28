@@ -362,6 +362,8 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         onStopStreaming = { composeVm.stopStreaming() },
                         onAcceptSuggestion = acceptSuggestion,
                         onAiRealtimeToggle = { aiRealtime = it },
+                        realtimeStatus = composeUi.realtimeStatus,
+                        realtimeErrorMessage = composeUi.realtimeErrorMessage,
                         bannerState = bannerState,
                         onDismissBanner = { bannerState = null },
                         showInlineSwipeBar = false,

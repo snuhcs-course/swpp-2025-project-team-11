@@ -13,13 +13,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+enum class RealtimeConnectionStatus {
+    IDLE,
+    CONNECTING,
+    CONNECTED,
+    ERROR
+}
+
 data class MailComposeUiState(
     val isStreaming: Boolean = false,
     val subject: String = "",
     val bodyRendered: String = "",
     val error: String? = null,
     val suggestionText: String = "",
-    val isRealtimeEnabled: Boolean = false
+    val isRealtimeEnabled: Boolean = false,
+    val realtimeStatus: RealtimeConnectionStatus = RealtimeConnectionStatus.IDLE,
+    val realtimeErrorMessage: String? = null
 )
 
 class MailComposeViewModel(
@@ -111,10 +120,23 @@ class MailComposeViewModel(
     }
 
     fun enableRealtimeMode(enabled: Boolean) {
-        _ui.update { it.copy(isRealtimeEnabled = enabled) }
         if (enabled) {
+            _ui.update {
+                it.copy(
+                    isRealtimeEnabled = true,
+                    realtimeErrorMessage = null
+                )
+            }
             connectWebSocket()
         } else {
+            _ui.update {
+                it.copy(
+                    isRealtimeEnabled = false,
+                    realtimeStatus = RealtimeConnectionStatus.IDLE,
+                    realtimeErrorMessage = null,
+                    suggestionText = ""
+                )
+            }
             disconnectWebSocket()
         }
     }
@@ -126,7 +148,13 @@ class MailComposeViewModel(
     }
 
     private fun connectWebSocket() {
+        if (_ui.value.realtimeStatus == RealtimeConnectionStatus.CONNECTING ||
+            _ui.value.realtimeStatus == RealtimeConnectionStatus.CONNECTED
+        ) {
+            return
+        }
         wsClient?.let { client ->
+            _ui.update { it.copy(realtimeStatus = RealtimeConnectionStatus.CONNECTING, realtimeErrorMessage = null) }
             client.connect(
                 onMessage = { message ->
                     try {
@@ -155,12 +183,29 @@ class MailComposeViewModel(
                     }
                 },
                 onError = { error ->
-                    _ui.update { it.copy(error = error) }
+                    handleRealtimeError(error)
                 },
                 onClose = {
-                    _ui.update { it.copy(isRealtimeEnabled = false) }
+                    val stillEnabled = _ui.value.isRealtimeEnabled
+                    _ui.update {
+                        it.copy(
+                            isRealtimeEnabled = if (stillEnabled) it.isRealtimeEnabled else false,
+                            realtimeStatus = if (stillEnabled) {
+                                RealtimeConnectionStatus.ERROR
+                            } else {
+                                RealtimeConnectionStatus.IDLE
+                            },
+                            realtimeErrorMessage = if (stillEnabled) "실시간 AI 연결이 종료되었습니다. 다시 시도해 주세요." else null
+                        )
+                    }
                 },
                 onConnected = {
+                    _ui.update {
+                        it.copy(
+                            realtimeStatus = RealtimeConnectionStatus.CONNECTED,
+                            realtimeErrorMessage = null
+                        )
+                    }
                     sendPendingSuggestion()
                 }
             )
@@ -171,7 +216,36 @@ class MailComposeViewModel(
     private fun disconnectWebSocket() {
         wsClient?.disconnect()
         suggestionBuffer.clear()
-        _ui.update { it.copy(suggestionText = "") }
+        _ui.update {
+            it.copy(
+                suggestionText = "",
+                realtimeStatus = RealtimeConnectionStatus.IDLE,
+                realtimeErrorMessage = null
+            )
+        }
+    }
+
+    private fun handleRealtimeError(rawMessage: String) {
+        val friendlyMessage = mapRealtimeError(rawMessage) ?: return
+        _ui.update {
+            it.copy(
+                error = rawMessage,
+                realtimeStatus = RealtimeConnectionStatus.ERROR,
+                realtimeErrorMessage = friendlyMessage
+            )
+        }
+    }
+
+    private fun mapRealtimeError(rawMessage: String): String? {
+        val lower = rawMessage.lowercase()
+        return when {
+            lower.contains("이미 연결 중") -> null
+            lower.contains("websocket이 연결되지 않았습니다") ->
+                "실시간 AI 연결이 아직 준비 중입니다. 잠시 후 다시 시도해 주세요."
+            lower.contains("연결 실패") || lower.contains("서버 에러") ||
+                lower.contains("failed") -> "실시간 AI 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+            else -> "실시간 AI 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        }
     }
 
     fun onTextChanged(currentText: String) {

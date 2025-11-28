@@ -20,7 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fiveis.xend.ui.compose.RealtimeConnectionStatus
 import com.fiveis.xend.ui.theme.ComposeOutline
+import com.fiveis.xend.ui.theme.TextSecondary
 
 /**
  * 실시간 AI 토글 칩
@@ -87,6 +89,25 @@ fun BodyHeader(isRealtimeOn: Boolean, onToggle: (Boolean) -> Unit, modifier: Mod
         RealtimeAIToggle(
             isChecked = isRealtimeOn,
             onToggle = onToggle
+        )
+    }
+}
+
+@Composable
+fun RealtimeStatusLabel(status: RealtimeConnectionStatus, errorMessage: String?, modifier: Modifier = Modifier) {
+    val statusText = when (status) {
+        RealtimeConnectionStatus.CONNECTING -> "실시간 AI 연결 중..."
+        RealtimeConnectionStatus.ERROR -> errorMessage ?: "실시간 AI 연결 실패. 다시 시도해 주세요."
+        else -> null
+    }
+    statusText?.let {
+        val color = if (status == RealtimeConnectionStatus.ERROR) Color(0xFFDC2626) else TextSecondary
+        Text(
+            text = it,
+            color = color,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = modifier
         )
     }
 }

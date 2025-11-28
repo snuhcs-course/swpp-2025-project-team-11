@@ -211,6 +211,11 @@ class InboxRepository(
 
     suspend fun deleteEmail(emailId: String, permanent: Boolean = false) {
         try {
+            // Optimistic UI: 먼저 로컬 DB에서 삭제
+            emailDao.deleteEmail(emailId)
+            Log.d("InboxRepository", "Deleted email from local DB: $emailId")
+
+            // 그 다음 서버에 삭제 요청
             val response = mailApiService.deleteEmail(
                 messageId = emailId,
                 permanent = permanent
@@ -220,13 +225,12 @@ class InboxRepository(
                 val errorBody = response.errorBody()?.string()
                 Log.e(
                     "InboxRepository",
-                    "Failed to delete email (code=${response.code()} body=$errorBody)"
+                    "Failed to delete email from server (code=${response.code()} body=$errorBody)"
                 )
                 throw Exception("Failed to delete email: ${response.code()}")
             }
 
-            emailDao.deleteEmail(emailId)
-            Log.d("InboxRepository", "Successfully deleted email: $emailId (permanent=$permanent)")
+            Log.d("InboxRepository", "Successfully deleted email from server: $emailId (permanent=$permanent)")
         } catch (e: Exception) {
             Log.e("InboxRepository", "Error deleting email $emailId", e)
             throw e

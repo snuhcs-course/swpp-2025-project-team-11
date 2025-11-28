@@ -130,6 +130,7 @@ import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.RealtimeStatusLabel
 import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.inbox.AddContactDialog
@@ -191,6 +192,8 @@ fun EmailComposeScreen(
     onAcceptSuggestion: () -> Unit = {},
     aiRealtime: Boolean = true,
     onAiRealtimeToggle: (Boolean) -> Unit = {},
+    realtimeStatus: RealtimeConnectionStatus = RealtimeConnectionStatus.IDLE,
+    realtimeErrorMessage: String? = null,
     onAddContactClick: ((Contact) -> Unit)? = null,
     bannerState: BannerState?,
     onDismissBanner: () -> Unit,
@@ -323,6 +326,13 @@ fun EmailComposeScreen(
             )
 
             Spacer(modifier = Modifier.height(1.dp))
+
+            RealtimeStatusLabel(
+                status = realtimeStatus,
+                errorMessage = realtimeErrorMessage,
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
+            )
 
             error?.let { ErrorMessage(it) }
         }
@@ -1531,6 +1541,8 @@ class MailComposeActivity : ComponentActivity() {
                                         )
                                     }
                                 },
+                                realtimeStatus = composeUi.realtimeStatus,
+                                realtimeErrorMessage = composeUi.realtimeErrorMessage,
                                 onAiComplete = {
                                     // Save current state before AI generation
                                     composeVm.saveUndoSnapshot(
@@ -1903,6 +1915,8 @@ private fun EmailComposePreview() {
             onAcceptSuggestion = {},
             aiRealtime = true,
             onAiRealtimeToggle = {},
+            realtimeStatus = RealtimeConnectionStatus.CONNECTED,
+            realtimeErrorMessage = null,
             bannerState = null,
             onDismissBanner = {},
             canUndo = false,

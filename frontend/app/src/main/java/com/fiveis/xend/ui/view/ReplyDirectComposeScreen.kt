@@ -76,9 +76,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.ui.compose.RealtimeConnectionStatus
 import com.fiveis.xend.ui.compose.TemplateTIcon
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.RealtimeStatusLabel
 import com.fiveis.xend.ui.compose.common.XendRichEditorState
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.theme.Blue60
@@ -113,6 +115,8 @@ fun ReplyDirectComposeScreen(
     isStreaming: Boolean = false,
     suggestionText: String = "",
     aiRealtime: Boolean = true,
+    realtimeStatus: RealtimeConnectionStatus = RealtimeConnectionStatus.IDLE,
+    realtimeErrorMessage: String? = null,
     onUndo: () -> Unit = {},
     onRedo: () -> Unit = {},
     onAiComplete: () -> Unit = {},
@@ -314,6 +318,13 @@ fun ReplyDirectComposeScreen(
                         scrollState.animateScrollTo(target)
                     }
                 }
+            )
+
+            RealtimeStatusLabel(
+                status = realtimeStatus,
+                errorMessage = realtimeErrorMessage,
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
             )
 
             Spacer(modifier = Modifier.height(120.dp))
@@ -844,7 +855,8 @@ private fun ReplyDirectComposeScreenPreview() {
             onSend = { _ -> },
             senderEmail = "김대표 <ceo@company.com>",
             date = "Q4 실적 보고서 검토 요청 · 협업미팅 2개",
-            originalBody = "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 우수한 성과라고 판단됩니다."
+            originalBody = "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 우수한 성과라고 판단됩니다.",
+            realtimeStatus = RealtimeConnectionStatus.CONNECTED
         )
     }
 }

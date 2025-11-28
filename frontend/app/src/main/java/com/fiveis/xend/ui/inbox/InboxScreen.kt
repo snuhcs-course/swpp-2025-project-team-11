@@ -375,10 +375,6 @@ private fun EmailList(
     onDeleteEmail: (String) -> Unit = {},
     deletingEmailId: String? = null
 ) {
-    val visibleEmails = remember(emails, deletingEmailId) {
-        if (deletingEmailId == null) emails else emails.filter { it.id != deletingEmailId }
-    }
-
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
@@ -389,7 +385,10 @@ private fun EmailList(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            items(items = visibleEmails, key = { it.id }) { item ->
+            items(
+                items = emails,
+                key = { it.id }
+            ) { item ->
                 Column(
                     modifier = Modifier.animateItem()
                 ) {
@@ -400,7 +399,7 @@ private fun EmailList(
                         contactEmails = contactEmails,
                         contactsByEmail = contactsByEmail,
                         onDeleteClick = { onDeleteEmail(item.id) },
-                        isDeleting = false
+                        isDeleting = deletingEmailId == item.id
                     )
                     HorizontalDivider(
                         modifier = Modifier,
