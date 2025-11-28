@@ -666,13 +666,15 @@ private fun AttachmentSection(
             attachments.forEach { attachment ->
                 val previewType = attachment.previewType()
                 val supportsPreview = previewType != AttachmentPreviewType.UNSUPPORTED
+                val supportsAnalysis = attachment.supportsAnalysis()
                 AttachmentItem(
                     attachment = attachment,
                     onClick = { onAttachmentClick(attachment) },
                     onAnalyze = { onAnalyzeAttachment(attachment) },
                     onPreview = { onPreviewAttachment(attachment) },
                     onOpenExternal = { onOpenAttachmentExternally(attachment) },
-                    supportsPreview = supportsPreview
+                    supportsPreview = supportsPreview,
+                    supportsAnalysis = supportsAnalysis
                 )
             }
         }
@@ -686,7 +688,8 @@ private fun AttachmentItem(
     onAnalyze: () -> Unit,
     onPreview: () -> Unit,
     onOpenExternal: () -> Unit,
-    supportsPreview: Boolean
+    supportsPreview: Boolean,
+    supportsAnalysis: Boolean
 ) {
     Surface(
         modifier = Modifier
@@ -732,7 +735,9 @@ private fun AttachmentItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AiAnalysisBadge(onClick = onAnalyze)
+                if (supportsAnalysis) {
+                    AiAnalysisBadge(onClick = onAnalyze)
+                }
                 PreviewButton(
                     onClick = {
                         if (supportsPreview) {
@@ -1053,6 +1058,19 @@ private fun AnalysisContent(isLoading: Boolean, result: AttachmentAnalysisRespon
             }
         }
     }
+}
+
+private fun Attachment.supportsAnalysis(): Boolean {
+    val allowedTokens = setOf("pdf", "txt", "csv", "xlsx", "xls", "docx")
+    val sizeOk = size <= 10 * 1024 * 1024
+    if (!sizeOk) return false
+
+    val mime = mimeType.lowercase(Locale.getDefault())
+    val filenameLower = filename.lowercase(Locale.getDefault())
+    val typeOk = allowedTokens.any { token ->
+        mime.contains(token) || filenameLower.endsWith(".$token")
+    }
+    return typeOk
 }
 
 @Composable
