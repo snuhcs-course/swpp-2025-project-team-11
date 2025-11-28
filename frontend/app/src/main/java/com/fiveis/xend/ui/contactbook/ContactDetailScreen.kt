@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -202,11 +201,26 @@ fun ContactDetailScreen(
                             )
                         }
                         Spacer(Modifier.size(12.dp))
-                        Column(Modifier.wrapContentWidth()) {
-                            Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            if (contact.email.isNotBlank()) Text(contact.email, color = Color.Gray)
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                contact.name,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (contact.email.isNotBlank()) {
+                                Text(
+                                    contact.email,
+                                    color = Color.Gray,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
-                        Spacer(Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp))
                         IconButton(
                             onClick = {
                                 editNameField = contact.name
