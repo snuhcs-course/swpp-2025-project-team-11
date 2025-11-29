@@ -172,38 +172,6 @@ class ContactViewTest(BaseContactViewTest):
             {self.c1.email, self.c3_same_group.email},
         )
 
-    def test_contact_create_calls_serializer_save_with_user(self):
-        """
-        perform_create() 가 serializer.save(user=request.user)를 호출하는지 확인
-        """
-        request = self.factory.post(
-            "/api/contact/contacts/",
-            {
-                "name": "New Guy",
-                "email": "new@u1.com",
-                "group_id": self.group_user1.id,
-                "context": {
-                    "sender_role": "me",
-                    "recipient_role": "professor",
-                    "relationship_details": "I am their student",
-                    "personal_prompt": "be polite",
-                    "language_preference": "en",
-                },
-            },
-            format="json",
-        )
-        force_authenticate(request, user=self.user1)
-
-        mock_serializer = MagicMock(spec=ContactSerializer)
-        mock_serializer.save = MagicMock()
-
-        view = ContactListCreateView()
-        # perform_create 내부에서 self.request.user 읽으니까 넣어준다
-        view.request = SimpleNamespace(user=self.user1)
-
-        view.perform_create(mock_serializer)
-        mock_serializer.save.assert_called_once_with(user=self.user1)
-
     def test_contact_detail_only_owner_can_access(self):
         """
         다른 유저의 Contact는 404

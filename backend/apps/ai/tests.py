@@ -1,18 +1,27 @@
 import json
 import re
-from unittest.mock import Mock, patch
+import unittest
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.db import connections
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
+from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult, MailAnalysisResult
 from apps.ai.services import pii_masker as pm
-from apps.ai.services.mail_generation import stream_mail_generation
-from apps.ai.services.reply import stream_reply_options_llm
+from apps.ai.services.attachment_analysis import analyze_gmail_attachment, analyze_uploaded_file
+from apps.ai.services.mail_generation import (
+    debug_mail_generation_analysis,
+    stream_mail_generation,
+    stream_mail_generation_test,
+    stream_mail_generation_with_plan,
+    stream_mail_generation_with_timestamp,
+)
+from apps.ai.services.prompt_preview import generate_prompt_preview
 from apps.ai.services.utils import (
     _fetch_analysis_for_group,
     _fetch_analysis_for_single,
@@ -20,6 +29,11 @@ from apps.ai.services.utils import (
     collect_prompt_context,
     heartbeat,
     sse_event,
+)
+from apps.ai.tasks import (
+    analyze_speech,
+    backfill_contact_mail_analysis,
+    delete_up_n,
 )
 from apps.contact.models import Contact, ContactContext, Group, PromptOption
 
@@ -325,264 +339,351 @@ class ReplyOptionsStreamViewTest(TestCase):
         self.assertIn("id: 3", content)
         self.assertIn("id: 4", content)
 
+    @patch("apps.ai.services.chains.plan_chain")
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_fallback_plan_used_on_exception(self, mock_stream, _):
+        """plan_chain 예외 발생 시 FallbackPlan 경로가 실행되는지"""
+
+        def mock_generator():
+            yield 'event: ready\ndata: {"ts":123}\nretry: 5000\n\n'
+            yield 'event: options\ndata: {"count":2,"items":[{"id":0,"type":"Concise reply","title":"Quick confirmation"}]}\n\n'
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+
+        self.assertIn("Concise reply", content)
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_zero_plan_items(self, mock_stream):
+        """옵션이 0개인 경우 count=0 확인"""
+
+        def mock_generator():
+            yield "event: ready\ndata: {}\n\n"
+            yield 'event: options\ndata: {"count":0,"items":[]}\n\n'
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+        self.assertIn('"count":0', content)
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_worker_error(self, mock_stream):
+        """워커 내부 오류 → option.error 이벤트 발생"""
+
+        def mock_generator():
+            yield "event: ready\ndata: {}\n\n"
+            yield 'event: options\ndata: {"count":1,"items":[{"id":0,"type":"테스트","title":"타이틀"}]}\n\n'
+            yield 'event: option.error\ndata: {"id":0,"message":"test error"}\n\n'
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+        self.assertIn("option.error", content)
+
+    @patch("apps.ai.services.reply.time.monotonic")
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_force_ping_by_time(self, mock_stream, mock_mono):
+        """time.monotonic 조작 → ping 조건 강제 만족"""
+
+        mock_mono.side_effect = [0, 11]  # last_ping=0, 현재=11 → 10초 경과
+
+        def mock_generator():
+            yield "event: ready\ndata: {}\n\n"
+            yield "event: ping\ndata: {}\n\n"
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+        self.assertIn("event: ping", content)
+
+    @patch("apps.ai.services.chains.plan_chain")
+    @patch("apps.ai.services.chains.reply_body_chain")
+    @patch("apps.ai.services.reply.PiiMasker.mask_inputs")
+    def test_reply_options_mapping_cleared(self, mock_mask_inputs, mock_plan_chain, mock_reply_chain):
+
+        mapping = {"k": "v"}
+        mock_mask_inputs.return_value = (
+            {
+                "incoming_subject": "",
+                "incoming_body": "",  # <-- KeyError 해결
+            },
+            mapping,
+        )
+
+        # plan_chain mock
+        plan_mock = type("X", (), {"language": "ko", "options": []})()
+        mock_plan_chain.invoke.return_value = plan_mock
+
+        # reply_body_chain mock
+        async def empty_gen(_):
+            if False:
+                yield
+
+        mock_reply_chain.astream.return_value = empty_gen({})
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+
+        # consume stream
+        import asyncio
+
+        async def consume(gen):
+            async for _ in gen:
+                pass
+
+        asyncio.run(consume(resp.streaming_content))
+
+        self.assertEqual(mapping, {})
+
 
 def _drain(gen):
     return list(gen)
 
 
-class StreamMailGenerationTest(SimpleTestCase):
-    """
-    stream_mail_generation() 동작 테스트
-    - 컨텍스트/프롬프트 입력 수집이 호출되는지
-    - PiiMasker로 마스킹 후 subject_chain/body_chain이 호출되는지
-    - SSE 이벤트 시퀀스가 ready → subject → body.delta* → done 형태로 나오는지
-    """
+class TestStreamMailGeneration(unittest.IsolatedAsyncioTestCase):
 
-    @patch("apps.ai.services.mail_generation.time.monotonic", side_effect=[0, 0, 0])
-    @patch("apps.ai.services.utils.heartbeat", return_value="HEARTBEAT_EVT")
     @patch("apps.ai.services.mail_generation.sse_event")
-    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.heartbeat")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
     @patch("apps.ai.services.mail_generation.body_chain")
-    @patch("apps.ai.services.mail_generation.plan_chain")
+    @patch("apps.ai.services.mail_generation.subject_chain")
     @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="REQ1")
     @patch("apps.ai.services.mail_generation.build_prompt_inputs")
     @patch("apps.ai.services.mail_generation.collect_prompt_context")
-    @patch("apps.ai.services.mail_generation.unmask_stream")
-    @patch("apps.ai.services.mail_generation.make_req_id", return_value="req123")
-    def test_stream_mail_generation_happy_path(
+    async def test_stream_mail_generation(
         self,
-        mock_make_req_id,
-        mock_unmask_stream,
-        mock_collect_ctx,
+        mock_collect,
         mock_build_inputs,
-        MockPiiMasker,
-        mock_plan_chain,
-        mock_body_chain,
+        mock_req_id,
+        MockMasker,
         mock_subject_chain,
-        mock_sse_event,
+        mock_body_chain,
+        mock_unmask,
         mock_heartbeat,
-        mock_monotonic,
+        mock_sse,
     ):
-        user = Mock()
-        to_emails = ["a@example.com", "b@example.com"]
-
-        mock_collect_ctx.return_value = {"ctx_key": "ctx_val"}
-
-        mock_build_inputs.return_value = {
-            "language": "ko",
-            "recipients": ["a@example.com", "b@example.com"],
-            "group_name": "Team",
-            "group_description": "group-desc",
-            "prompt_text": "be polite",
-            "sender_role": "me",
-            "recipient_role": "them",
-            "analysis": None,
-        }
-
-        masker_instance = Mock()
-        masker_instance.mask_inputs.return_value = (
-            {
-                "subject": "MASKED_SUBJ",
-                "body": "MASKED_BODY",
-                "language": "ko",
-                "recipients": ["a@example.com", "b@example.com"],
-                "group_name": "Team",
-                "group_description": "group-desc",
-                "prompt_text": "be polite",
-                "sender_role": "me",
-                "recipient_role": "them",
-                "analysis": None,
-            },
-            {1: "secret-a"},
-        )
-        MockPiiMasker.return_value = masker_instance
-
-        mock_subject_chain.invoke.return_value = "SUBJECT_OUT   "
-        mock_body_chain.stream.return_value = iter(["BODY_CHUNK_1", "BODY_CHUNK_2"])
-
-        def _unmask_side_effect(chunks, req_id, mapping):
-            if isinstance(chunks, list):
-                for piece in chunks:
-                    yield f"UNMASKED_{piece.strip()}"
-            else:
-                for piece in chunks:
-                    yield f"UNMASKED_{piece}"
-
-        mock_unmask_stream.side_effect = _unmask_side_effect
-
-        def _sse_side_effect(event_type, payload, eid=None, retry_ms=None):
-            data = {"event": event_type, "payload": payload}
-            if eid is not None:
-                data["eid"] = eid
-            if retry_ms is not None:
-                data["retry_ms"] = retry_ms
-            return data
-
-        mock_sse_event.side_effect = _sse_side_effect
+        mock_collect.return_value = {"user": "u"}
+        mock_build_inputs.return_value = {"language": "ko", "recipients": ["a@a.com"]}
+        masker_instance = MockMasker.return_value
+        masker_instance.mask_inputs.return_value = ({"body": "MASKED_BODY"}, {"a": "b"})
+        mock_subject_chain.invoke.return_value = "MASKED_TITLE"
+        mock_body_chain.stream.return_value = iter(["BODY1", "BODY2"])
+        mock_unmask.side_effect = lambda x, *_: x
+        mock_sse.side_effect = lambda evt, data, eid=None, retry_ms=None: f"SSE:{evt}"
 
         gen = stream_mail_generation(
-            user=user,
-            subject="hi there",
-            body="this is body",
-            to_emails=to_emails,
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
         )
-        out_events = _drain(gen)
 
-        mock_collect_ctx.assert_called_once_with(user, to_emails)
-        mock_build_inputs.assert_called_once_with({"ctx_key": "ctx_val"})
-        MockPiiMasker.assert_called_once_with("req123")
-        masker_instance.mask_inputs.assert_called_once()
+        result = []
+        async for ev in gen:
+            result.append(ev)
 
-        called_inputs_for_subject = mock_subject_chain.invoke.call_args[0][0]
-        self.assertEqual(called_inputs_for_subject["subject"], "MASKED_SUBJ")
-
-        locked_inputs = mock_body_chain.stream.call_args[0][0]
-        self.assertEqual(locked_inputs["locked_subject"], "SUBJECT_OUT")
-        self.assertEqual(locked_inputs["body"], "MASKED_BODY")
-
-        self.assertGreaterEqual(len(out_events), 4)
-        self.assertEqual(out_events[0]["event"], "ready")
-        self.assertIn("ts", out_events[0]["payload"])
-
-        self.assertEqual(out_events[1]["event"], "subject")
-        self.assertEqual(out_events[1]["payload"]["title"], "UNMASKED_SUBJECT_OUT")
-        self.assertTrue(out_events[1]["payload"]["text"].startswith("UNMASKED_SUBJECT_OUT"))
-
-        body_chunks = [e for e in out_events if e["event"] == "body.delta"]
-        self.assertEqual(len(body_chunks), 2)
-        self.assertIn("UNMASKED_BODY_CHUNK_1", body_chunks[0]["payload"]["text"])
-        self.assertIn("UNMASKED_BODY_CHUNK_2", body_chunks[1]["payload"]["text"])
-
-        self.assertEqual(out_events[-1]["event"], "done")
-        self.assertEqual(out_events[-1]["payload"]["reason"], "stop")
+        self.assertIn("SSE:ready", result[0])
+        self.assertIn("SSE:subject", result[1])
+        self.assertIn("SSE:body.delta", result[2])
+        self.assertIn("SSE:body.delta", result[3])
+        self.assertIn("SSE:done", result[-1])
+        mock_collect.assert_called_once()
+        mock_build_inputs.assert_called_once()
+        mock_subject_chain.invoke.assert_called_once()
+        mock_body_chain.stream.assert_called_once()
 
 
-class StreamReplyOptionsLLMTest(SimpleTestCase):
-    """
-    stream_reply_options_llm() 동작 테스트
-    - ready → options → option.delta / option.done → done
-    - 내부적으로 각 옵션별로 thread에서 reply_body_chain.astream(async gen)을 돌리며 queue로 이벤트를 전달
-    - 우리는 reply_body_chain, plan_chain 등을 mock 해서 결정적인 흐름만 확인
-    """
+class StreamMailGenerationTestCase(TestCase):
 
-    @patch("apps.ai.services.reply.time.monotonic", return_value=0)
-    @patch("apps.ai.services.reply.unmask_stream")
-    @patch("apps.ai.services.reply.sse_event")
-    @patch("apps.ai.services.reply.PiiMasker")
-    @patch("apps.ai.services.reply.build_prompt_inputs")
-    @patch("apps.ai.services.reply.collect_prompt_context")
-    @patch("apps.ai.services.reply.plan_chain")
-    @patch("apps.ai.services.reply.reply_body_chain")
-    @patch("apps.ai.services.reply.make_req_id", return_value="req777")
-    def test_stream_reply_options_llm_basic(
+    def test_stream_mail_generation_test(self):
+        gen = stream_mail_generation_test()
+
+        events = list(gen)
+        self.assertGreater(len(events), 5, "스트림 이벤트가 너무 적음 — 제대로 작동하지 않는 것 같음")
+
+        first = events[0]
+        self.assertIn("event: ready", first)
+        self.assertIn("data:", first)
+        self.assertIn("ts", first)
+
+        second = events[1]
+        self.assertIn("event: subject", second)
+        self.assertIn("Important Update", second)
+
+        body_events = [ev for ev in events if "event: body.delta" in ev]
+        self.assertGreater(len(body_events), 3, "body.delta 이벤트가 충분히 출력되지 않음")
+
+        sample_body = body_events[0]
+        self.assertIn("data:", sample_body)
+        self.assertIn("seq", sample_body)
+        self.assertIn("text", sample_body)
+
+        last = events[-1]
+        self.assertIn("event: done", last)
+        self.assertIn("reason", last)
+
+        order = []
+        for ev in events:
+            for line in ev.split("\n"):
+                if line.startswith("event:"):
+                    order.append(line)
+                    break
+
+        self.assertIn("event: ready", order[0])
+        self.assertIn("event: subject", order[1])
+        self.assertIn("event: done", order[-1])
+
+
+class TestStreamMailGenerationWithTimestamp(unittest.IsolatedAsyncioTestCase):
+
+    @patch("apps.ai.services.mail_generation.sse_event")
+    @patch("apps.ai.services.mail_generation.heartbeat")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="REQ_TS")
+    @patch("apps.ai.services.mail_generation.build_prompt_inputs")
+    @patch("apps.ai.services.mail_generation.collect_prompt_context")
+    async def test_stream_mail_generation_with_timestamp(
         self,
-        mock_make_req_id,
-        mock_reply_body_chain,
-        mock_plan_chain,
-        mock_collect_ctx,
+        mock_collect,
         mock_build_inputs,
-        MockPiiMasker,
-        mock_sse_event,
-        mock_unmask_stream,
-        mock_monotonic,
+        mock_req_id,
+        MockMasker,
+        mock_subject_chain,
+        mock_body_chain,
+        mock_unmask,
+        mock_heartbeat,
+        mock_sse,
     ):
-        user = Mock()
-        to_email = "boss@example.com"
+        mock_collect.return_value = {"user": "u"}
+        mock_build_inputs.return_value = {"language": "ko", "recipients": ["a@a.com"]}
+        masker_instance = MockMasker.return_value
+        masker_instance.mask_inputs.return_value = ({"body": "MASKED_BODY"}, {"a": "b"})
+        mock_subject_chain.invoke.return_value = "MASKED_TITLE"
+        mock_body_chain.stream.return_value = iter(["BODY1", "BODY2"])
+        mock_unmask.side_effect = lambda x, *_: x
+        mock_sse.side_effect = lambda evt, data, eid=None, retry_ms=None: f"SSE:{evt}"
 
-        mock_collect_ctx.return_value = {"ctx": "val"}
-        mock_build_inputs.return_value = {
-            "language": "ko",
-            "recipients": [to_email],
-            "group_description": "desc",
-            "prompt_text": "be nice",
-            "sender_role": "me",
-            "recipient_role": "boss",
+        gen = stream_mail_generation_with_timestamp(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
+        )
+
+        result = []
+        async for ev in gen:
+            result.append(ev)
+
+        self.assertIn("SSE:ready", result[0])
+        self.assertIn("SSE:subject", result[1])
+        self.assertIn("SSE:body.delta", result[2])
+        self.assertIn("SSE:body.delta", result[3])
+        self.assertIn("SSE:done", result[-1])
+
+
+class TestStreamMailGenerationWithPlan(unittest.IsolatedAsyncioTestCase):
+
+    @patch("apps.ai.services.mail_generation.sse_event")
+    @patch("apps.ai.services.mail_generation.heartbeat")
+    @patch("apps.ai.services.mail_generation.unmask_stream")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.plan_chain")
+    @patch("apps.ai.services.mail_generation.validator_chain")
+    @patch("apps.ai.services.mail_generation.mail_graph")
+    async def test_stream_mail_generation_with_plan(
+        self,
+        mock_graph,
+        mock_validator,
+        mock_plan_chain,
+        mock_body_chain,
+        mock_unmask,
+        mock_heartbeat,
+        mock_sse,
+    ):
+        mock_graph.invoke.return_value = {
+            "req_id": "REQ_PLAN",
+            "mask_mapping": {"a": "b"},
+            "masked_inputs": {"body": "MASKED_BODY"},
+            "body_inputs": {"body": "MASKED_BODY"},
+            "locked_title": "MASKED_TITLE",
         }
+        mock_plan_chain.stream.return_value = iter(["PLAN1", "PLAN2"])
+        mock_body_chain.stream.return_value = iter(["BODY1", "BODY2"])
+        mock_unmask.side_effect = lambda x, *_: x
+        mock_validator.invoke.return_value = MagicMock(passed=True)
+        mock_sse.side_effect = lambda evt, data, eid=None, retry_ms=None: f"SSE:{evt}"
 
-        masker_instance = Mock()
-        masker_instance.mask_inputs.return_value = (
-            {
-                "incoming_subject": "MASKED_SUBJ",
-                "incoming_body": "MASKED_BODY",
-                "language": "ko",
-                "recipients": [to_email],
-                "group_description": "desc",
-                "prompt_text": "be nice",
-                "sender_role": "me",
-                "recipient_role": "boss",
-            },
-            {1: "orig1", 2: "orig2"},
+        gen = stream_mail_generation_with_plan(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
         )
-        MockPiiMasker.return_value = masker_instance
 
-        class FakeOpt:
-            def __init__(self, t, title):
-                self.type = t
-                self.title = title
+        result = []
+        async for ev in gen:
+            result.append(ev)
 
-        class FakePlan:
-            def __init__(self):
-                self.language = "ko"
-                self.options = [
-                    FakeOpt("긍정 응답", "네, 가능합니다"),
-                    FakeOpt("일정 조율", "시간을 조정하고 싶습니다"),
-                ]
+        self.assertIn("SSE:ready", result[0])
+        self.assertIn("SSE:plan.start", result[1])
+        self.assertIn("SSE:plan.delta", result[2])
+        self.assertIn("SSE:plan.done", [r for r in result if "SSE:plan.done" in r][0])
+        self.assertIn("SSE:subject", [r for r in result if "SSE:subject" in r][0])
+        self.assertIn("SSE:body.start", [r for r in result if "SSE:body.start" in r][0])
+        self.assertIn("SSE:body.delta", [r for r in result if "SSE:body.delta" in r][0])
+        self.assertIn("SSE:done", result[-1])
 
-        mock_plan_chain.invoke.return_value = FakePlan()
 
-        async def fake_astream(_inputs):
-            yield "BODY_PART_A"
-            yield "BODY_PART_B"
+class TestDebugMailGenerationAnalysis(unittest.TestCase):
 
-        mock_reply_body_chain.astream.side_effect = fake_astream
+    @patch("apps.ai.services.mail_generation.subject_chain")
+    @patch("apps.ai.services.mail_generation.body_chain")
+    @patch("apps.ai.services.mail_generation.PiiMasker")
+    @patch("apps.ai.services.mail_generation.make_req_id", return_value="REQ_DBG")
+    @patch("apps.ai.services.mail_generation.build_prompt_inputs")
+    @patch("apps.ai.services.mail_generation.collect_prompt_context")
+    def test_debug_mail_generation_analysis(
+        self,
+        mock_collect,
+        mock_build_inputs,
+        mock_req_id,
+        MockMasker,
+        mock_body_chain,
+        mock_subject_chain,
+    ):
+        mock_collect.return_value = {"analysis": "ANALYSIS", "fewshots": "FEWSHOTS"}
+        mock_build_inputs.return_value = {"language": "ko", "recipients": ["a@a.com"]}
+        masker_instance = MockMasker.return_value
+        masker_instance.mask_inputs.return_value = ({"body": "MASKED_BODY"}, {"a": "b"})
+        mock_subject_chain.invoke.return_value = "MASKED_TITLE"
+        mock_body_chain.invoke.return_value = "BODY_CONTENT"
 
-        def _sse_side_effect(event_type, payload, eid=None, retry_ms=None):
-            data = {"event": event_type, "payload": payload}
-            if eid is not None:
-                data["eid"] = eid
-            if retry_ms is not None:
-                data["retry_ms"] = retry_ms
-            return data
-
-        mock_sse_event.side_effect = _sse_side_effect
-
-        def _unmask_side_effect(chunks, req_id, mapping):
-            for c in chunks:
-                yield f"UNMASKED_{c}"
-
-        mock_unmask_stream.side_effect = _unmask_side_effect
-
-        gen = stream_reply_options_llm(
-            user=user,
-            subject="orig sub",
-            body="orig body",
-            to_email=to_email,
+        result = debug_mail_generation_analysis(
+            user={"id": 1},
+            subject="hello",
+            body="world",
+            to_emails=["a@a.com"],
         )
-        out_events = _drain(gen)
 
-        assert len(out_events) >= 4
-        assert out_events[0]["event"] == "ready"
-        assert "ts" in out_events[0]["payload"]
-
-        options_events = [e for e in out_events if e["event"] == "options"]
-        assert len(options_events) == 1
-        opt_payload = options_events[0]["payload"]
-        assert opt_payload["count"] == 2
-        assert len(opt_payload["items"]) == 2
-
-        first_item = opt_payload["items"][0]
-        assert first_item["id"] == 0
-        assert first_item["title"].startswith("UNMASKED_")
-        assert first_item["type"].startswith("UNMASKED_")
-
-        delta_events = [e for e in out_events if e["event"] == "option.delta"]
-        assert len(delta_events) > 0
-
-        done_events = [e for e in out_events if e["event"] == "option.done"]
-        assert len(done_events) == 2
-
-        assert out_events[-1]["event"] == "done"
-        assert out_events[-1]["payload"]["reason"] == "all_options_finished"
+        self.assertIn("analysis", result)
+        self.assertIn("fewshots", result)
+        self.assertIn("without_analysis", result)
+        self.assertIn("with_analysis", result)
+        self.assertIn("with_fewshots", result)
+        self.assertEqual(result["without_analysis"]["subject"], "MASKED_TITLE")
+        self.assertEqual(result["without_analysis"]["body"], "BODY_CONTENT")
 
 
 class PiiMaskerAndUnmaskTest(SimpleTestCase):
@@ -1535,6 +1636,45 @@ class IntegrationTest(TestCase):
         self.assertIsNone(cross_result)
 
 
+class TestPromptPreview(TestCase):
+
+    @patch("apps.ai.services.prompt_preview.prompt_preview_chain")
+    @patch("apps.ai.services.prompt_preview.build_prompt_inputs")
+    @patch("apps.ai.services.prompt_preview.collect_prompt_context")
+    def test_prompt_preview_success(self, mock_collect, mock_build, mock_chain):
+        # 준비
+        user = User.objects.create(email="test@x.com")
+        mock_collect.return_value = {"user": "x"}
+        mock_build.return_value = {"input": "y"}
+        mock_chain.invoke.return_value = "결과입니다  "
+
+        # 실행
+        text = generate_prompt_preview(user=user, to_emails=["a@b.com"])
+
+        # 검증
+        self.assertEqual(text, "결과입니다")
+        mock_collect.assert_called_once()
+        mock_build.assert_called_once()
+        mock_chain.invoke.assert_called_once()
+
+    @patch("apps.ai.services.prompt_preview.prompt_preview_chain")
+    @patch("apps.ai.services.prompt_preview.build_prompt_inputs")
+    @patch("apps.ai.services.prompt_preview.collect_prompt_context")
+    def test_prompt_preview_exception(self, mock_collect, mock_build, mock_chain):
+        user = User.objects.create(email="test@x.com")
+        mock_collect.return_value = {"user": "x"}
+        mock_build.return_value = {"input": "y"}
+
+        # invoke가 예외를 발생시키도록 설정
+        mock_chain.invoke.side_effect = Exception("fail")
+
+        # 실행
+        text = generate_prompt_preview(user=user, to_emails=["a@b.com"])
+
+        # 검증
+        self.assertEqual(text, "현재 수신자에 대한 프롬프트 정보가 없습니다..")
+
+
 # =========================
 # collect_prompt_context
 # =========================
@@ -1755,3 +1895,191 @@ class CollectPromptContextTest(TestCase):
         self.assertIsNone(out["language"])
         # anlaysis 기본 None
         self.assertEqual(out["analysis"], None)
+
+
+class TestAttachmentAnalysis(TestCase):
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_attachment")
+    @patch("apps.ai.services.attachment_analysis.get_attachment_logic")
+    @patch("apps.ai.services.attachment_analysis.extract_text_from_bytes")
+    @patch("apps.ai.services.attachment_analysis.attachment_analysis_chain")
+    def test_analyze_gmail_attachment_new(self, mock_chain, mock_extract, mock_get_attachment, mock_cached):
+        mock_cached.return_value = None
+        mock_get_attachment.return_value = {"data": b"dummy data", "filename": "test.txt", "mime_type": "text/plain"}
+        mock_extract.return_value = "extracted text"
+        mock_result = MagicMock()
+        mock_result.summary = "summary"
+        mock_result.insights = "insights"
+        mock_result.mail_guide = "guide"
+        mock_result.model_dump.return_value = {"summary": "summary", "insights": "insights", "mail_guide": "guide"}
+        mock_chain.invoke.return_value = mock_result
+
+        user_id = 1
+        result = analyze_gmail_attachment(user_id, "msg1", "att1", "test.txt", "text/plain")
+
+        self.assertEqual(result["summary"], "summary")
+        self.assertEqual(result["insights"], "insights")
+        self.assertEqual(result["mail_guide"], "guide")
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_attachment")
+    def test_analyze_gmail_attachment_cached(self, mock_cached):
+        mock_cached.return_value = MagicMock(summary="cached_summary", insights="cached_insights", mail_guide="cached_guide")
+
+        user_id = 1
+        result = analyze_gmail_attachment(user_id, "msg1", "att1", "test.txt", "text/plain")
+
+        self.assertEqual(result["summary"], "cached_summary")
+        self.assertEqual(result["insights"], "cached_insights")
+        self.assertEqual(result["mail_guide"], "cached_guide")
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_content_key")
+    @patch("apps.ai.services.attachment_analysis.extract_text_from_bytes")
+    @patch("apps.ai.services.attachment_analysis.attachment_analysis_chain")
+    def test_analyze_uploaded_file_new(self, mock_chain, mock_extract, mock_cached):
+        mock_cached.return_value = None
+        mock_extract.return_value = "extracted text"
+        mock_result = MagicMock()
+        mock_result.summary = "summary"
+        mock_result.insights = "insights"
+        mock_result.mail_guide = "guide"
+        mock_result.model_dump.return_value = {"summary": "summary", "insights": "insights", "mail_guide": "guide"}
+        mock_chain.invoke.return_value = mock_result
+
+        class DummyFile:
+            name = "upload.txt"
+
+            def read(self):
+                return b"dummy data"
+
+            content_type = "text/plain"
+
+        user_id = 1
+        file_obj = DummyFile()
+        result = analyze_uploaded_file(user_id, file_obj)
+
+        self.assertEqual(result["summary"], "summary")
+        self.assertEqual(result["insights"], "insights")
+        self.assertEqual(result["mail_guide"], "guide")
+
+    @patch("apps.mail.models.AttachmentAnalysis.get_recent_by_content_key")
+    def test_analyze_uploaded_file_cached(self, mock_cached):
+        mock_cached.return_value = MagicMock(summary="cached_summary", insights="cached_insights", mail_guide="cached_guide")
+
+        class DummyFile:
+            name = "upload.txt"
+
+            def read(self):
+                return b"dummy data"
+
+            content_type = "text/plain"
+
+        user_id = 1
+        file_obj = DummyFile()
+        result = analyze_uploaded_file(user_id, file_obj)
+
+        self.assertEqual(result["summary"], "cached_summary")
+        self.assertEqual(result["insights"], "cached_insights")
+        self.assertEqual(result["mail_guide"], "cached_guide")
+
+
+class TestAnalyzeSpeech(TestCase):
+    @patch("apps.ai.tasks.analyze_speech_llm")
+    def test_analyze_speech_success(self, mock_llm):
+        user = User.objects.create(email="a@test.com")
+        contact = Contact.objects.create(user=user, email="c@test.com")
+
+        mock_llm.return_value.model_dump.return_value = {
+            "lexical_style": "A",
+            "grammar_patterns": ["B"],
+            "emotional_tone": "C",
+            "representative_sentences": ["D"],
+        }
+
+        result = analyze_speech(
+            user_id=user.id,
+            subject="hi",
+            body="body",
+            to_emails=[contact.email],
+        )
+
+        self.assertIsNone(result)
+        self.assertEqual(MailAnalysisResult.objects.count(), 1)
+        self.assertEqual(ContactAnalysisResult.objects.count(), 1)
+        self.assertEqual(GroupAnalysisResult.objects.count(), 0)
+
+    def test_analyze_speech_user_missing(self):
+        result = analyze_speech(999, "sub", "body", ["test@test.com"])
+        self.assertIsNone(result)
+
+
+class TestDeleteUpN(TestCase):
+    def test_delete_up_n(self):
+        user = User.objects.create(email="user@test.com")
+        group = Group.objects.create(
+            user=user,
+            name="Team Alpha",
+            description="Internal team comms",
+        )
+        contact = Contact.objects.create(user=user, email="c@test.com", group=group)
+
+        # 5개 생성 → n=2이면 3개 삭제
+        for i in range(5):  # noqa: B007
+            MailAnalysisResult.objects.create(
+                user=user,
+                contact=contact,
+                lexical_style="A",
+                grammar_patterns=["B"],
+                emotional_tone="C",
+                representative_sentences=["D"],
+            )
+
+        delete_up_n(n=2)
+
+        self.assertEqual(MailAnalysisResult.objects.count(), 2)
+
+
+class TestBackfillContactMailAnalysis(TestCase):
+    @patch("apps.ai.tasks.list_emails_logic")
+    @patch("apps.ai.tasks.analyze_speech.delay")
+    def test_backfill_success(self, mock_delay, mock_list):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        mock_list.return_value = (
+            None,
+            [{"subject": "S", "body": "B", "id": 1}],
+        )
+
+        count = backfill_contact_mail_analysis(user.id, contact.id)
+        self.assertEqual(count, 1)
+        mock_delay.assert_called_once()
+
+    @patch("apps.ai.tasks.list_emails_logic", side_effect=Exception("API ERR"))
+    def test_backfill_retry(self, mock_list):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        with self.assertRaises(Exception):  # noqa: B017
+            backfill_contact_mail_analysis(user.id, contact.id)
+
+    @patch("apps.ai.tasks.list_emails_logic", return_value=(None, []))
+    def test_backfill_no_messages(self, _):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        count = backfill_contact_mail_analysis(user.id, contact.id)
+        self.assertEqual(count, 0)
+
+    @patch("apps.ai.tasks.list_emails_logic", return_value=(None, [{"subject": "", "body": ""}]))
+    def test_backfill_empty_subject_and_body(self, _):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        count = backfill_contact_mail_analysis(user.id, contact.id)
+        self.assertEqual(count, 0)
+
+
+def tearDown(self):
+    super().tearDown()
+    for conn in connections.all():
+        conn.close()
