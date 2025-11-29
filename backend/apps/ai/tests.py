@@ -4,13 +4,14 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.db import connections
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
+from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult, MailAnalysisResult
 from apps.ai.services import pii_masker as pm
 from apps.ai.services.attachment_analysis import analyze_gmail_attachment, analyze_uploaded_file
 from apps.ai.services.mail_generation import (
@@ -20,6 +21,7 @@ from apps.ai.services.mail_generation import (
     stream_mail_generation_with_plan,
     stream_mail_generation_with_timestamp,
 )
+from apps.ai.services.prompt_preview import generate_prompt_preview
 from apps.ai.services.utils import (
     _fetch_analysis_for_group,
     _fetch_analysis_for_single,
@@ -27,6 +29,11 @@ from apps.ai.services.utils import (
     collect_prompt_context,
     heartbeat,
     sse_event,
+)
+from apps.ai.tasks import (
+    analyze_speech,
+    backfill_contact_mail_analysis,
+    delete_up_n,
 )
 from apps.contact.models import Contact, ContactContext, Group, PromptOption
 
@@ -331,6 +338,110 @@ class ReplyOptionsStreamViewTest(TestCase):
         self.assertIn("id: 2", content)
         self.assertIn("id: 3", content)
         self.assertIn("id: 4", content)
+
+    @patch("apps.ai.services.chains.plan_chain")
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_fallback_plan_used_on_exception(self, mock_stream, _):
+        """plan_chain 예외 발생 시 FallbackPlan 경로가 실행되는지"""
+
+        def mock_generator():
+            yield 'event: ready\ndata: {"ts":123}\nretry: 5000\n\n'
+            yield 'event: options\ndata: {"count":2,"items":[{"id":0,"type":"Concise reply","title":"Quick confirmation"}]}\n\n'
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+
+        self.assertIn("Concise reply", content)
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_zero_plan_items(self, mock_stream):
+        """옵션이 0개인 경우 count=0 확인"""
+
+        def mock_generator():
+            yield "event: ready\ndata: {}\n\n"
+            yield 'event: options\ndata: {"count":0,"items":[]}\n\n'
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+        self.assertIn('"count":0', content)
+
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_worker_error(self, mock_stream):
+        """워커 내부 오류 → option.error 이벤트 발생"""
+
+        def mock_generator():
+            yield "event: ready\ndata: {}\n\n"
+            yield 'event: options\ndata: {"count":1,"items":[{"id":0,"type":"테스트","title":"타이틀"}]}\n\n'
+            yield 'event: option.error\ndata: {"id":0,"message":"test error"}\n\n'
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+        self.assertIn("option.error", content)
+
+    @patch("apps.ai.services.reply.time.monotonic")
+    @patch("apps.ai.views.stream_reply_options_llm")
+    def test_reply_options_force_ping_by_time(self, mock_stream, mock_mono):
+        """time.monotonic 조작 → ping 조건 강제 만족"""
+
+        mock_mono.side_effect = [0, 11]  # last_ping=0, 현재=11 → 10초 경과
+
+        def mock_generator():
+            yield "event: ready\ndata: {}\n\n"
+            yield "event: ping\ndata: {}\n\n"
+            yield 'event: done\ndata: {"reason":"all_options_finished"}\n\n'
+
+        mock_stream.return_value = mock_generator()
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+        content = b"".join(resp.streaming_content).decode()
+        self.assertIn("event: ping", content)
+
+    @patch("apps.ai.services.chains.plan_chain")
+    @patch("apps.ai.services.chains.reply_body_chain")
+    @patch("apps.ai.services.reply.PiiMasker.mask_inputs")
+    def test_reply_options_mapping_cleared(self, mock_mask_inputs, mock_plan_chain, mock_reply_chain):
+
+        mapping = {"k": "v"}
+        mock_mask_inputs.return_value = (
+            {
+                "incoming_subject": "",
+                "incoming_body": "",  # <-- KeyError 해결
+            },
+            mapping,
+        )
+
+        # plan_chain mock
+        plan_mock = type("X", (), {"language": "ko", "options": []})()
+        mock_plan_chain.invoke.return_value = plan_mock
+
+        # reply_body_chain mock
+        async def empty_gen(_):
+            if False:
+                yield
+
+        mock_reply_chain.astream.return_value = empty_gen({})
+
+        resp = self.client.post(self.url, self.valid_payload, format="json")
+
+        # consume stream
+        import asyncio
+
+        async def consume(gen):
+            async for _ in gen:
+                pass
+
+        asyncio.run(consume(resp.streaming_content))
+
+        self.assertEqual(mapping, {})
 
 
 def _drain(gen):
@@ -1525,6 +1636,45 @@ class IntegrationTest(TestCase):
         self.assertIsNone(cross_result)
 
 
+class TestPromptPreview(TestCase):
+
+    @patch("apps.ai.services.prompt_preview.prompt_preview_chain")
+    @patch("apps.ai.services.prompt_preview.build_prompt_inputs")
+    @patch("apps.ai.services.prompt_preview.collect_prompt_context")
+    def test_prompt_preview_success(self, mock_collect, mock_build, mock_chain):
+        # 준비
+        user = User.objects.create(email="test@x.com")
+        mock_collect.return_value = {"user": "x"}
+        mock_build.return_value = {"input": "y"}
+        mock_chain.invoke.return_value = "결과입니다  "
+
+        # 실행
+        text = generate_prompt_preview(user=user, to_emails=["a@b.com"])
+
+        # 검증
+        self.assertEqual(text, "결과입니다")
+        mock_collect.assert_called_once()
+        mock_build.assert_called_once()
+        mock_chain.invoke.assert_called_once()
+
+    @patch("apps.ai.services.prompt_preview.prompt_preview_chain")
+    @patch("apps.ai.services.prompt_preview.build_prompt_inputs")
+    @patch("apps.ai.services.prompt_preview.collect_prompt_context")
+    def test_prompt_preview_exception(self, mock_collect, mock_build, mock_chain):
+        user = User.objects.create(email="test@x.com")
+        mock_collect.return_value = {"user": "x"}
+        mock_build.return_value = {"input": "y"}
+
+        # invoke가 예외를 발생시키도록 설정
+        mock_chain.invoke.side_effect = Exception("fail")
+
+        # 실행
+        text = generate_prompt_preview(user=user, to_emails=["a@b.com"])
+
+        # 검증
+        self.assertEqual(text, "현재 수신자에 대한 프롬프트 정보가 없습니다..")
+
+
 # =========================
 # collect_prompt_context
 # =========================
@@ -1830,3 +1980,106 @@ class TestAttachmentAnalysis(TestCase):
         self.assertEqual(result["summary"], "cached_summary")
         self.assertEqual(result["insights"], "cached_insights")
         self.assertEqual(result["mail_guide"], "cached_guide")
+
+
+class TestAnalyzeSpeech(TestCase):
+    @patch("apps.ai.tasks.analyze_speech_llm")
+    def test_analyze_speech_success(self, mock_llm):
+        user = User.objects.create(email="a@test.com")
+        contact = Contact.objects.create(user=user, email="c@test.com")
+
+        mock_llm.return_value.model_dump.return_value = {
+            "lexical_style": "A",
+            "grammar_patterns": ["B"],
+            "emotional_tone": "C",
+            "representative_sentences": ["D"],
+        }
+
+        result = analyze_speech(
+            user_id=user.id,
+            subject="hi",
+            body="body",
+            to_emails=[contact.email],
+        )
+
+        self.assertIsNone(result)
+        self.assertEqual(MailAnalysisResult.objects.count(), 1)
+        self.assertEqual(ContactAnalysisResult.objects.count(), 1)
+        self.assertEqual(GroupAnalysisResult.objects.count(), 0)
+
+    def test_analyze_speech_user_missing(self):
+        result = analyze_speech(999, "sub", "body", ["test@test.com"])
+        self.assertIsNone(result)
+
+
+class TestDeleteUpN(TestCase):
+    def test_delete_up_n(self):
+        user = User.objects.create(email="user@test.com")
+        group = Group.objects.create(
+            user=user,
+            name="Team Alpha",
+            description="Internal team comms",
+        )
+        contact = Contact.objects.create(user=user, email="c@test.com", group=group)
+
+        # 5개 생성 → n=2이면 3개 삭제
+        for i in range(5):  # noqa: B007
+            MailAnalysisResult.objects.create(
+                user=user,
+                contact=contact,
+                lexical_style="A",
+                grammar_patterns=["B"],
+                emotional_tone="C",
+                representative_sentences=["D"],
+            )
+
+        delete_up_n(n=2)
+
+        self.assertEqual(MailAnalysisResult.objects.count(), 2)
+
+
+class TestBackfillContactMailAnalysis(TestCase):
+    @patch("apps.ai.tasks.list_emails_logic")
+    @patch("apps.ai.tasks.analyze_speech.delay")
+    def test_backfill_success(self, mock_delay, mock_list):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        mock_list.return_value = (
+            None,
+            [{"subject": "S", "body": "B", "id": 1}],
+        )
+
+        count = backfill_contact_mail_analysis(user.id, contact.id)
+        self.assertEqual(count, 1)
+        mock_delay.assert_called_once()
+
+    @patch("apps.ai.tasks.list_emails_logic", side_effect=Exception("API ERR"))
+    def test_backfill_retry(self, mock_list):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        with self.assertRaises(Exception):  # noqa: B017
+            backfill_contact_mail_analysis(user.id, contact.id)
+
+    @patch("apps.ai.tasks.list_emails_logic", return_value=(None, []))
+    def test_backfill_no_messages(self, _):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        count = backfill_contact_mail_analysis(user.id, contact.id)
+        self.assertEqual(count, 0)
+
+    @patch("apps.ai.tasks.list_emails_logic", return_value=(None, [{"subject": "", "body": ""}]))
+    def test_backfill_empty_subject_and_body(self, _):
+        user = User.objects.create(email="u@test.com")
+        contact = Contact.objects.create(user=user, email="x@test.com")
+
+        count = backfill_contact_mail_analysis(user.id, contact.id)
+        self.assertEqual(count, 0)
+
+
+def tearDown(self):
+    super().tearDown()
+    for conn in connections.all():
+        conn.close()
