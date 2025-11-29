@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -202,11 +202,26 @@ fun ContactDetailScreen(
                             )
                         }
                         Spacer(Modifier.size(12.dp))
-                        Column(Modifier.wrapContentWidth()) {
-                            Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            if (contact.email.isNotBlank()) Text(contact.email, color = Color.Gray)
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                contact.name,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (contact.email.isNotBlank()) {
+                                Text(
+                                    contact.email,
+                                    color = Color.Gray,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
-                        Spacer(Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp))
                         IconButton(
                             onClick = {
                                 editNameField = contact.name
@@ -643,13 +658,15 @@ private fun EditContactDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.90f)
-                .widthIn(max = 720.dp),
+                .widthIn(max = 720.dp)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(
                 modifier = Modifier
                     .background(Color.White)
                     .padding(20.dp)
+                    .fillMaxHeight()
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -680,6 +697,7 @@ private fun EditContactDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f, fill = true)
                         .verticalScroll(scrollState)
                 ) {
                     Text("이름", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)

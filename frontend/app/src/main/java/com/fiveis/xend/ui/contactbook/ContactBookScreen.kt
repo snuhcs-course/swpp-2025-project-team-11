@@ -479,19 +479,25 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                     }
                 }
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
                     Text(
                         group.description ?: "",
-                        modifier = Modifier.width(240.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         color = Color.DarkGray,
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                Text("${group.members.size}명", color = groupColor, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "${group.members.size}명",
+                    color = groupColor,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
+                )
                 Spacer(Modifier.width(12.dp))
             }
 

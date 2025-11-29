@@ -47,6 +47,10 @@ interface MailApiService {
     @POST("api/ai/mail/attachments/analyze/")
     suspend fun analyzeAttachment(@Body request: AttachmentAnalysisRequest): Response<AttachmentAnalysisResponse>
 
+    @Multipart
+    @POST("api/ai/mail/attachments/analyze-upload/")
+    suspend fun analyzeAttachmentUpload(@Part file: MultipartBody.Part): Response<AttachmentAnalysisResponse>
+
     @PATCH("api/mail/emails/{message_id}/read/")
     suspend fun updateReadStatus(
         @Path("message_id") messageId: String,

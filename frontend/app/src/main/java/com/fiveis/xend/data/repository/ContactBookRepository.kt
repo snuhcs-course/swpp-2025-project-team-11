@@ -9,10 +9,9 @@ import com.fiveis.xend.data.database.entity.ContactEntity
 import com.fiveis.xend.data.database.entity.GroupEntity
 import com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef
 import com.fiveis.xend.data.database.entity.PromptOptionEntity
-import com.fiveis.xend.data.model.AddContactRequest
-import com.fiveis.xend.data.model.AddContactRequestContext
 import com.fiveis.xend.data.model.AddGroupRequest
 import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.data.model.ContactRequestBuilder
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
@@ -191,14 +190,15 @@ class ContactBookRepository(
         personalPrompt: String?,
         languagePreference: String? = null
     ): ContactResponse {
-        val requestContext = AddContactRequestContext(
-            senderRole = senderRole ?: "",
-            recipientRole = recipientRole,
-            personalPrompt = personalPrompt ?: "",
-            languagePreference = languagePreference ?: ""
-        )
-
-        val request = AddContactRequest(name = name, email = email, groupId = groupId, context = requestContext)
+        val request = ContactRequestBuilder()
+            .name(name)
+            .email(email)
+            .groupId(groupId)
+            .senderRole(senderRole)
+            .recipientRole(recipientRole)
+            .personalPrompt(personalPrompt)
+            .languagePreference(languagePreference)
+            .build()
         val res = api.addContact(request)
         if (!res.isSuccessful) {
             val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"

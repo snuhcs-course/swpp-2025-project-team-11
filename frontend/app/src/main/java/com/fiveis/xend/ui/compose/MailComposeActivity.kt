@@ -86,6 +86,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -111,6 +112,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.text.HtmlCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -119,6 +122,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fiveis.xend.BuildConfig
 import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.DraftItem
 import com.fiveis.xend.data.model.Group
@@ -128,6 +132,7 @@ import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
+import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
 import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
@@ -135,11 +140,17 @@ import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.AddButtonText
+import com.fiveis.xend.ui.theme.AttachmentExcelBg
+import com.fiveis.xend.ui.theme.AttachmentImageBg
+import com.fiveis.xend.ui.theme.BackgroundWhite
+import com.fiveis.xend.ui.theme.Blue40
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
 import com.fiveis.xend.ui.theme.ComposeSurface
+import com.fiveis.xend.ui.theme.Gray600
+import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.StableColor
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
@@ -147,6 +158,7 @@ import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.utils.formatFileSize
 import com.fiveis.xend.utils.shortenFilename
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -188,6 +200,7 @@ fun EmailComposeScreen(
     sendUiState: SendUiState,
     attachments: List<Uri>,
     onSend: () -> Unit,
+    onAnalyzeAttachment: (ComposeAttachmentItem) -> Unit = {},
     suggestionText: String = "",
     onAcceptSuggestion: () -> Unit = {},
     aiRealtime: Boolean = true,
@@ -300,7 +313,8 @@ fun EmailComposeScreen(
 
             LightAttachmentPager(
                 attachments = attachments,
-                onRemove = onRemoveAttachment
+                onRemove = onRemoveAttachment,
+                onAnalyze = onAnalyzeAttachment
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -1251,6 +1265,11 @@ class MailComposeActivity : ComponentActivity() {
                 var aiRealtime by rememberSaveable { mutableStateOf(true) }
                 var canUndo by rememberSaveable { mutableStateOf(false) }
                 var canRedo by rememberSaveable { mutableStateOf(false) }
+                var analysisTarget by remember { mutableStateOf<ComposeAttachmentItem?>(null) }
+                var analysisResult by remember { mutableStateOf<AttachmentAnalysisResponse?>(null) }
+                var analysisError by remember { mutableStateOf<String?>(null) }
+                var isAnalyzingAttachment by remember { mutableStateOf(false) }
+                val attachmentContentKeys = remember { mutableStateMapOf<Uri, String>() }
                 val lifecycleOwner = LocalLifecycleOwner.current
 
                 // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
@@ -1419,6 +1438,34 @@ class MailComposeActivity : ComponentActivity() {
                     }
                 }
 
+                val onDismissAnalysis = {
+                    analysisTarget = null
+                    analysisResult = null
+                    analysisError = null
+                    isAnalyzingAttachment = false
+                }
+
+                val analyzeAttachment: (ComposeAttachmentItem) -> Unit = analyze@{ item ->
+                    if (!item.supportsAnalysis) return@analyze
+                    analysisTarget = item
+                    analysisResult = null
+                    analysisError = null
+                    isAnalyzingAttachment = true
+                    coroutineScope.launch {
+                        try {
+                            val result = sendVm.analyzeAttachmentUpload(item.uri)
+                            analysisResult = result
+                            result.contentKey?.let { key ->
+                                attachmentContentKeys[item.uri] = key
+                            }
+                        } catch (e: Exception) {
+                            analysisError = e.message ?: "AI 분석에 실패했습니다."
+                        } finally {
+                            isAnalyzingAttachment = false
+                        }
+                    }
+                }
+
                 // Enable/disable realtime mode when toggle changes
                 DisposableEffect(aiRealtime) {
                     composeVm.enableRealtimeMode(aiRealtime)
@@ -1522,11 +1569,15 @@ class MailComposeActivity : ComponentActivity() {
                                 error = composeUi.error,
                                 sendUiState = sendUi,
                                 attachments = attachmentUris,
+                                onAnalyzeAttachment = analyzeAttachment,
                                 // Trigger our custom back press handling
                                 onBack = { onBackPressedDispatcher.onBackPressed() },
                                 onTemplateClick = { showTemplateScreen = true },
                                 onAttachmentClick = { attachmentPicker.launch("*/*") },
-                                onRemoveAttachment = { uri -> attachmentUris.remove(uri) },
+                                onRemoveAttachment = { uri ->
+                                    attachmentUris.remove(uri)
+                                    attachmentContentKeys.remove(uri)
+                                },
                                 onUndo = undoAction,
                                 suggestionText = composeUi.suggestionText,
                                 onAcceptSuggestion = acceptSuggestion,
@@ -1549,12 +1600,15 @@ class MailComposeActivity : ComponentActivity() {
                                     )
                                     canUndo = true
                                     canRedo = false
-
+                                    val contentKeys = attachmentUris.mapNotNull { uri ->
+                                        attachmentContentKeys[uri]
+                                    }
                                     val payload = JSONObject().apply {
                                         put("subject", subject.ifBlank { "제목 생성" })
                                         // Use HTML content for AI prompt
                                         put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
                                         put("to_emails", JSONArray(contacts.map { it.email }))
+                                        put("attachment_content_keys", JSONArray(contentKeys))
 //                                    put("relationship", "업무 관련")
 //                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
 //                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
@@ -1600,6 +1654,16 @@ class MailComposeActivity : ComponentActivity() {
                                     // TODO: Hook up prompt viewer once backend API is ready
                                 }
                             )
+
+                            analysisTarget?.let { target ->
+                                ComposeAttachmentAnalysisPopup(
+                                    attachment = target,
+                                    isLoading = isAnalyzingAttachment,
+                                    result = analysisResult,
+                                    errorMessage = analysisError,
+                                    onDismiss = onDismissAnalysis
+                                )
+                            }
 
                             // Show Add Contact Dialog
                             if (showAddContactDialog) {
@@ -1744,12 +1808,11 @@ class MailComposeActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LightAttachmentRow(attachments: List<Uri>) {
-    LightAttachmentPager(attachments = attachments, onRemove = {})
-}
-
-@Composable
-private fun LightAttachmentPager(attachments: List<Uri>, onRemove: (Uri) -> Unit) {
+private fun LightAttachmentPager(
+    attachments: List<Uri>,
+    onRemove: (Uri) -> Unit,
+    onAnalyze: (ComposeAttachmentItem) -> Unit = {}
+) {
     if (attachments.isEmpty()) return
 
     val context = LocalContext.current
@@ -1772,7 +1835,22 @@ private fun LightAttachmentPager(attachments: List<Uri>, onRemove: (Uri) -> Unit
                 if (idx >= 0 && cursor.moveToFirst()) cursor.getLong(idx) else -1L
             } ?: -1L
         val sizeLabel = formatFileSize(size)
-        ComposeAttachmentChip(uri = uri, name = name, sizeLabel = sizeLabel)
+        val badgeColor = composeAttachmentBadgeColor(name)
+        val mimeType = resolver.getType(uri)?.lowercase(Locale.getDefault()).orEmpty()
+        val supportsAnalysis = composeAttachmentSupportsAnalysis(
+            filename = name,
+            mimeType = mimeType,
+            sizeBytes = size
+        )
+        ComposeAttachmentItem(
+            uri = uri,
+            name = name,
+            sizeLabel = sizeLabel,
+            badgeColor = badgeColor,
+            mimeType = mimeType,
+            sizeBytes = size,
+            supportsAnalysis = supportsAnalysis
+        )
     }
 
     val pagerState = rememberPagerState(pageCount = { items.size })
@@ -1797,18 +1875,49 @@ private fun LightAttachmentPager(attachments: List<Uri>, onRemove: (Uri) -> Unit
         ) { page ->
             items[page].Content(
                 modifier = Modifier.fillMaxWidth(),
-                onRemove = { onRemove(items[page].uri) }
+                onRemove = { onRemove(items[page].uri) },
+                onAnalyze = { onAnalyze(items[page]) }
             )
         }
     }
 }
 
-private data class ComposeAttachmentChip(val uri: Uri, val name: String, val sizeLabel: String) {
+private fun composeAttachmentBadgeColor(filename: String): Color {
+    val extension = filename.substringAfterLast('.', "").lowercase(Locale.getDefault())
+    return when (extension) {
+        "xls", "xlsx", "csv" -> AttachmentExcelBg
+        "png", "jpg", "jpeg", "gif", "bmp", "webp" -> AttachmentImageBg
+        else -> Blue40
+    }
+}
+
+private fun composeAttachmentSupportsAnalysis(filename: String, mimeType: String, sizeBytes: Long): Boolean {
+    val allowedTokens = setOf("pdf", "txt", "csv", "xlsx", "xls", "docx")
+    val sizeOk = sizeBytes <= 10 * 1024 * 1024
+    if (!sizeOk) return false
+
+    val lowerMime = mimeType.lowercase(Locale.getDefault())
+    val filenameLower = filename.lowercase(Locale.getDefault())
+    val typeOk = allowedTokens.any { token ->
+        lowerMime.contains(token) || filenameLower.endsWith(".$token")
+    }
+    return typeOk
+}
+
+data class ComposeAttachmentItem(
+    val uri: Uri,
+    val name: String,
+    val sizeLabel: String,
+    val badgeColor: Color,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val supportsAnalysis: Boolean
+) {
     @Composable
-    fun Content(modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null) {
+    fun Content(modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null, onAnalyze: (() -> Unit)? = null) {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = ComposeSurface,
+            color = BackgroundWhite,
             border = BorderStroke(1.dp, ComposeOutline),
             modifier = modifier
                 .heightIn(min = 44.dp)
@@ -1822,13 +1931,13 @@ private data class ComposeAttachmentChip(val uri: Uri, val name: String, val siz
                 Surface(
                     modifier = Modifier.size(32.dp),
                     shape = RoundedCornerShape(8.dp),
-                    color = Blue60.copy(alpha = 0.15f)
+                    color = badgeColor
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.InsertDriveFile,
                             contentDescription = null,
-                            tint = Blue60,
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1859,19 +1968,227 @@ private data class ComposeAttachmentChip(val uri: Uri, val name: String, val siz
                     )
                 }
 
-                if (onRemove != null) {
-                    IconButton(
-                        onClick = onRemove,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Remove,
-                            contentDescription = "첨부 취소",
-                            tint = Color.Red
-                        )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (supportsAnalysis && onAnalyze != null) {
+                        AiAnalysisBadge(onClick = onAnalyze)
+                    }
+                    if (onRemove != null) {
+                        IconButton(
+                            onClick = onRemove,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Remove,
+                                contentDescription = "첨부 취소",
+                                tint = Color.Red
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AiAnalysisBadge(onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFEFF6FF),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            text = "AI 분석",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = Purple60,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun ComposeAttachmentAnalysisPopup(
+    attachment: ComposeAttachmentItem,
+    isLoading: Boolean,
+    result: AttachmentAnalysisResponse?,
+    errorMessage: String?,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x88000000)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .heightIn(min = 400.dp, max = 640.dp),
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 12.dp,
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    ComposeAnalysisHeader(attachment = attachment, onDismiss = onDismiss)
+                    ComposeAnalysisContent(
+                        isLoading = isLoading,
+                        result = result,
+                        errorMessage = errorMessage
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComposeAnalysisHeader(attachment: ComposeAttachmentItem, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = attachment.badgeColor
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.InsertDriveFile,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = attachment.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Text(
+                    text = "파일 분석 결과",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFFF1F5F9),
+            modifier = Modifier.clickable(onClick = onDismiss)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "닫기",
+                tint = TextSecondary,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComposeAnalysisContent(isLoading: Boolean, result: AttachmentAnalysisResponse?, errorMessage: String?) {
+    when {
+        isLoading -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator()
+                Text(
+                    text = "AI가 파일을 분석 중입니다...",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        errorMessage != null -> {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = errorMessage,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "잠시 후 다시 시도해 주세요.",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        result != null -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                AttachmentAnalysisSection(
+                    title = "주요 내용 요약",
+                    backgroundColor = Color(0xFFF8FAFC),
+                    borderColor = Color(0xFFE2E8F0),
+                    contentLines = result.summary.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                )
+                AttachmentAnalysisSection(
+                    title = "핵심 시사점",
+                    backgroundColor = Color(0xFFFFF7ED),
+                    borderColor = Color(0xFFFED7AA),
+                    contentLines = result.insights.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                )
+                AttachmentAnalysisSection(
+                    title = "메일 작성 가이드",
+                    backgroundColor = Color(0xFFFAF5FF),
+                    borderColor = Color(0xFFDDD6FE),
+                    contentLines = result.mailGuide.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                )
+
+                Text(
+                    text = "메일 작성 가이드는 메일 생성 시 자동으로 반영돼요.",
+                    fontSize = 13.sp,
+                    color = Gray600
+                )
+            }
+        } else -> {
+            Text(
+                text = "분석 결과를 불러올 수 없습니다.",
+                fontSize = 14.sp,
+                color = TextSecondary
+            )
         }
     }
 }
@@ -1907,6 +2224,7 @@ private fun EmailComposePreview() {
             error = null,
             sendUiState = SendUiState(),
             attachments = emptyList(),
+            onAnalyzeAttachment = {},
             onTemplateClick = {},
             onSend = {},
             suggestionText = "",

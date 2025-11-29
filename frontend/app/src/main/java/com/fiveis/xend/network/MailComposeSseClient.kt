@@ -23,12 +23,21 @@ private val loggingInterceptor = HttpLoggingInterceptor().apply {
     level = HttpLoggingInterceptor.Level.BASIC
 }
 
-class MailComposeSseClient(
-    context: Context,
-    val tokenManager: TokenManager = TokenManager(context),
-    private val endpointUrl: String,
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.SECONDS) // 무한 읽기
+interface MailComposeStreamSubject {
+    fun start(
+        payload: JSONObject,
+        onSubject: (String) -> Unit,
+        onBodyDelta: (Int, String) -> Unit,
+        onDone: () -> Unit,
+        onError: (String) -> Unit
+    )
+
+    fun stop()
+}
+
+private fun defaultStreamingClient(context: Context, tokenManager: TokenManager): OkHttpClient {
+    return OkHttpClient.Builder()
+        .readTimeout(0, TimeUnit.SECONDS)
         .connectTimeout(15, TimeUnit.SECONDS)
 //        .addInterceptor(loggingInterceptor)
         .addInterceptor { chain ->
@@ -42,19 +51,24 @@ class MailComposeSseClient(
         }
         .authenticator(TokenRefreshAuthenticator(context, tokenManager))
         .build()
-) {
+}
+
+class RemoteMailComposeSubject(
+    private val endpointUrl: String,
+    private val client: OkHttpClient
+) : MailComposeStreamSubject {
     private var call: Call? = null
     private var readerJob: Job? = null
     private val stopped = AtomicBoolean(false)
 
-    fun start(
+    override fun start(
         payload: JSONObject,
         onSubject: (String) -> Unit,
         onBodyDelta: (Int, String) -> Unit,
         onDone: () -> Unit,
         onError: (String) -> Unit
     ) {
-        stop() // 이전 연결 정리
+        stop()
 
         val json = payload.toString()
         val reqBody = json.toRequestBody("application/json".toMediaType())
@@ -91,7 +105,6 @@ class MailComposeSseClient(
                     return
                 }
 
-                // 백그라운드에서 SSE 라인 파서 가동
                 readerJob = CoroutineScope(Dispatchers.IO).launch {
                     try {
                         parseSseStream(
@@ -121,7 +134,7 @@ class MailComposeSseClient(
         })
     }
 
-    fun stop() {
+    override fun stop() {
         stopped.set(true)
         readerJob?.cancel()
         readerJob = null
@@ -129,22 +142,15 @@ class MailComposeSseClient(
         call = null
     }
 
-    /**
-     * 단순 SSE 파서:
-     * - 'event: xxx' / 'data: yyy' 라인들을 모아 빈 줄 만나면 1 프레임으로 처리
-     * - CRLF/LF 모두 처리
-     */
     private fun parseSseStream(source: okio.BufferedSource, onEvent: (event: String, data: String) -> Unit) {
         var curEvent = "message"
         val dataLines = mutableListOf<String>()
 
         while (true) {
-            // UTF-8로 한 줄씩 읽기 (LF/CRLF 모두 처리, EOF면 null)
             val raw = source.readUtf8Line() ?: break
-            val line = raw.removePrefix("\uFEFF") // 혹시 있을지 모르는 BOM 제거
+            val line = raw.removePrefix("\uFEFF")
 
             if (line.isEmpty()) {
-                // 프레임 종료: 누적된 data를 한 번에 전달
                 if (dataLines.isNotEmpty()) {
                     onEvent(curEvent, dataLines.joinToString("\n"))
                     dataLines.clear()
@@ -163,9 +169,51 @@ class MailComposeSseClient(
             }
         }
 
-        // 스트림이 개행 없이 끝났을 때 마지막 프레임 처리
         if (dataLines.isNotEmpty()) {
             onEvent(curEvent, dataLines.joinToString("\n"))
         }
+    }
+}
+
+class MailComposeSseClient(
+    context: Context,
+    tokenManager: TokenManager = TokenManager(context),
+    endpointUrl: String,
+    client: OkHttpClient = defaultStreamingClient(context, tokenManager)
+) : MailComposeStreamSubject {
+
+    private val realSubject: MailComposeStreamSubject = RemoteMailComposeSubject(endpointUrl, client)
+    private val active = AtomicBoolean(false)
+
+    override fun start(
+        payload: JSONObject,
+        onSubject: (String) -> Unit,
+        onBodyDelta: (Int, String) -> Unit,
+        onDone: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (!active.compareAndSet(false, true)) {
+            realSubject.stop()
+            active.set(true)
+        }
+
+        realSubject.start(
+            payload = payload,
+            onSubject = onSubject,
+            onBodyDelta = onBodyDelta,
+            onDone = {
+                active.set(false)
+                onDone()
+            },
+            onError = { message ->
+                active.set(false)
+                onError(message)
+            }
+        )
+    }
+
+    override fun stop() {
+        active.set(false)
+        realSubject.stop()
     }
 }
