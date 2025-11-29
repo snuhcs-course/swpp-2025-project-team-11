@@ -76,11 +76,11 @@ class AddContactActivity : ComponentActivity() {
                         addViewModel.addContact(
                             name = name,
                             email = email,
-                            senderRole = senderRole,
-                            recipientRole = recipientRole ?: "",
-                            personalPrompt = personalPrompt,
+                            senderRole = senderRole?.takeIf { it.isNotBlank() },
+                            recipientRole = recipientRole?.takeIf { it.isNotBlank() },
+                            personalPrompt = personalPrompt?.takeIf { it.isNotBlank() },
                             group = selectedGroup,
-                            languagePreference = languagePreference
+                            languagePreference = languagePreference.takeIf { it.isNotBlank() }
                         )
                     },
                     onAddGroupClick = {
