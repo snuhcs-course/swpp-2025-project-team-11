@@ -64,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -777,6 +778,7 @@ private fun EditContactDialog(
                                     },
                                     onValueChange = {},
                                     readOnly = true,
+                                    singleLine = true,
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Outlined.Group,
@@ -791,7 +793,10 @@ private fun EditContactDialog(
                                     modifier = Modifier
                                         .menuAnchor()
                                         .height(48.dp),
-                                    textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontSize = 10.sp,
+                                        baselineShift = BaselineShift(0.4f)
+                                    ),
                                     shape = RoundedCornerShape(12.dp),
                                     enabled = !isProcessing,
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -809,7 +814,7 @@ private fun EditContactDialog(
                                 ) {
                                     senderRoleOptions.forEach { option ->
                                         DropdownMenuItem(
-                                            text = { Text(option, fontSize = 13.sp) },
+                                            text = { Text(option, fontSize = 10.sp) },
                                             onClick = {
                                                 isSenderExpanded = false
                                                 if (option == directInputLabel) {
@@ -841,6 +846,7 @@ private fun EditContactDialog(
                                     },
                                     onValueChange = {},
                                     readOnly = true,
+                                    singleLine = true,
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Outlined.Group,
@@ -855,7 +861,10 @@ private fun EditContactDialog(
                                     modifier = Modifier
                                         .menuAnchor()
                                         .height(48.dp),
-                                    textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontSize = 10.sp,
+                                        baselineShift = BaselineShift(0.4f)
+                                    ),
                                     shape = RoundedCornerShape(12.dp),
                                     enabled = !isProcessing,
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -873,7 +882,7 @@ private fun EditContactDialog(
                                 ) {
                                     recipientRoleOptions.forEach { option ->
                                         DropdownMenuItem(
-                                            text = { Text(option, fontSize = 13.sp) },
+                                            text = { Text(option, fontSize = 10.sp) },
                                             onClick = {
                                                 isRecipientExpanded = false
                                                 if (option == directInputLabel) {
@@ -995,6 +1004,7 @@ private fun EditContactDialog(
                             value = selectedGroupName,
                             onValueChange = {},
                             readOnly = true,
+                            singleLine = true,
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.FolderOpen,
@@ -1010,7 +1020,10 @@ private fun EditContactDialog(
                                 .fillMaxWidth()
                                 .menuAnchor()
                                 .height(48.dp),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                            textStyle = LocalTextStyle.current.copy(
+                                fontSize = 13.sp,
+                                baselineShift = BaselineShift(0.4f)
+                            ),
                             shape = RoundedCornerShape(12.dp),
                             enabled = !isProcessing,
                             colors = OutlinedTextFieldDefaults.colors(
