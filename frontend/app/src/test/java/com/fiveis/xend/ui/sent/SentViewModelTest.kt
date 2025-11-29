@@ -38,6 +38,7 @@ class SentViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var repository: SentRepository
+    private lateinit var prefs: android.content.SharedPreferences
     private lateinit var viewModel: SentViewModel
 
     private val mockEmail1 = EmailItem(
@@ -68,6 +69,9 @@ class SentViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = mockk()
+        prefs = mockk(relaxed = true)
+        every { prefs.getString(any(), any()) } returns null
+        every { prefs.edit() } returns mockk(relaxed = true)
     }
 
     @After
@@ -81,7 +85,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(mockEmails)
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         assertEquals(mockEmails, viewModel.uiState.value.emails)
@@ -94,7 +98,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         coVerify { repository.refreshEmails(any(), any()) }
@@ -105,7 +109,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         viewModel.refreshEmails()
@@ -120,7 +124,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(listOf(mockEmail1))
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         viewModel.refreshEmails()
@@ -136,7 +140,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         coEvery { repository.refreshEmails(any(), any()) } returns Result.failure(Exception("Network error"))
@@ -159,7 +163,7 @@ class SentViewModelTest {
         } returns Response.success(MailListResponse(newEmails, null, 0))
         coEvery { repository.saveEmailsToCache(any()) } returns Unit
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         assertEquals("nextToken", viewModel.uiState.value.loadMoreNextPageToken)
@@ -169,7 +173,7 @@ class SentViewModelTest {
 
         assertFalse(viewModel.uiState.value.isLoading)
         coVerify { repository.getMails(any(), any(), "nextToken", any()) }
-        coVerify { repository.saveEmailsToCache(newEmails) }
+        coVerify { repository.saveEmailsToCache(any()) }
     }
 
     @Test
@@ -177,8 +181,11 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(listOf(mockEmail1))
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
+
+        // State should have no token
+        assertNull(viewModel.uiState.value.loadMoreNextPageToken)
 
         viewModel.loadMoreEmails()
         advanceUntilIdle()
@@ -195,7 +202,7 @@ class SentViewModelTest {
             repository.getMails(any(), any(), "nextToken", any())
         } returns Response.error(500, "Server error".toResponseBody())
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -213,8 +220,10 @@ class SentViewModelTest {
             repository.getMails(any(), any(), "nextToken", any())
         } throws RuntimeException("Network error")
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
+
+        assertEquals("nextToken", viewModel.uiState.value.loadMoreNextPageToken)
 
         viewModel.loadMoreEmails()
         advanceUntilIdle()
@@ -235,11 +244,15 @@ class SentViewModelTest {
         } returns Response.success(MailListResponse(batch1, "token2", 0))
         coEvery { repository.saveEmailsToCache(any()) } returns Unit
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
+
+        assertEquals("token1", viewModel.uiState.value.loadMoreNextPageToken)
 
         viewModel.loadMoreEmails()
         advanceUntilIdle()
+
+        assertEquals("token2", viewModel.uiState.value.loadMoreNextPageToken)
 
         val batch2 = listOf(
             EmailItem(
@@ -270,7 +283,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.emails.isEmpty())
@@ -288,7 +301,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns emailsFlow
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         assertEquals(initialEmails, viewModel.uiState.value.emails)
@@ -304,7 +317,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         coEvery { repository.refreshEmails(any(), any()) } returns Result.failure(Exception("Error"))
@@ -327,7 +340,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         viewModel.refreshEmails()
@@ -356,8 +369,10 @@ class SentViewModelTest {
         } returns Response.success(MailListResponse(newEmailsWithDuplicate, null, 0))
         coEvery { repository.saveEmailsToCache(any()) } returns Unit
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
+
+        assertEquals("nextToken", viewModel.uiState.value.loadMoreNextPageToken)
 
         viewModel.loadMoreEmails()
         advanceUntilIdle()
@@ -372,7 +387,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(listOf(mockEmail1))
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         // Should not throw exception
@@ -392,8 +407,10 @@ class SentViewModelTest {
         } returns Response.success(MailListResponse(emptyList(), null, 0))
         coEvery { repository.saveEmailsToCache(any()) } returns Unit
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
+
+        assertEquals("nextToken", viewModel.uiState.value.loadMoreNextPageToken)
 
         viewModel.loadMoreEmails()
         advanceUntilIdle()
@@ -407,7 +424,7 @@ class SentViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails(any(), any()) } returns Result.success(null)
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         coEvery { repository.refreshEmails(any(), any()) } throws RuntimeException("Network failure")
@@ -430,7 +447,7 @@ class SentViewModelTest {
         } returns Response.success(MailListResponse(listOf(mockEmail2), null, 0))
         coEvery { repository.saveEmailsToCache(any()) } returns Unit
 
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()

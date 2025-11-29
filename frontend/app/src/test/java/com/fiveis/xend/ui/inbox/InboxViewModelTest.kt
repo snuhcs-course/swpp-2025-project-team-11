@@ -38,6 +38,7 @@ class InboxViewModelTest {
 
     private lateinit var repository: InboxRepository
     private lateinit var contactRepository: ContactBookRepository
+    private lateinit var prefs: android.content.SharedPreferences
     private lateinit var viewModel: InboxViewModel
 
     @Before
@@ -45,6 +46,7 @@ class InboxViewModelTest {
         Dispatchers.setMain(testDispatcher)
         repository = mockk()
         contactRepository = mockk()
+        prefs = mockk(relaxed = true)
         every { contactRepository.observeGroups() } returns flowOf(emptyList())
         every { contactRepository.observeContacts() } returns flowOf(emptyList())
     }
@@ -63,7 +65,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(mockEmails)
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         assertEquals(mockEmails, viewModel.uiState.value.emails)
@@ -72,9 +74,11 @@ class InboxViewModelTest {
     @Test
     fun refresh_emails_success_updates_state() = runTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
+        every { prefs.getString(any(), any()) } returns null
+        every { prefs.edit() } returns mockk(relaxed = true)
         coEvery { repository.refreshEmails() } returns Result.success("token123")
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         assertEquals("token123", viewModel.uiState.value.loadMoreNextPageToken)
@@ -87,7 +91,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.failure(Exception("Network error"))
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         // Silent refresh in init doesn't set error (showLoading=false)
@@ -112,11 +116,13 @@ class InboxViewModelTest {
         )
 
         every { repository.getCachedEmails() } returns flowOf(emptyList())
+        every { prefs.getString(any(), any()) } returns null
+        every { prefs.edit() } returns mockk(relaxed = true)
         coEvery { repository.refreshEmails() } returns Result.success("token123")
         coEvery { repository.getMails(pageToken = "token123") } returns mockResponse
         coEvery { repository.saveEmailsToCache(newEmails) } returns Unit
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -130,9 +136,10 @@ class InboxViewModelTest {
     @Test
     fun load_more_emails_without_token_does_nothing() = runTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
+        every { prefs.getString(any(), any()) } returns null
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -147,7 +154,7 @@ class InboxViewModelTest {
         coEvery { repository.refreshEmails() } returns Result.success("token123")
         coEvery { repository.getMails(pageToken = "token123") } throws Exception("Load more failed")
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -162,7 +169,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
 
         assertTrue(viewModel.uiState.value.emails.isEmpty())
         assertFalse(viewModel.uiState.value.isRefreshing)
@@ -174,7 +181,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.refreshEmails()
@@ -195,10 +202,12 @@ class InboxViewModelTest {
         )
 
         every { repository.getCachedEmails() } returns flowOf(emptyList())
+        every { prefs.getString(any(), any()) } returns null
+        every { prefs.edit() } returns mockk(relaxed = true)
         coEvery { repository.refreshEmails() } returns Result.success("token123")
         coEvery { repository.getMails(pageToken = "token123") } returns mockResponse
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -213,7 +222,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.refreshEmails()
@@ -233,7 +242,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(mockEmails1, mockEmails2)
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         // Should have received the flow updates
@@ -252,11 +261,13 @@ class InboxViewModelTest {
         )
 
         every { repository.getCachedEmails() } returns flowOf(emptyList())
+        every { prefs.getString(any(), any()) } returns null
+        every { prefs.edit() } returns mockk(relaxed = true)
         coEvery { repository.refreshEmails() } returns Result.success("token123")
         coEvery { repository.getMails(pageToken = "token123") } returns mockResponse
         coEvery { repository.saveEmailsToCache(newEmails) } returns Unit
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -270,7 +281,7 @@ class InboxViewModelTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
         coEvery { repository.refreshEmails() } returns Result.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         // First, set an error
@@ -296,7 +307,7 @@ class InboxViewModelTest {
         coEvery { repository.refreshEmails() } returns Result.success("token123")
         coEvery { repository.getMails(pageToken = "token123") } returns Response.success(null)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -308,9 +319,11 @@ class InboxViewModelTest {
     @Test
     fun refresh_emails_with_token_returned() = runTest {
         every { repository.getCachedEmails() } returns flowOf(emptyList())
+        every { prefs.getString(any(), any()) } returns null
+        every { prefs.edit() } returns mockk(relaxed = true)
         coEvery { repository.refreshEmails() } returns Result.success("nextToken")
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         assertEquals("nextToken", viewModel.uiState.value.loadMoreNextPageToken)
@@ -327,7 +340,7 @@ class InboxViewModelTest {
         coEvery { repository.refreshEmails() } returns Result.success("token123")
         coEvery { repository.getMails(pageToken = "token123") } returns mockResponse
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         viewModel.loadMoreEmails()
@@ -358,7 +371,7 @@ class InboxViewModelTest {
         every { contactRepository.observeContacts() } returns flowOf(mockContacts)
         every { contactRepository.observeGroups() } returns flowOf(mockGroups)
 
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
         advanceUntilIdle()
 
         assertEquals(setOf("john@test.com"), viewModel.uiState.value.contactEmails)

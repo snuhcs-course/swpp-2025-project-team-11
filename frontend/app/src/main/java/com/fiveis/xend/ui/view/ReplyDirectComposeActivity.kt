@@ -501,7 +501,7 @@ private fun String.toHtmlPreservingLineBreaks(): String {
 }
 
 @Composable
-private fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit) {
+internal fun AiPromptPreviewDialog(contacts: List<Contact>, onDismiss: () -> Unit) {
     val context = LocalContext.current
     var promptData by remember { mutableStateOf<com.fiveis.xend.network.PromptPreviewResponse?>(null) }
     var isLoading by remember { mutableStateOf(true) }

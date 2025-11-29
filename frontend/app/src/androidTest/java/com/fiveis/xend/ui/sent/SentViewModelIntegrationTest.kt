@@ -29,6 +29,7 @@ class SentViewModelIntegrationTest {
     private lateinit var repository: SentRepository
     private lateinit var viewModel: SentViewModel
     private lateinit var mockApiService: MailApiService
+    private lateinit var prefs: android.content.SharedPreferences
 
     @Before
     fun setup() {
@@ -41,8 +42,9 @@ class SentViewModelIntegrationTest {
         emailDao = database.emailDao()
 
         mockApiService = mockk(relaxed = true)
+        prefs = mockk(relaxed = true)
         repository = SentRepository(mockApiService, emailDao)
-        viewModel = SentViewModel(repository)
+        viewModel = SentViewModel(repository, prefs)
     }
 
     @After

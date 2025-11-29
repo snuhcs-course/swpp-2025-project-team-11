@@ -153,6 +153,9 @@ class EmailDaoIntegrationTest {
 
     @Test
     fun getEmailCount_returns_zero_when_no_emails() = runTest {
+        // Ensure database is clean
+        emailDao.deleteAllEmails()
+
         val count = emailDao.getEmailCount()
 
         assertEquals(0, count)

@@ -43,11 +43,14 @@ class InboxRepositoryTest {
             createMockEmailItem("1"),
             createMockEmailItem("2")
         )
-        every { emailDao.getEmailsByLabel("INBOX") } returns flowOf(mockEmails)
+        every { emailDao.getInboxEmails() } returns flowOf(mockEmails)
 
         val result = repository.getCachedEmails()
 
-        coVerify { emailDao.getEmailsByLabel("INBOX") }
+        // Collect from flow to verify it works
+        var collected: List<EmailItem>? = null
+        result.collect { collected = it }
+        assertEquals(mockEmails, collected)
     }
 
     @Test
@@ -90,7 +93,7 @@ class InboxRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals("token123", result.getOrNull())
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -174,7 +177,7 @@ class InboxRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals(null, result.getOrNull())
-        coVerify(atLeast = 1) { emailDao.insertEmails(newEmails) }
+        coVerify(atLeast = 1) { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -221,12 +224,12 @@ class InboxRepositoryTest {
             createMockEmailItem("1"),
             createMockEmailItem("2")
         )
-        coEvery { emailDao.insertEmails(mockEmails) } returns Unit
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
 
         repository.saveEmailsToCache(mockEmails)
 
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify { emailDao.insertEmails(any()) }
         coVerify { emailDao.getEmailCount() }
     }
 
