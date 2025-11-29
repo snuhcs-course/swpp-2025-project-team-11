@@ -46,6 +46,11 @@ class AddGroupActivity : ComponentActivity() {
                 )
                 val addUiState by addViewModel.uiState.collectAsState()
 
+                // 이전 성공 상태 초기화 (ViewModel이 재사용될 경우 대비)
+                LaunchedEffect(Unit) {
+                    addViewModel.dismissSuccessBanner()
+                }
+
                 val bookViewModel: ContactBookViewModel = viewModel(
                     factory = ContactBookViewModel.Factory(application)
                 )

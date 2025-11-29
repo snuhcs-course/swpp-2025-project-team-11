@@ -23,10 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,16 +61,11 @@ import com.fiveis.xend.ui.compose.Banner
 import com.fiveis.xend.ui.compose.BannerType
 import com.fiveis.xend.ui.profile.LanguageDialog
 import com.fiveis.xend.ui.profile.languageDisplayText
-import com.fiveis.xend.ui.theme.AddButtonBackground
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray200
 import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.Gray600
-import com.fiveis.xend.ui.theme.IndigoText
-import com.fiveis.xend.ui.theme.Orange
-import com.fiveis.xend.ui.theme.OrangeSoftBg
-import com.fiveis.xend.ui.theme.OrangeText
 import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.Slate900
 import com.fiveis.xend.ui.theme.StableColor
@@ -114,7 +108,6 @@ fun AddContactScreen(
     onLanguagePreferenceChange: (String) -> Unit = {},
     onBack: () -> Unit,
     onAdd: () -> Unit,
-    onGmailContactsSync: () -> Unit,
     onBottomNavChange: (String) -> Unit = {},
     onGroupChange: (Group?) -> Unit = {},
     onAddGroupClick: () -> Unit = {},
@@ -125,8 +118,6 @@ fun AddContactScreen(
     onDismissError: () -> Unit = {}
 ) {
     val directInputLabel = "직접 입력"
-
-    var isManualOpen by rememberSaveable { mutableStateOf(true) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
 
@@ -162,7 +153,7 @@ fun AddContactScreen(
                         Icon(
                             imageVector = Icons.Filled.ArrowBack,
                             contentDescription = "뒤로가기",
-                            tint = Purple60
+                            tint = ToolbarIconTint
                         )
                     }
                 },
@@ -180,7 +171,10 @@ fun AddContactScreen(
                         enabled = savable,
                         colors = ButtonDefaults.textButtonColors(contentColor = Purple60)
                     ) { Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White
+                )
             )
         }
 //        bottomBar = {
@@ -226,47 +220,6 @@ fun AddContactScreen(
                     .padding(horizontal = 20.dp)
                     .fillMaxWidth()
             ) {
-                Text(
-                    "연락처 가져오기",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-                Spacer(Modifier.height(16.dp))
-
-                // Gmail 동기화 카드
-                ActionCard(
-                    bg = AddButtonBackground,
-                    border = Purple60,
-                    titleColor = IndigoText,
-                    subtitleColor = Purple60,
-                    icon = Icons.Outlined.Email,
-                    iconBg = Purple60,
-                    title = "Gmail 연락처 동기화",
-                    subtitle = "구글 계정의 모든 연락처를 가져옵니다",
-                    trailingTint = Purple60,
-                    onClick = onGmailContactsSync
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                // 직접 입력 카드 (토글)
-                ActionCard(
-                    bg = OrangeSoftBg,
-                    border = Orange,
-                    titleColor = OrangeText,
-                    subtitleColor = Orange,
-                    icon = Icons.Outlined.PersonAdd,
-                    iconBg = Orange,
-                    title = "직접 입력",
-                    subtitle = "연락처 정보를 직접 입력합니다",
-                    trailingTint = Orange,
-                    onClick = { isManualOpen = !isManualOpen },
-                    isExpanded = isManualOpen
-                )
-            }
-
-            if (isManualOpen) {
                 Spacer(Modifier.height(16.dp))
                 FormBlock(label = "이름") {
                     OutlinedTextField(

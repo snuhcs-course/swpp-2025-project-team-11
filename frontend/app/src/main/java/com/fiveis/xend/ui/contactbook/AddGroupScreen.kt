@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -63,7 +61,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.ui.theme.BackgroundLight
-import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.Purple60
@@ -126,18 +123,8 @@ fun AddGroupScreen(
                     ) { Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
             )
-        },
+        }
 //        bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAdd,
-                containerColor = Blue80,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "그룹 추가")
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center
     ) { padding ->
         LazyColumn(
             modifier = Modifier

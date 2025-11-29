@@ -44,6 +44,11 @@ class AddContactActivity : ComponentActivity() {
                 )
                 val addUiState by addViewModel.uiState.collectAsState()
 
+                // 이전 성공 상태 초기화 (ViewModel이 재사용될 경우 대비)
+                LaunchedEffect(Unit) {
+                    addViewModel.dismissSuccessBanner()
+                }
+
                 // 그룹 목록이 필요하면 ContactBookViewModel 활용
                 val bookViewModel: ContactBookViewModel = viewModel(
                     factory = ContactBookViewModel.Factory(application)
@@ -76,15 +81,12 @@ class AddContactActivity : ComponentActivity() {
                         addViewModel.addContact(
                             name = name,
                             email = email,
-                            senderRole = senderRole,
-                            recipientRole = recipientRole ?: "",
-                            personalPrompt = personalPrompt,
+                            senderRole = senderRole?.takeIf { it.isNotBlank() },
+                            recipientRole = recipientRole?.takeIf { it.isNotBlank() },
+                            personalPrompt = personalPrompt?.takeIf { it.isNotBlank() },
                             group = selectedGroup,
-                            languagePreference = languagePreference
+                            languagePreference = languagePreference.takeIf { it.isNotBlank() }
                         )
-                    },
-                    onGmailContactsSync = {
-                        // TODO: Gmail 동기화 기능 구현 예정
                     },
                     onAddGroupClick = {
                         startActivity(Intent(this, AddGroupActivity::class.java))
@@ -96,9 +98,6 @@ class AddContactActivity : ComponentActivity() {
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
                     },
-                    showSuccessBanner = addUiState.showSuccessBanner,
-                    successMessage = addUiState.successMessage,
-                    onDismissSuccessBanner = { addViewModel.dismissSuccessBanner() },
                     errorMessage = addUiState.error,
                     onDismissError = { addViewModel.clearError() }
                 )
