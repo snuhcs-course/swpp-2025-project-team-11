@@ -34,6 +34,8 @@ data class InboxUiState(
     val contactsByEmail: Map<String, String> = emptyMap(),
     // 임시 저장 성공 배너 표시 여부
     val showDraftSavedBanner: Boolean = false,
+    // 메일 전송 성공 배너 표시 여부
+    val showMailSentBanner: Boolean = false,
     // 메일 삭제 관련
     val deletingEmailId: String? = null,
     val deleteError: String? = null
@@ -360,6 +362,20 @@ class InboxViewModel(
     }
 
     /**
+     * 메일 전송 성공 배너 표시
+     */
+    fun showMailSentBanner() {
+        _uiState.update { it.copy(showMailSentBanner = true) }
+    }
+
+    /**
+     * 메일 전송 성공 배너 닫기
+     */
+    fun dismissMailSentBanner() {
+        _uiState.update { it.copy(showMailSentBanner = false) }
+    }
+
+    /**
      * 연락처 추가
      */
     fun addContact(
@@ -422,7 +438,7 @@ class InboxViewModel(
                 Log.d("InboxViewModel", "Deleting email: $emailId (permanent=$permanent)")
                 repository.deleteEmail(emailId, permanent)
                 Log.d("InboxViewModel", "Email deleted successfully: $emailId")
-                _uiState.update { it.copy(deleteError = null) }
+                _uiState.update { it.copy(deletingEmailId = null, deleteError = null) }
             } catch (e: Exception) {
                 Log.e("InboxViewModel", "Failed to delete email: $emailId", e)
                 _uiState.update {

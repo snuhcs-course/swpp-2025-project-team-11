@@ -247,6 +247,7 @@ private fun ReplyComposeContent(
     android.util.Log.d("ReplyComposeContent", "렌더링: isLoading=$isLoadingOptions, options=${replyOptions.size}")
     val scrollState = rememberScrollState()
     var isMailContentExpanded by remember { mutableStateOf(false) }
+    var selectedOption by remember { mutableStateOf<ReplyOptionState?>(null) }
 
     Column(
         modifier = modifier
@@ -288,14 +289,18 @@ private fun ReplyComposeContent(
                 replyOptions = replyOptions,
                 isLoading = isLoadingOptions,
                 isStreaming = isStreamingOptions,
-                onUseOption = onUseOption
+                onGenerateMore = onGenerateMore,
+                onCurrentOptionChange = { selectedOption = it }
             )
         }
 
         // 하단 버튼들
         BottomActionButtons(
             onDirectCompose = onDirectCompose,
-            onGenerateMore = onGenerateMore
+            onUseSelectedOption = {
+                selectedOption?.let { option -> onUseOption(option) }
+            },
+            isUseOptionEnabled = selectedOption != null
         )
     }
 }
@@ -479,7 +484,8 @@ private fun ReplyOptionsSection(
     replyOptions: List<ReplyOptionState>,
     isLoading: Boolean,
     isStreaming: Boolean,
-    onUseOption: (ReplyOptionState) -> Unit
+    onGenerateMore: () -> Unit,
+    onCurrentOptionChange: (ReplyOptionState?) -> Unit
 ) {
     // 상태 로깅
     android.util.Log.d(
@@ -599,10 +605,13 @@ private fun ReplyOptionsSection(
             android.util.Log.d("ReplyOptionsSection", "HorizontalPager page=$page 렌더링 중")
             ReplyContentCard(
                 replyOption = replyOptions[page],
-                onUse = {
-                    onUseOption(replyOptions[page])
-                }
+                onGenerateMore = onGenerateMore
             )
+        }
+
+        androidx.compose.runtime.LaunchedEffect(pagerState.currentPage, replyOptions) {
+            val current = replyOptions.getOrNull(pagerState.currentPage)
+            onCurrentOptionChange(current)
         }
     }
 }
@@ -633,7 +642,7 @@ private fun OptionTab(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ReplyContentCard(replyOption: ReplyOptionState, onUse: () -> Unit) {
+private fun ReplyContentCard(replyOption: ReplyOptionState, onGenerateMore: () -> Unit) {
     android.util.Log.d(
         "ReplyContentCard",
         "id=${replyOption.id}, type=${replyOption.type}, " +
@@ -649,7 +658,7 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onUse: () -> Unit) {
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
-            // 상단: 추천 뱃지 + 이 옵션 사용 버튼
+            // 상단: 추천 뱃지 + 새로 생성 버튼
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -671,9 +680,9 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onUse: () -> Unit) {
                     )
                 }
 
-                // 이 옵션 사용 버튼
+                // 새로 생성 버튼
                 Button(
-                    onClick = onUse,
+                    onClick = onGenerateMore,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Green60,
@@ -685,13 +694,13 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onUse: () -> Unit) {
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Check,
+                        imageVector = Icons.Default.AutoAwesome,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "이 옵션 사용",
+                        text = "새로 생성",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -732,7 +741,11 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onUse: () -> Unit) {
 }
 
 @Composable
-private fun BottomActionButtons(onDirectCompose: () -> Unit, onGenerateMore: () -> Unit) {
+private fun BottomActionButtons(
+    onDirectCompose: () -> Unit,
+    onUseSelectedOption: (() -> Unit)?,
+    isUseOptionEnabled: Boolean
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -763,25 +776,26 @@ private fun BottomActionButtons(onDirectCompose: () -> Unit, onGenerateMore: () 
             )
         }
 
-        // 추가 생성 버튼
+        // 이 옵션 사용 버튼
         Button(
-            onClick = onGenerateMore,
+            onClick = { if (isUseOptionEnabled) onUseSelectedOption?.invoke() },
+            enabled = isUseOptionEnabled,
             modifier = Modifier.weight(1f).height(48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Purple60,
+                containerColor = if (isUseOptionEnabled) Purple60 else Gray200,
                 contentColor = Color.White
             ),
-            border = BorderStroke(1.dp, Purple60)
+            border = BorderStroke(1.dp, if (isUseOptionEnabled) Purple60 else Gray200)
         ) {
             Icon(
-                imageVector = Icons.Default.AutoAwesome,
+                imageVector = Icons.Default.Check,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "새로 생성",
+                text = "이 옵션 사용",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium
             )

@@ -135,10 +135,10 @@ import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.RealtimeStatusLabel
 import com.fiveis.xend.ui.compose.common.SwipeSuggestionOverlay
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.inbox.AddContactDialog
-import com.fiveis.xend.ui.mail.MailActivity
 import com.fiveis.xend.ui.theme.AddButtonText
 import com.fiveis.xend.ui.theme.AttachmentExcelBg
 import com.fiveis.xend.ui.theme.AttachmentImageBg
@@ -205,6 +205,8 @@ fun EmailComposeScreen(
     onAcceptSuggestion: () -> Unit = {},
     aiRealtime: Boolean = true,
     onAiRealtimeToggle: (Boolean) -> Unit = {},
+    realtimeStatus: RealtimeConnectionStatus = RealtimeConnectionStatus.IDLE,
+    realtimeErrorMessage: String? = null,
     onAddContactClick: ((Contact) -> Unit)? = null,
     bannerState: BannerState?,
     onDismissBanner: () -> Unit,
@@ -338,6 +340,13 @@ fun EmailComposeScreen(
             )
 
             Spacer(modifier = Modifier.height(1.dp))
+
+            RealtimeStatusLabel(
+                status = realtimeStatus,
+                errorMessage = realtimeErrorMessage,
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
+            )
 
             error?.let { ErrorMessage(it) }
         }
@@ -1174,6 +1183,7 @@ class MailComposeActivity : ComponentActivity() {
 
         const val REQUEST_CODE_COMPOSE = 1001
         const val RESULT_DRAFT_SAVED = RESULT_FIRST_USER + 1
+        const val RESULT_MAIL_SENT = RESULT_FIRST_USER + 2
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1502,18 +1512,8 @@ class MailComposeActivity : ComponentActivity() {
                 // Update banner state for send results
                 LaunchedEffect(sendUi.lastSuccessMsg) {
                     sendUi.lastSuccessMsg?.let {
-                        bannerState = BannerState(
-                            message = "메일 전송에 성공했습니다.",
-                            type = BannerType.SUCCESS,
-                            actionText = "홈 화면 이동하기",
-                            onActionClick = {
-                                // Navigate to MailActivity
-                                val intent = Intent(this@MailComposeActivity, MailActivity::class.java)
-                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                startActivity(intent)
-                                finish()
-                            }
-                        )
+                        setResult(RESULT_MAIL_SENT, Intent())
+                        finish()
                     }
                 }
 
@@ -1592,6 +1592,8 @@ class MailComposeActivity : ComponentActivity() {
                                         )
                                     }
                                 },
+                                realtimeStatus = composeUi.realtimeStatus,
+                                realtimeErrorMessage = composeUi.realtimeErrorMessage,
                                 onAiComplete = {
                                     // Save current state before AI generation
                                     composeVm.saveUndoSnapshot(
@@ -2231,6 +2233,8 @@ private fun EmailComposePreview() {
             onAcceptSuggestion = {},
             aiRealtime = true,
             onAiRealtimeToggle = {},
+            realtimeStatus = RealtimeConnectionStatus.CONNECTED,
+            realtimeErrorMessage = null,
             bannerState = null,
             onDismissBanner = {},
             canUndo = false,

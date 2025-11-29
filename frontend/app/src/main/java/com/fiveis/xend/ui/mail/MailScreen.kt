@@ -90,6 +90,8 @@ fun MailScreen(
     onDismissSuccessBanner: () -> Unit = {},
     showDraftSavedBanner: Boolean,
     onDismissDraftSavedBanner: () -> Unit,
+    showMailSentBanner: Boolean = false,
+    onDismissMailSentBanner: () -> Unit = {},
     onInboxDeleteEmail: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -221,6 +223,33 @@ fun MailScreen(
                             message = "임시 저장되었습니다.",
                             type = BannerType.SUCCESS,
                             onDismiss = onDismissDraftSavedBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
+                // Mail Sent Banner
+                AnimatedVisibility(
+                    visible = showMailSentBanner,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "메일이 전송되었습니다",
+                            type = BannerType.SUCCESS,
+                            onDismiss = onDismissMailSentBanner,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(top = 8.dp, bottom = 8.dp)

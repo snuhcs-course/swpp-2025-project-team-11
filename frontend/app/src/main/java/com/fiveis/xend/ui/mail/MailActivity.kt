@@ -49,6 +49,8 @@ class MailActivity : ComponentActivity() {
         ) { result ->
             if (result.resultCode == MailComposeActivity.RESULT_DRAFT_SAVED) {
                 inboxViewModel.showDraftSavedBanner()
+            } else if (result.resultCode == MailComposeActivity.RESULT_MAIL_SENT) {
+                inboxViewModel.showMailSentBanner()
             }
         }
 
@@ -112,6 +114,8 @@ class MailActivity : ComponentActivity() {
                     },
                     showDraftSavedBanner = inboxViewModel.uiState.value.showDraftSavedBanner,
                     onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner,
+                    showMailSentBanner = inboxUiState.showMailSentBanner,
+                    onDismissMailSentBanner = inboxViewModel::dismissMailSentBanner,
                     onInboxDeleteEmail = inboxViewModel::deleteEmail
                 )
 

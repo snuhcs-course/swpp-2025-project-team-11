@@ -3,7 +3,6 @@ package com.fiveis.xend.ui.login
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,7 +31,6 @@ class MainActivity : ComponentActivity() {
     ) { result ->
         val data = result.data ?: run {
             Log.w("GoogleAuth", "Sign-in canceled or no data.")
-            Toast.makeText(this, "로그인이 취소되었습니다", Toast.LENGTH_LONG).show()
             return@registerForActivityResult
         }
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
@@ -43,15 +41,6 @@ class MainActivity : ComponentActivity() {
             Log.e("GoogleAuth", "Sign-in failed: ${e.statusCode}", e)
             Log.e("GoogleAuth", "Status message: ${e.statusMessage}")
             Log.e("GoogleAuth", "Error details: ${e.message}")
-
-            val errorMsg = when (e.statusCode) {
-                7 -> "로그인 실패 (코드 7)\n\n가능한 원인:\n• SHA-1 인증서 미등록\n• 패키지명 불일치\n• OAuth Client ID 설정 오류"
-                10 -> "개발자 오류: OAuth 설정 확인 필요"
-                12501 -> "로그인이 취소되었습니다"
-                else -> "로그인 실패: ${e.statusCode}\n${e.statusMessage}"
-            }
-
-            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -108,7 +97,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleSignInResult(account: GoogleSignInAccount?) {
         if (account == null) {
-            Toast.makeText(this, "계정 정보를 가져오지 못했습니다", Toast.LENGTH_LONG).show()
+            Log.e("GoogleAuth", "Account is null")
             return
         }
 
@@ -122,12 +111,7 @@ class MainActivity : ComponentActivity() {
         Log.d("GoogleAuth", "Granted Scopes: ${account.grantedScopes.joinToString { it.scopeUri }}")
 
         if (authCode.isNullOrBlank()) {
-            val errorMsg = "Authorization Code를 받지 못했습니다.\n\n" +
-                "확인사항:\n" +
-                "1) server_client_id가 Web 클라이언트 ID인지\n" +
-                "2) GCP에서 Gmail API 활성화\n" +
-                "3) OAuth 동의 화면에 Gmail 스코프 추가"
-            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
+            Log.e("GoogleAuth", "Authorization Code is null or blank")
             return
         }
 
@@ -145,7 +129,6 @@ class MainActivity : ComponentActivity() {
         }
 
         viewModel?.handleAuthCodeReceived(authCode, email)
-        Toast.makeText(this, "Auth Code 수신 성공!", Toast.LENGTH_SHORT).show()
     }
 
     private fun signOutFromGoogle() {
@@ -157,10 +140,8 @@ class MainActivity : ComponentActivity() {
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
         googleSignInClient.signOut().addOnCompleteListener(this) { task ->
             if (task.isSuccessful) {
-                Toast.makeText(this, "로그아웃 완료", Toast.LENGTH_SHORT).show()
                 Log.d("GoogleAuth", "로그아웃 성공")
             } else {
-                Toast.makeText(this, "로그아웃 실패", Toast.LENGTH_SHORT).show()
                 Log.e("GoogleAuth", "로그아웃 실패", task.exception)
             }
         }
@@ -172,7 +153,6 @@ class MainActivity : ComponentActivity() {
             finish()
         } catch (e: Exception) {
             Log.e("Nav", "MailActivity 이동 실패", e)
-            Toast.makeText(this, "화면 이동 실패: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }

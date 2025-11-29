@@ -28,7 +28,9 @@ data class ContactBookUiState(
     val error: String? = null,
     val isSearchMode: Boolean = false,
     val searchQuery: String = "",
-    val searchResults: List<Contact> = emptyList()
+    val searchResults: List<Contact> = emptyList(),
+    val showSuccessBanner: Boolean = false,
+    val successMessage: String? = null
 )
 
 @OptIn(FlowPreview::class)
@@ -162,6 +164,18 @@ class ContactBookViewModel(
     fun onContactSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
         contactSearchQuery.value = query
+    }
+
+    fun showContactAddedBanner() {
+        _uiState.update { it.copy(showSuccessBanner = true, successMessage = "연락처가 추가되었습니다") }
+    }
+
+    fun showGroupAddedBanner() {
+        _uiState.update { it.copy(showSuccessBanner = true, successMessage = "그룹이 추가되었습니다") }
+    }
+
+    fun dismissSuccessBanner() {
+        _uiState.update { it.copy(showSuccessBanner = false, successMessage = null) }
     }
 
     class Factory(private val application: Application) : androidx.lifecycle.ViewModelProvider.Factory {
