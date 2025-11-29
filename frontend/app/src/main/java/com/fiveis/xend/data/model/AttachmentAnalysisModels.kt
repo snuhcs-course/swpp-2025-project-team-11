@@ -19,5 +19,7 @@ data class AttachmentAnalysisResponse(
     @SerializedName("insights")
     val insights: String,
     @SerializedName("mail_guide")
-    val mailGuide: String
+    val mailGuide: String,
+    @SerializedName("content_key")
+    val contentKey: String? = null
 )

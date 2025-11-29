@@ -86,6 +86,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1268,6 +1269,7 @@ class MailComposeActivity : ComponentActivity() {
                 var analysisResult by remember { mutableStateOf<AttachmentAnalysisResponse?>(null) }
                 var analysisError by remember { mutableStateOf<String?>(null) }
                 var isAnalyzingAttachment by remember { mutableStateOf(false) }
+                val attachmentContentKeys = remember { mutableStateMapOf<Uri, String>() }
                 val lifecycleOwner = LocalLifecycleOwner.current
 
                 // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
@@ -1453,6 +1455,9 @@ class MailComposeActivity : ComponentActivity() {
                         try {
                             val result = sendVm.analyzeAttachmentUpload(item.uri)
                             analysisResult = result
+                            result.contentKey?.let { key ->
+                                attachmentContentKeys[item.uri] = key
+                            }
                         } catch (e: Exception) {
                             analysisError = e.message ?: "AI 분석에 실패했습니다."
                         } finally {
@@ -1569,7 +1574,10 @@ class MailComposeActivity : ComponentActivity() {
                                 onBack = { onBackPressedDispatcher.onBackPressed() },
                                 onTemplateClick = { showTemplateScreen = true },
                                 onAttachmentClick = { attachmentPicker.launch("*/*") },
-                                onRemoveAttachment = { uri -> attachmentUris.remove(uri) },
+                                onRemoveAttachment = { uri ->
+                                    attachmentUris.remove(uri)
+                                    attachmentContentKeys.remove(uri)
+                                },
                                 onUndo = undoAction,
                                 suggestionText = composeUi.suggestionText,
                                 onAcceptSuggestion = acceptSuggestion,
@@ -1592,12 +1600,15 @@ class MailComposeActivity : ComponentActivity() {
                                     )
                                     canUndo = true
                                     canRedo = false
-
+                                    val contentKeys = attachmentUris.mapNotNull { uri ->
+                                        attachmentContentKeys[uri]
+                                    }
                                     val payload = JSONObject().apply {
                                         put("subject", subject.ifBlank { "제목 생성" })
                                         // Use HTML content for AI prompt
                                         put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
                                         put("to_emails", JSONArray(contacts.map { it.email }))
+                                        put("attachment_content_keys", JSONArray(contentKeys))
 //                                    put("relationship", "업무 관련")
 //                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
 //                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
