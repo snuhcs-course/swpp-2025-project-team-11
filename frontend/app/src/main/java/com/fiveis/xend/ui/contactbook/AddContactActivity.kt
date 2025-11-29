@@ -83,9 +83,6 @@ class AddContactActivity : ComponentActivity() {
                             languagePreference = languagePreference
                         )
                     },
-                    onGmailContactsSync = {
-                        // TODO: Gmail 동기화 기능 구현 예정
-                    },
                     onAddGroupClick = {
                         startActivity(Intent(this, AddGroupActivity::class.java))
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
@@ -96,9 +93,6 @@ class AddContactActivity : ComponentActivity() {
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
                     },
-                    showSuccessBanner = addUiState.showSuccessBanner,
-                    successMessage = addUiState.successMessage,
-                    onDismissSuccessBanner = { addViewModel.dismissSuccessBanner() },
                     errorMessage = addUiState.error,
                     onDismissError = { addViewModel.clearError() }
                 )
