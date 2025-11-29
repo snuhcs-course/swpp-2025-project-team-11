@@ -87,6 +87,7 @@ import com.fiveis.xend.data.model.Attachment
 import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.theme.AttachmentExcelBg
 import com.fiveis.xend.ui.theme.AttachmentHeaderText
 import com.fiveis.xend.ui.theme.AttachmentImageBg
@@ -1011,7 +1012,7 @@ private fun AnalysisContent(isLoading: Boolean, result: AttachmentAnalysisRespon
                     color = MaterialTheme.colorScheme.error
                 )
                 Text(
-                    text = "잠시 후 다시 시도해주세요.",
+                    text = "잠시 후 다시 시도해 주세요.",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
@@ -1031,19 +1032,19 @@ private fun AnalysisContent(isLoading: Boolean, result: AttachmentAnalysisRespon
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                AnalysisSection(
+                AttachmentAnalysisSection(
                     title = "주요 내용 요약",
                     backgroundColor = Color(0xFFF8FAFC),
                     borderColor = Color(0xFFE2E8F0),
                     contentLines = result.summary.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 )
-                AnalysisSection(
+                AttachmentAnalysisSection(
                     title = "핵심 시사점",
                     backgroundColor = Color(0xFFFFF7ED),
                     borderColor = Color(0xFFFED7AA),
                     contentLines = result.insights.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 )
-                AnalysisSection(
+                AttachmentAnalysisSection(
                     title = "답장 작성 가이드",
                     backgroundColor = Color(0xFFFAF5FF),
                     borderColor = Color(0xFFDDD6FE),
@@ -1071,56 +1072,6 @@ private fun Attachment.supportsAnalysis(): Boolean {
         mime.contains(token) || filenameLower.endsWith(".$token")
     }
     return typeOk
-}
-
-@Composable
-private fun AnalysisSection(title: String, backgroundColor: Color, borderColor: Color, contentLines: List<String>) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = backgroundColor,
-            border = BorderStroke(1.dp, borderColor),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (contentLines.isEmpty()) {
-                    Text(
-                        text = "표시할 내용이 없습니다.",
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
-                } else {
-                    contentLines.forEach { line ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 9.dp)
-                                    .size(6.dp)
-                                    .background(color = Purple60, shape = CircleShape)
-                            )
-                            Text(
-                                text = line,
-                                fontSize = 13.sp,
-                                color = TextPrimary
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable

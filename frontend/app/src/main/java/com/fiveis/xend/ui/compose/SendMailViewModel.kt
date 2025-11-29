@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.repository.AttachmentException
 import com.fiveis.xend.data.repository.MailSendRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -63,6 +64,10 @@ class SendMailViewModel(application: Application) : AndroidViewModel(application
                 )
             }
         }
+    }
+
+    suspend fun analyzeAttachmentUpload(uri: Uri): AttachmentAnalysisResponse {
+        return repo.analyzeAttachmentUpload(uri)
     }
 
     class Factory(private val application: Application) : ViewModelProvider.Factory {
