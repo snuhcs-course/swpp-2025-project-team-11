@@ -1504,10 +1504,7 @@ class MailComposeActivity : ComponentActivity() {
                                 .toString()
                                 .replace("\u00A0", " ")
                                 .trimEnd()
-                            composeVm.onTextChanged(
-                                currentText = plainText,
-                                subject = subject
-                            )
+                            composeVm.onTextChanged(plainText)
                         }
                     }
                 }
@@ -1530,18 +1527,10 @@ class MailComposeActivity : ComponentActivity() {
                 }
 
                 val acceptSuggestion: () -> Unit = {
-                    composeVm.skipNextTextChangeSend()
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    // Give the editor a brief moment to apply the accepted text before requesting.
-                    coroutineScope.launch {
-                        delay(50)
-                        composeVm.requestImmediateSuggestion(
-                            currentText = editorState.getHtml(),
-                            subject = subject
-                        )
-                    }
+                    composeVm.requestImmediateSuggestion(editorState.getHtml())
                 }
                 LaunchedEffect(pendingTemplateBody, showTemplateScreen, editorState.editor) {
                     val body = pendingTemplateBody
@@ -1599,7 +1588,6 @@ class MailComposeActivity : ComponentActivity() {
                                         // 토글을 켜면 현재 텍스트를 대기열에 넣고 연결 준비되면 전송
                                         composeVm.requestImmediateSuggestion(
                                             currentText = editorState.getHtml(),
-                                            subject = subject,
                                             force = true
                                         )
                                     }
