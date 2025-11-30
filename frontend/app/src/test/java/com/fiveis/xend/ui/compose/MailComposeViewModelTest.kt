@@ -558,10 +558,10 @@ class MailComposeViewModelTest {
         viewModel = MailComposeViewModel(api, wsClient)
 
         viewModel.enableRealtimeMode(true)
-        viewModel.onTextChanged("Test text")
+        viewModel.onTextChanged("Test text", "Subject")
         advanceUntilIdle()
 
-        verify { wsClient.sendMessage(any(), eq("Test text"), any()) }
+        verify { wsClient.sendMessage(any(), eq("Test text"), eq("Subject"), any()) }
     }
 
     @Test
@@ -570,10 +570,10 @@ class MailComposeViewModelTest {
         viewModel = MailComposeViewModel(api, wsClient)
 
         viewModel.enableRealtimeMode(false)
-        viewModel.onTextChanged("Test text")
+        viewModel.onTextChanged("Test text", "Subject")
         advanceUntilIdle()
 
-        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any()) }
+        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any(), any()) }
     }
 
     // WebSocket integration tests are complex and are better tested in instrumentation tests
@@ -599,15 +599,15 @@ class MailComposeViewModelTest {
         viewModel = MailComposeViewModel(api, wsClient)
 
         viewModel.enableRealtimeMode(true)
-        viewModel.onTextChanged("First")
+        viewModel.onTextChanged("First", "Subject")
 
         // Should not send immediately
-        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any()) }
+        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any(), any()) }
 
         advanceUntilIdle()
 
         // Should send after debounce
-        verify { wsClient.sendMessage(any(), eq("First"), any()) }
+        verify { wsClient.sendMessage(any(), eq("First"), eq("Subject"), any()) }
     }
 
     @Test
@@ -616,16 +616,16 @@ class MailComposeViewModelTest {
         viewModel = MailComposeViewModel(api, wsClient)
 
         viewModel.enableRealtimeMode(true)
-        viewModel.onTextChanged("First")
-        viewModel.onTextChanged("Second")
-        viewModel.onTextChanged("Third")
+        viewModel.onTextChanged("First", "Subject")
+        viewModel.onTextChanged("Second", "Subject")
+        viewModel.onTextChanged("Third", "Subject")
 
         advanceUntilIdle()
 
         // Should only send the last value
-        verify(exactly = 1) { wsClient.sendMessage(any(), eq("Third"), any()) }
-        verify(exactly = 0) { wsClient.sendMessage(any(), eq("First"), any()) }
-        verify(exactly = 0) { wsClient.sendMessage(any(), eq("Second"), any()) }
+        verify(exactly = 1) { wsClient.sendMessage(any(), eq("Third"), eq("Subject"), any()) }
+        verify(exactly = 0) { wsClient.sendMessage(any(), eq("First"), any(), any()) }
+        verify(exactly = 0) { wsClient.sendMessage(any(), eq("Second"), any(), any()) }
     }
 
     @Test
@@ -676,6 +676,27 @@ class MailComposeViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.ui.value.isRealtimeEnabled)
+    }
+
+    @Test
+    fun websocket_noop_clears_suggestion() = runTest {
+        val wsClient = mockk<com.fiveis.xend.network.MailComposeWebSocketClient>(relaxed = true)
+        val onMessageSlot = slot<(String) -> Unit>()
+
+        every { wsClient.connect(capture(onMessageSlot), any(), any(), any()) } answers { }
+        every { wsClient.connectIfNeeded() } returns Unit
+
+        viewModel = MailComposeViewModel(api, wsClient)
+        viewModel.enableRealtimeMode(true)
+        advanceUntilIdle()
+
+        onMessageSlot.captured("""{"type":"gpu.message","data":{"text":"Hello world"}}""")
+        advanceUntilIdle()
+        assertEquals("Hello world", viewModel.ui.value.suggestionText)
+
+        onMessageSlot.captured("""{"type":"noop"}""")
+        advanceUntilIdle()
+        assertEquals("", viewModel.ui.value.suggestionText)
     }
 
     @Test
