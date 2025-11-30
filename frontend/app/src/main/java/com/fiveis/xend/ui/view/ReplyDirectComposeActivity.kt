@@ -211,7 +211,10 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     if (generatedBody.isEmpty() || generatedBodyApplied) {
                         editorState.editor?.setTextChangedListener { html ->
                             if (aiRealtime) {
-                                composeVm.onTextChanged(html)
+                                composeVm.onTextChanged(
+                                    currentText = html,
+                                    subject = currentSubject
+                                )
                             }
                         }
                     }
@@ -305,7 +308,10 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                    composeVm.requestImmediateSuggestion(
+                        currentText = editorState.getHtml(),
+                        subject = currentSubject
+                    )
                 }
 
                 val undoAction: () -> Unit = {

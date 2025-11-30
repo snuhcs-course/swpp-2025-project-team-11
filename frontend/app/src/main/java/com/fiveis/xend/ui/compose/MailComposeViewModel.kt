@@ -184,6 +184,10 @@ class MailComposeViewModel(
                             "gpu.done" -> {
                                 suggestionBuffer.clear()
                             }
+                            "noop" -> {
+                                suggestionBuffer.clear()
+                                _ui.update { it.copy(suggestionText = "") }
+                            }
                         }
                     } catch (e: Exception) {
                         _ui.update {

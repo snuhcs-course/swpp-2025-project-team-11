@@ -682,6 +682,27 @@ class MailComposeViewModelTest {
     }
 
     @Test
+    fun websocket_noop_clears_suggestion() = runTest {
+        val wsClient = mockk<com.fiveis.xend.network.MailComposeWebSocketClient>(relaxed = true)
+        val onMessageSlot = slot<(String) -> Unit>()
+
+        every { wsClient.connect(capture(onMessageSlot), any(), any(), any()) } answers { }
+        every { wsClient.connectIfNeeded() } returns Unit
+
+        viewModel = MailComposeViewModel(api, wsClient)
+        viewModel.enableRealtimeMode(true)
+        advanceUntilIdle()
+
+        onMessageSlot.captured("""{"type":"gpu.message","data":{"text":"Hello world"}}""")
+        advanceUntilIdle()
+        assertEquals("Hello world", viewModel.ui.value.suggestionText)
+
+        onMessageSlot.captured("""{"type":"noop"}""")
+        advanceUntilIdle()
+        assertEquals("", viewModel.ui.value.suggestionText)
+    }
+
+    @Test
     fun disconnect_websocket_clears_suggestion() = runTest {
         val wsClient = mockk<com.fiveis.xend.network.MailComposeWebSocketClient>(relaxed = true)
 
