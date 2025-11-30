@@ -150,6 +150,10 @@ class MailComposeViewModel(
                             "gpu.done" -> {
                                 suggestionBuffer.clear()
                             }
+                            "noop" -> {
+                                suggestionBuffer.clear()
+                                _ui.update { it.copy(suggestionText = "") }
+                            }
                         }
                     } catch (e: Exception) {
                         _ui.update { it.copy(error = "메시지 파싱 실패: ${e.message}") }
