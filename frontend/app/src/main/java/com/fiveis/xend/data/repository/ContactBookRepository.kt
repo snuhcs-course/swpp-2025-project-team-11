@@ -42,9 +42,9 @@ data class ContactData(val contacts: List<Contact>) : ContactBookData
 
 class ContactBookRepository(
     context: Context,
-    private val db: AppDatabase = AppDatabase.getDatabase(context)
-) {
+    private val db: AppDatabase = AppDatabase.getDatabase(context),
     private val api: ContactApiService = RetrofitClient.getContactApiService(context)
+) {
 
     // Room 주입
     private val groupDao = db.groupDao()

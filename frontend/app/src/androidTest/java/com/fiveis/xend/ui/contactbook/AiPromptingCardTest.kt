@@ -41,6 +41,7 @@ class AiPromptingCardTest {
         }
 
         // Then
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("수정").assertIsDisplayed()
     }
 

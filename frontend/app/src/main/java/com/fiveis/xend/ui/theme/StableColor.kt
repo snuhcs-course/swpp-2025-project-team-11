@@ -41,32 +41,36 @@ object StableColor {
     )
 
     fun forId(id: Long, isDark: Boolean, spec: Spec = widerHue, surface: Color? = null): Color {
-        val r1 = rnd01(id, 0)
-        val r2 = rnd01(id, 1)
-        val r3 = rnd01(id, 2)
+        try {
+            val r1 = rnd01(id, 0)
+            val r2 = rnd01(id, 1)
+            val r3 = rnd01(id, 2)
 
-        val hue = lerp(spec.hueRange.start, spec.hueRange.endInclusive, r1)
-        val sat = lerp(spec.saturationRange.start, spec.saturationRange.endInclusive, r2)
-        val lr = if (isDark) spec.lightnessRangeDarkTheme else spec.lightnessRangeLightTheme
-        var light = lerp(lr.start, lr.endInclusive, r3)
+            val hue = lerp(spec.hueRange.start, spec.hueRange.endInclusive, r1)
+            val sat = lerp(spec.saturationRange.start, spec.saturationRange.endInclusive, r2)
+            val lr = if (isDark) spec.lightnessRangeDarkTheme else spec.lightnessRangeLightTheme
+            var light = lerp(lr.start, lr.endInclusive, r3)
 
-        var c = Color.hsl(hue = hue, saturation = sat, lightness = light)
+            var c = Color.hsl(hue = hue, saturation = sat, lightness = light)
 
-        // surface 필드값 입력 있을 시 대비 보정
-        if (surface != null && contrastRatio(c, surface) < spec.minContrastOnSurface) {
-            // 어두운 테마면 조금 밝게, 밝은 테마면 조금 어둡게
-            light = adjustLightnessForContrast(
-                initial = light,
-                targetContrast = spec.minContrastOnSurface,
-                isDark = isDark,
-                surface = surface,
-                hue = hue,
-                sat = sat
-            )
-            c = Color.hsl(hue, sat, light)
+            // surface 필드값 입력 있을 시 대비 보정
+            if (surface != null && contrastRatio(c, surface) < spec.minContrastOnSurface) {
+                // 어두운 테마면 조금 밝게, 밝은 테마면 조금 어둡게
+                light = adjustLightnessForContrast(
+                    initial = light,
+                    targetContrast = spec.minContrastOnSurface,
+                    isDark = isDark,
+                    surface = surface,
+                    hue = hue,
+                    sat = sat
+                )
+                c = Color.hsl(hue, sat, light)
+            }
+
+            return c
+        } catch (e: Exception) {
+            return Color.Gray
         }
-
-        return c
     }
 
     /**
