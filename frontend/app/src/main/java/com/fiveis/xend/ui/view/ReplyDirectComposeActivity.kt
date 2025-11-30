@@ -71,7 +71,6 @@ import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.utils.EmailUtils
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -196,10 +195,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     if (generatedBody.isEmpty() || generatedBodyApplied) {
                         editorState.editor?.setTextChangedListener { html ->
                             if (aiRealtime) {
-                                composeVm.onTextChanged(
-                                    currentText = html,
-                                    subject = currentSubject
-                                )
+                                composeVm.onTextChanged(html)
                             }
                         }
                     }
@@ -290,18 +286,10 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 }
 
                 val acceptSuggestion: () -> Unit = {
-                    composeVm.skipNextTextChangeSend()
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    // Allow the editor to reflect the accepted text before sending.
-                    coroutineScope.launch {
-                        delay(50)
-                        composeVm.requestImmediateSuggestion(
-                            currentText = editorState.getHtml(),
-                            subject = currentSubject
-                        )
-                    }
+                    composeVm.requestImmediateSuggestion(editorState.getHtml())
                 }
 
                 val undoAction: () -> Unit = {

@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import redis.asyncio as aioredis
@@ -75,8 +73,7 @@ async def stream_generate_reply(system_prompt: str, user_input: str, max_tokens:
         await asyncio.sleep(0.01)
 
 async def generate_and_publish(user_id: int, system_prompt: str, user_input: str, max_tokens: int = 10):
-    redis_url = os.environ["REDIS_URL"]
-    redis = await aioredis.from_url(redis_url)
+    redis = await aioredis.from_url("redis://xend-fiveis-dev.duckdns.org:6379")
     channel = f"user_{user_id}_mail"
 
     async for token in stream_generate_reply(system_prompt, user_input, max_tokens):

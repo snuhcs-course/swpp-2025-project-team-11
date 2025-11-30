@@ -281,7 +281,7 @@ class MailComposeWebSocketClient(
         }
     }
 
-    fun sendMessage(systemPrompt: String, text: String, subject: String, maxTokens: Int = 50) {
+    fun sendMessage(systemPrompt: String, text: String, maxTokens: Int = 50) {
         val currentSocket = webSocket
         if (currentSocket == null || !isConnected.get()) {
             Log.w(TAG, "Cannot send message: WebSocket not connected")
@@ -293,7 +293,6 @@ class MailComposeWebSocketClient(
             val json = JSONObject().apply {
                 put("system_prompt", systemPrompt)
                 put("text", text)
-                put("subject", subject)
                 put("max_tokens", maxTokens)
             }
             val message = json.toString()

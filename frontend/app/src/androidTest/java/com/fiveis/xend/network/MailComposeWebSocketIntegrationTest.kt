@@ -91,7 +91,7 @@ class MailComposeWebSocketIntegrationTest {
 
         wsClient = MailComposeWebSocketClient(context, "wss://mock-server.com/ws")
 
-        wsClient.sendMessage("system prompt", "test message", "")
+        wsClient.sendMessage("system prompt", "test message")
 
         runBlocking {
             delay(500)
