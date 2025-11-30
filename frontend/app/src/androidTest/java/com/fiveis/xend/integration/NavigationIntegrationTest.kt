@@ -51,7 +51,12 @@ class NavigationIntegrationTest {
     @Test
     fun main_activity_launches_successfully() {
         try {
-            val scenario = ActivityScenario.launch(MainActivity::class.java)
+            // Clear any existing tokens to ensure clean state
+            tokenManager.clearTokens()
+            Thread.sleep(100)
+
+            val intent = Intent(context, MainActivity::class.java)
+            val scenario = ActivityScenario.launch<MainActivity>(intent)
             Thread.sleep(500) // Give time for initialization
             scenario.onActivity { activity ->
                 assertNotNull(activity)
