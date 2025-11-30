@@ -172,14 +172,25 @@ class MailComposeViewModel(
 
                                 val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
                                 val singleSentence = extractFirstSentence(parsed)
-                                _ui.update { it.copy(suggestionText = singleSentence) }
+                                _ui.update {
+                                    it.copy(
+                                        suggestionText = singleSentence,
+                                        realtimeErrorMessage = null
+                                        // 메시지 정상 수신 시 에러 클리어
+                                    )
+                                }
                             }
                             "gpu.done" -> {
                                 suggestionBuffer.clear()
                             }
                         }
                     } catch (e: Exception) {
-                        _ui.update { it.copy(error = "메시지 파싱 실패: ${e.message}") }
+                        _ui.update {
+                            it.copy(
+                                realtimeStatus = RealtimeConnectionStatus.ERROR,
+                                realtimeErrorMessage = "실시간 AI 메시지 처리 중 오류가 발생했습니다."
+                            )
+                        }
                     }
                 },
                 onError = { error ->
@@ -229,7 +240,6 @@ class MailComposeViewModel(
         val friendlyMessage = mapRealtimeError(rawMessage) ?: return
         _ui.update {
             it.copy(
-                error = rawMessage,
                 realtimeStatus = RealtimeConnectionStatus.ERROR,
                 realtimeErrorMessage = friendlyMessage
             )
@@ -242,9 +252,7 @@ class MailComposeViewModel(
             lower.contains("이미 연결 중") -> null
             lower.contains("websocket이 연결되지 않았습니다") ->
                 "실시간 AI 연결이 아직 준비 중입니다. 잠시 후 다시 시도해 주세요."
-            lower.contains("연결 실패") || lower.contains("서버 에러") ||
-                lower.contains("failed") -> "실시간 AI 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
-            else -> "실시간 AI 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+            else -> "실시간 AI 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
         }
     }
 

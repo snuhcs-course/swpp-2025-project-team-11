@@ -13,11 +13,11 @@ data class AddContactRequest(
 
 @Serializable
 data class AddContactRequestContext(
-    @SerialName("sender_role") val senderRole: String? = "",
-    @SerialName("recipient_role") val recipientRole: String? = "",
-    @SerialName("relationship_details") val relationshipDetails: String? = "",
-    @SerialName("personal_prompt") val personalPrompt: String? = "",
-    @SerialName("language_preference") val languagePreference: String? = "KOR"
+    @SerialName("sender_role") val senderRole: String = "",
+    @SerialName("recipient_role") val recipientRole: String = "",
+    @SerialName("relationship_details") val relationshipDetails: String = "",
+    @SerialName("personal_prompt") val personalPrompt: String = "",
+    @SerialName("language_preference") val languagePreference: String = ""
 )
 
 class ContactRequestBuilder {
@@ -55,11 +55,11 @@ class ContactRequestBuilder {
             null
         } else {
             AddContactRequestContext(
-                senderRole = senderRole,
-                recipientRole = recipientRole,
-                relationshipDetails = relationshipDetails,
-                personalPrompt = personalPrompt,
-                languagePreference = languagePreference
+                senderRole = senderRole ?: "",
+                recipientRole = recipientRole ?: "",
+                relationshipDetails = relationshipDetails ?: "",
+                personalPrompt = personalPrompt ?: "",
+                languagePreference = languagePreference ?: ""
             )
         }
 

@@ -30,7 +30,7 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
         name: String,
         email: String,
         senderRole: String?,
-        recipientRole: String,
+        recipientRole: String?,
         personalPrompt: String?,
         group: Group?,
         languagePreference: String? = null

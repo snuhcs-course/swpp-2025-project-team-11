@@ -186,7 +186,7 @@ class ContactBookRepository(
         email: String,
         groupId: Long?,
         senderRole: String?,
-        recipientRole: String,
+        recipientRole: String?,
         personalPrompt: String?,
         languagePreference: String? = null
     ): ContactResponse {
