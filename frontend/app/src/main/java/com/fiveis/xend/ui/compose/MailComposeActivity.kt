@@ -131,6 +131,9 @@ import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.MailComposeSseClient
 import com.fiveis.xend.network.MailComposeWebSocketClient
+import com.fiveis.xend.network.MailGenerateRequestDto
+import com.fiveis.xend.network.MailGenerateTestResponse
+import com.fiveis.xend.network.MailGenerateVariantDto
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
@@ -191,6 +194,8 @@ fun EmailComposeScreen(
     error: String?,
     onBack: () -> Unit = {},
     onTemplateClick: () -> Unit = {},
+    onTestClick: () -> Unit = {},
+    isTestLoading: Boolean = false,
     onAttachmentClick: () -> Unit = {},
     onRemoveAttachment: (Uri) -> Unit = {},
     onUndo: () -> Unit = {},
@@ -232,6 +237,9 @@ fun EmailComposeScreen(
                 scrollBehavior = scrollBehavior,
                 onBack = onBack,
                 onTemplateClick = onTemplateClick,
+                onTestClick = onTestClick,
+                isTestLoading = isTestLoading,
+                testEnabled = contacts.isNotEmpty(),
                 onAttachmentClick = onAttachmentClick,
                 onSend = onSend,
                 sendUiState = sendUiState,
@@ -359,6 +367,9 @@ private fun ComposeTopBar(
     scrollBehavior: TopAppBarScrollBehavior,
     onBack: () -> Unit,
     onTemplateClick: () -> Unit,
+    onTestClick: () -> Unit,
+    isTestLoading: Boolean,
+    testEnabled: Boolean,
     onAttachmentClick: () -> Unit,
     onSend: () -> Unit,
     sendUiState: SendUiState,
@@ -392,6 +403,25 @@ private fun ComposeTopBar(
             }
         },
         actions = {
+            TextButton(
+                onClick = onTestClick,
+                enabled = testEnabled && !isTestLoading,
+                modifier = Modifier.height(40.dp)
+            ) {
+                if (isTestLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = Blue60
+                    )
+                } else {
+                    Text(
+                        text = "테스트 시작",
+                        style = MaterialTheme.typography.labelLarge.copy(color = Blue60)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
             ToolbarIconButton(
                 onClick = onTemplateClick,
                 border = null,
@@ -1280,6 +1310,10 @@ class MailComposeActivity : ComponentActivity() {
                 var analysisError by remember { mutableStateOf<String?>(null) }
                 var isAnalyzingAttachment by remember { mutableStateOf(false) }
                 val attachmentContentKeys = remember { mutableStateMapOf<Uri, String>() }
+                var showTestDialog by remember { mutableStateOf(false) }
+                var testResult by remember { mutableStateOf<MailGenerateTestResponse?>(null) }
+                var testError by remember { mutableStateOf<String?>(null) }
+                var isRunningTest by remember { mutableStateOf(false) }
                 val lifecycleOwner = LocalLifecycleOwner.current
 
                 // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
@@ -1356,6 +1390,7 @@ class MailComposeActivity : ComponentActivity() {
                         emailDao = AppDatabase.getDatabase(application.applicationContext).emailDao()
                     )
                 }
+                val aiApiService = remember { RetrofitClient.getAiApiService(application.applicationContext) }
                 LaunchedEffect(Unit) {
                     contactRepository.observeGroups().collect { loadedGroups ->
                         groups = loadedGroups
@@ -1555,6 +1590,45 @@ class MailComposeActivity : ComponentActivity() {
                             )
                         } else {
                             // 메일 작성 화면
+                            val startTestGeneration: () -> Unit = test@{
+                                if (contacts.isEmpty()) {
+                                    Toast.makeText(context, "받는 사람을 먼저 추가해주세요.", Toast.LENGTH_SHORT).show()
+                                    return@test
+                                }
+                                val requestPayload = buildMailGenerateRequest(
+                                    subject = subject,
+                                    bodyHtml = editorState.getHtml(),
+                                    contacts = contacts,
+                                    attachments = attachmentUris,
+                                    attachmentContentKeys = attachmentContentKeys
+                                )
+                                testResult = null
+                                testError = null
+                                isRunningTest = true
+                                showTestDialog = true
+                                coroutineScope.launch {
+                                    try {
+                                        val response = aiApiService.runMailGenerateTest(requestPayload)
+                                        if (response.isSuccessful) {
+                                            val body = response.body()
+                                            if (body != null) {
+                                                testResult = body
+                                            } else {
+                                                testError = "응답이 비어 있습니다."
+                                            }
+                                        } else {
+                                            val errorBody = response.errorBody()?.string().orEmpty()
+                                            testError =
+                                                "HTTP ${response.code()} ${response.message()} ${errorBody.take(200)}"
+                                        }
+                                    } catch (e: Exception) {
+                                        testError = e.message ?: "테스트 요청에 실패했습니다."
+                                    } finally {
+                                        isRunningTest = false
+                                    }
+                                }
+                            }
+
                             EmailComposeScreen(
                                 modifier = Modifier.padding(innerPadding),
                                 subject = subject,
@@ -1569,6 +1643,8 @@ class MailComposeActivity : ComponentActivity() {
                                 error = composeUi.error,
                                 sendUiState = sendUi,
                                 attachments = attachmentUris,
+                                onTestClick = startTestGeneration,
+                                isTestLoading = isRunningTest,
                                 onAnalyzeAttachment = analyzeAttachment,
                                 // Trigger our custom back press handling
                                 onBack = { onBackPressedDispatcher.onBackPressed() },
@@ -1602,22 +1678,14 @@ class MailComposeActivity : ComponentActivity() {
                                     )
                                     canUndo = true
                                     canRedo = false
-                                    val contentKeys = attachmentUris.mapNotNull { uri ->
-                                        attachmentContentKeys[uri]
-                                    }
-                                    val payload = JSONObject().apply {
-                                        put("subject", subject.ifBlank { "제목 생성" })
-                                        // Use HTML content for AI prompt
-                                        put("body", editorState.getHtml().ifBlank { "간단한 인사와 핵심 내용으로 작성" })
-                                        put("to_emails", JSONArray(contacts.map { it.email }))
-                                        put("attachment_content_keys", JSONArray(contentKeys))
-//                                    put("relationship", "업무 관련")
-//                                    put("situational_prompt", "정중하고 간결한 결과 보고 메일")
-//                                    put("style_prompt", "정중, 명료, 불필요한 수식어 제외")
-//                                    put("format_prompt", "문단 구분, 끝인사 포함")
-//                                    put("language", "Korean")
-                                    }
-                                    composeVm.startStreaming(payload)
+                                    val requestPayload = buildMailGenerateRequest(
+                                        subject = subject,
+                                        bodyHtml = editorState.getHtml(),
+                                        contacts = contacts,
+                                        attachments = attachmentUris,
+                                        attachmentContentKeys = attachmentContentKeys
+                                    )
+                                    composeVm.startStreaming(requestPayload.toJsonObject())
                                 },
                                 onStopStreaming = { composeVm.stopStreaming() },
                                 onSend = {
@@ -1794,6 +1862,19 @@ class MailComposeActivity : ComponentActivity() {
                                 AiPromptPreviewDialog(
                                     contacts = contacts,
                                     onDismiss = { showAiPromptDialog = false }
+                                )
+                            }
+
+                            if (showTestDialog) {
+                                MailGenerateTestDialog(
+                                    isLoading = isRunningTest,
+                                    result = testResult,
+                                    errorMessage = testError,
+                                    onDismiss = {
+                                        showTestDialog = false
+                                        testResult = null
+                                        testError = null
+                                    }
                                 )
                             }
                         }
@@ -2192,6 +2273,153 @@ private fun ComposeAnalysisContent(isLoading: Boolean, result: AttachmentAnalysi
                 color = TextSecondary
             )
         }
+    }
+}
+
+@Composable
+private fun MailGenerateTestDialog(
+    isLoading: Boolean,
+    result: MailGenerateTestResponse?,
+    errorMessage: String?,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .heightIn(min = 320.dp, max = 620.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = ComposeSurface
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "AI 테스트 결과",
+                        style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary)
+                    )
+                    TextButton(onClick = onDismiss) {
+                        Text("닫기")
+                    }
+                }
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator()
+                            Text("테스트 응답을 불러오는 중...")
+                        }
+                    }
+
+                    errorMessage != null -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "오류가 발생했습니다.",
+                                style =
+                                MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.error)
+                            )
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+
+                    result != null -> {
+                        MailVariantBox(label = "v1", title = "", variant = result.withoutAnalysis)
+                        MailVariantBox(label = "v2", title = "", variant = result.withFewshots)
+                        MailVariantBox(label = "v3", title = "", variant = result.withAnalysis)
+                    }
+
+                    else -> {
+                        Text("표시할 결과가 없습니다.")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MailVariantBox(label: String, title: String, variant: MailGenerateVariantDto) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, ComposeOutline, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = Blue40.copy(alpha = 0.12f)
+            ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelMedium.copy(color = Blue60, fontWeight = FontWeight.SemiBold)
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium.copy(color = TextSecondary)
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = variant.subject,
+                style = MaterialTheme.typography.titleSmall.copy(color = TextPrimary)
+            )
+            Text(
+                text = variant.body,
+                style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+private fun buildMailGenerateRequest(
+    subject: String,
+    bodyHtml: String,
+    contacts: List<Contact>,
+    attachments: List<Uri>,
+    attachmentContentKeys: Map<Uri, String>
+): MailGenerateRequestDto {
+    val contentKeys = attachments.mapNotNull { uri -> attachmentContentKeys[uri] }
+    return MailGenerateRequestDto(
+        subject = subject.ifBlank { "제목 생성" },
+        body = bodyHtml.ifBlank { "간단한 인사와 핵심 내용으로 작성" },
+        toEmails = contacts.map { it.email },
+        attachmentContentKeys = contentKeys
+    )
+}
+
+private fun MailGenerateRequestDto.toJsonObject(): JSONObject {
+    return JSONObject().apply {
+        put("subject", subject)
+        put("body", body)
+        put("to_emails", JSONArray(toEmails))
+        put("attachment_content_keys", JSONArray(attachmentContentKeys))
     }
 }
 
