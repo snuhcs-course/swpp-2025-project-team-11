@@ -1483,13 +1483,18 @@ class MailComposeActivity : ComponentActivity() {
                 }
 
                 val acceptSuggestion: () -> Unit = {
+                    composeVm.skipNextTextChangeSend()
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    composeVm.requestImmediateSuggestion(
-                        currentText = editorState.getHtml(),
-                        subject = subject
-                    )
+                    // Give the editor a brief moment to apply the accepted text before requesting.
+                    coroutineScope.launch {
+                        delay(50)
+                        composeVm.requestImmediateSuggestion(
+                            currentText = editorState.getHtml(),
+                            subject = subject
+                        )
+                    }
                 }
                 LaunchedEffect(pendingTemplateBody, showTemplateScreen, editorState.editor) {
                     val body = pendingTemplateBody
