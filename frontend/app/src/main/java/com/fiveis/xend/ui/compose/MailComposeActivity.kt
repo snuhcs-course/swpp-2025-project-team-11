@@ -1504,7 +1504,10 @@ class MailComposeActivity : ComponentActivity() {
                                 .toString()
                                 .replace("\u00A0", " ")
                                 .trimEnd()
-                            composeVm.onTextChanged(plainText)
+                            composeVm.onTextChanged(
+                                currentText = plainText,
+                                subject = subject
+                            )
                         }
                     }
                 }
@@ -1530,7 +1533,10 @@ class MailComposeActivity : ComponentActivity() {
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                    composeVm.requestImmediateSuggestion(
+                        currentText = editorState.getHtml(),
+                        subject = subject
+                    )
                 }
                 LaunchedEffect(pendingTemplateBody, showTemplateScreen, editorState.editor) {
                     val body = pendingTemplateBody
@@ -1588,6 +1594,7 @@ class MailComposeActivity : ComponentActivity() {
                                         // 토글을 켜면 현재 텍스트를 대기열에 넣고 연결 준비되면 전송
                                         composeVm.requestImmediateSuggestion(
                                             currentText = editorState.getHtml(),
+                                            subject = subject,
                                             force = true
                                         )
                                     }
