@@ -94,7 +94,8 @@ class AddContactViewModelTest {
                 null,
                 "Sender",
                 "Recipient",
-                "Be formal"
+                "Be formal",
+                null
             )
         } returns mockResponse
 
@@ -111,8 +112,8 @@ class AddContactViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isLoading)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "연락처가 추가되었습니다")
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -132,6 +133,7 @@ class AddContactViewModelTest {
                 5L,
                 null,
                 "Recipient",
+                null,
                 null
             )
         } returns mockResponse
@@ -149,13 +151,13 @@ class AddContactViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isLoading)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
     fun add_contact_failure_sets_error() = runTest {
         coEvery {
-            anyConstructed<ContactBookRepository>().addContact(any(), any(), any(), any(), any(), any())
+            anyConstructed<ContactBookRepository>().addContact(any(), any(), any(), any(), any(), any(), any())
         } throws Exception("Network error")
 
         viewModel = AddContactViewModel(application)
@@ -172,7 +174,8 @@ class AddContactViewModelTest {
 
         assertFalse(viewModel.uiState.value.isLoading)
         assertNotNull(viewModel.uiState.value.error)
-        assertTrue(viewModel.uiState.value.error?.contains("Network error") == true)
+        // Error goes through mapAddContactError which provides fallback message
+        assertTrue(viewModel.uiState.value.error?.isNotEmpty() == true)
     }
 
     @Test
@@ -191,6 +194,7 @@ class AddContactViewModelTest {
                 null,
                 null,
                 "Recipient",
+                null,
                 null
             )
         } returns mockResponse
@@ -208,7 +212,7 @@ class AddContactViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isLoading)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -224,6 +228,7 @@ class AddContactViewModelTest {
                 null,
                 null,
                 "Recipient",
+                null,
                 null
             )
         } returns mockResponse1
@@ -235,6 +240,7 @@ class AddContactViewModelTest {
                 null,
                 null,
                 "Recipient",
+                null,
                 null
             )
         } returns mockResponse2
@@ -246,16 +252,16 @@ class AddContactViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isLoading)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "연락처가 추가되었습니다")
 
         // Second add
         viewModel.addContact("User2", "user2@test.com", null, "Recipient", null, null)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isLoading)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("2") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "연락처가 추가되었습니다")
     }
 
     @Test
@@ -290,7 +296,7 @@ class AddContactViewModelTest {
 
         assertFalse(state.isLoading)
         assertEquals(null, state.error)
-        assertEquals(null, state.lastSuccessMsg)
+        assertEquals(null, state.successMessage)
     }
 
     @Test

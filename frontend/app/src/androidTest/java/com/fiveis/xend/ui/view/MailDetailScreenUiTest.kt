@@ -115,7 +115,11 @@ class MailDetailScreenUiTest {
             )
         }
 
+        Thread.sleep(500)
+        composeTestRule.onNodeWithText("답장하기").assertExists()
+        Thread.sleep(200)
         composeTestRule.onNodeWithText("답장하기").performClick()
+        Thread.sleep(200)
         assert(replyClicked)
     }
 
@@ -134,6 +138,8 @@ class MailDetailScreenUiTest {
             )
         }
 
+        composeTestRule.onNodeWithText("John Doe").assertIsDisplayed()
+        composeTestRule.onNodeWithText("<john@test.com>").assertIsDisplayed()
         composeTestRule.onNodeWithText("2024.12.19").assertIsDisplayed()
     }
 

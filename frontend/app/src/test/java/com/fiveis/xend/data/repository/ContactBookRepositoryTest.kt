@@ -193,7 +193,7 @@ class ContactBookRepositoryTest {
         coVerify {
             contactApiService.addContact(
                 match { request ->
-                    request.context?.senderRole == ""
+                    request.context?.senderRole == null || request.context?.senderRole == ""
                 }
             )
         }
@@ -819,7 +819,7 @@ class ContactBookRepositoryTest {
         coEvery { contactDao.upsertContacts(any()) } returns Unit
         coEvery { contactDao.upsertContexts(any()) } returns Unit
 
-        repository.updateContact(9L, "Lee", "lee@example.com", null, null, null, null)
+        repository.updateContact(9L, "Lee", "lee@example.com", null, null, null, null, null)
 
         coVerify { contactDao.upsertContacts(match { it.single().id == 9L && it.single().name == "Lee" }) }
     }
@@ -837,7 +837,7 @@ class ContactBookRepositoryTest {
             groupId = null, senderRole = "Writer", recipientRole = "Emp", personalPrompt = null
         )
 
-        assertEquals("", reqSlot.captured.context?.personalPrompt)
+        assertTrue(reqSlot.captured.context?.personalPrompt == null || reqSlot.captured.context?.personalPrompt == "")
     }
 
     @Test

@@ -32,7 +32,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -50,14 +50,14 @@ class AddContactDialogIntegrationTest {
                     senderName = "John Doe",
                     senderEmail = "john.doe@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
 
         // Name appears in multiple places (display + input field)
         composeTestRule.onAllNodesWithText("John Doe").assertCountEquals(2)
-        composeTestRule.onNodeWithText("john.doe@example.com").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("john.doe@example.com").assertCountEquals(2)
     }
 
     @Test
@@ -69,7 +69,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = { dismissCalled = true },
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -87,7 +87,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = { dismissCalled = true },
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -104,7 +104,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -124,7 +124,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Valid Name",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -141,7 +141,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -157,12 +157,13 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("관계").assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 나").assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 상대방").assertIsDisplayed()
         composeTestRule.onNodeWithText("나").assertIsDisplayed()
         composeTestRule.onNodeWithText("상대방").assertIsDisplayed()
     }
@@ -175,7 +176,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -192,7 +193,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -214,7 +215,7 @@ class AddContactDialogIntegrationTest {
                     senderEmail = "test@example.com",
                     groups = groups,
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -240,7 +241,7 @@ class AddContactDialogIntegrationTest {
                     senderEmail = "test@example.com",
                     groups = groups,
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -272,7 +273,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId ->
+                    onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, _ ->
                         confirmedName = name
                         confirmedEmail = email
                         confirmedSenderRole = senderRole
@@ -300,7 +301,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -321,7 +322,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -342,7 +343,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -367,7 +368,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -393,7 +394,7 @@ class AddContactDialogIntegrationTest {
                     senderEmail = "test@example.com",
                     groups = emptyList(),
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -421,7 +422,7 @@ class AddContactDialogIntegrationTest {
                     senderEmail = "john@example.com",
                     groups = groups,
                     onDismiss = {},
-                    onConfirm = { name, email, _, _, personalPrompt, _ ->
+                    onConfirm = { name, email, _, _, personalPrompt, _, _ ->
                         confirmedName = name
                         confirmedEmail = email
                         confirmedPersonalPrompt = personalPrompt
@@ -446,7 +447,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Test User",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -454,7 +455,7 @@ class AddContactDialogIntegrationTest {
         // Verify all major sections are displayed
         composeTestRule.onAllNodesWithText("연락처 추가").assertCountEquals(2) // Title and button
         composeTestRule.onNodeWithText("이름").assertIsDisplayed()
-        composeTestRule.onNodeWithText("관계").assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 나").assertIsDisplayed()
         composeTestRule.onNodeWithText("관계 프롬프팅(선택사항)").assertIsDisplayed()
         composeTestRule.onNodeWithText("그룹 선택(선택사항)").assertIsDisplayed()
         composeTestRule.onNodeWithText("취소").assertIsDisplayed()
@@ -475,7 +476,7 @@ class AddContactDialogIntegrationTest {
                     senderEmail = "test@example.com",
                     groups = groups,
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }
@@ -498,7 +499,7 @@ class AddContactDialogIntegrationTest {
                     senderName = "Persistent Name",
                     senderEmail = "test@example.com",
                     onDismiss = {},
-                    onConfirm = { _, _, _, _, _, _ -> }
+                    onConfirm = { _, _, _, _, _, _, _ -> }
                 )
             }
         }

@@ -290,8 +290,8 @@ class AddContactScreenTest {
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithText("관계").assertIsDisplayed()
+        // Then - Check for relationship labels with actual text in UI (may need to scroll)
+        composeTestRule.onNodeWithText("관계 - 나").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -707,8 +707,9 @@ class AddContactScreenTest {
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithText("관계").assertIsDisplayed()
+        // Then - Check for relationship labels with actual text in UI (may need to scroll)
+        composeTestRule.onNodeWithText("관계 - 나").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 상대방").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -1078,11 +1079,11 @@ class AddContactScreenTest {
             )
         }
 
-        // Then - All main sections should be visible
+        // Then - All main sections should be visible (scroll to them if needed)
         composeTestRule.onNodeWithText("연락처 가져오기").assertIsDisplayed()
         composeTestRule.onNodeWithText("이름").assertIsDisplayed()
         composeTestRule.onNodeWithText("이메일 주소").assertIsDisplayed()
-        composeTestRule.onNodeWithText("관계").assertIsDisplayed()
-        composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 나").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("그룹").performScrollTo().assertIsDisplayed()
     }
 }

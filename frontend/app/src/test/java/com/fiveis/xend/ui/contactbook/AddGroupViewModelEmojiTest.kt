@@ -72,7 +72,7 @@ class AddGroupViewModelEmojiTest {
 
         coVerify { repository.addGroup("Party Group", "Fun group", emoji, emptyList()) }
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
@@ -91,7 +91,7 @@ class AddGroupViewModelEmojiTest {
 
         coVerify { repository.addGroup("No Emoji Group", "Description", "", emptyList()) }
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
@@ -135,7 +135,7 @@ class AddGroupViewModelEmojiTest {
         coVerify { repository.addGroup("Team", "Team group", emoji, emptyList()) }
         coVerify { repository.updateContactGroup(1L, 1L) }
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("멤버 1명") == true)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
     }
 
     @Test
@@ -154,7 +154,7 @@ class AddGroupViewModelEmojiTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
@@ -173,7 +173,7 @@ class AddGroupViewModelEmojiTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
@@ -192,7 +192,7 @@ class AddGroupViewModelEmojiTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
@@ -211,7 +211,7 @@ class AddGroupViewModelEmojiTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
     }
 
     @Test
@@ -231,7 +231,7 @@ class AddGroupViewModelEmojiTest {
         emojis.forEachIndexed { index, emoji ->
             viewModel.addGroup("Group$index", "Desc", emoji, emptyList())
             advanceUntilIdle()
-            assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+            assertNotNull(viewModel.uiState.value.successMessage)
         }
     }
 

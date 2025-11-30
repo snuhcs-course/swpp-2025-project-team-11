@@ -169,6 +169,9 @@ class ContactDaoIntegrationTest {
         )
         contactDao.upsertContacts(listOf(contact))
 
+        // Add a small delay to ensure DB write is complete
+        kotlinx.coroutines.delay(100)
+
         val result = contactDao.observeAllWithContext().first()
         assertEquals(1, result.size)
         assertEquals("test@example.com", result[0].contact.email)

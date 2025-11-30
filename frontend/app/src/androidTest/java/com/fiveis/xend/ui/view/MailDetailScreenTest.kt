@@ -97,7 +97,8 @@ class MailDetailScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("김철수 (chulsoo@test.com)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("김철수").assertIsDisplayed()
+        composeTestRule.onNodeWithText("<chulsoo@test.com>").assertIsDisplayed()
     }
 
     @Test
@@ -238,6 +239,10 @@ class MailDetailScreenTest {
         composeTestRule.setContent {
             MailDetailScreen(uiState = uiState, onBack = {}, onReply = {})
         }
+
+        // Wait for UI to be ready
+        composeTestRule.waitForIdle()
+        Thread.sleep(200)
 
         // Then
         composeTestRule.onNodeWithText("simple@test.com").assertIsDisplayed()

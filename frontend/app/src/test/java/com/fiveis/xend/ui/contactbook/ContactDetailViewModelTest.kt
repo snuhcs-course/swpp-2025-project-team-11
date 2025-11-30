@@ -184,19 +184,19 @@ class ContactDetailViewModelTest {
         every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
         coEvery { repository.refreshContact(contactId) } returns Unit
         coEvery {
-            repository.updateContact(contactId, "Jane", "jane@test.com", "sender", "recipient", "prompt", null)
+            repository.updateContact(contactId, "Jane", "jane@test.com", "sender", "recipient", "prompt", null, null)
         } returns Unit
 
         viewModel = ContactDetailViewModel(application, repository)
         viewModel.load(contactId)
         advanceUntilIdle()
 
-        viewModel.updateContact("Jane", "jane@test.com", "sender", "recipient", "prompt", null)
+        viewModel.updateContact("Jane", "jane@test.com", "sender", "recipient", "prompt", null, null)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isUpdating)
         assertNull(viewModel.uiState.value.updateError)
-        coVerify { repository.updateContact(contactId, "Jane", "jane@test.com", "sender", "recipient", "prompt", null) }
+        coVerify { repository.updateContact(contactId, "Jane", "jane@test.com", "sender", "recipient", "prompt", null, null) }
     }
 
     @Test
@@ -207,14 +207,14 @@ class ContactDetailViewModelTest {
         every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
         coEvery { repository.refreshContact(contactId) } returns Unit
         coEvery {
-            repository.updateContact(any(), any(), any(), any(), any(), any(), any())
+            repository.updateContact(any(), any(), any(), any(), any(), any(), any(), any())
         } throws Exception("Update failed")
 
         viewModel = ContactDetailViewModel(application, repository)
         viewModel.load(contactId)
         advanceUntilIdle()
 
-        viewModel.updateContact("Jane", "jane@test.com", null, null, null, null)
+        viewModel.updateContact("Jane", "jane@test.com", null, null, null, null, null)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isUpdating)
@@ -229,14 +229,14 @@ class ContactDetailViewModelTest {
         every { repository.observeContact(contactId) } returns kotlinx.coroutines.flow.flowOf(mockContact)
         coEvery { repository.refreshContact(contactId) } returns Unit
         coEvery {
-            repository.updateContact(any(), any(), any(), any(), any(), any(), any())
+            repository.updateContact(any(), any(), any(), any(), any(), any(), any(), any())
         } throws Exception("Update failed")
 
         viewModel = ContactDetailViewModel(application, repository)
         viewModel.load(contactId)
         advanceUntilIdle()
 
-        viewModel.updateContact("Jane", "jane@test.com", null, null, null, null)
+        viewModel.updateContact("Jane", "jane@test.com", null, null, null, null, null)
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.updateError)

@@ -114,8 +114,8 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -238,8 +238,8 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("멤버 2명") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
         coVerify(exactly = 2) { repository.updateContactGroup(any(), 1L) }
     }
 
@@ -365,7 +365,7 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -388,7 +388,7 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -410,7 +410,7 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -437,16 +437,16 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
 
         // Second add
         viewModel.addGroup("Group2", "Desc2", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("2") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
     }
 
     @Test
@@ -581,7 +581,7 @@ class AddGroupViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
         coVerify { repository.addGroup("VIP", "Important", "🔥", emptyList()) }
     }

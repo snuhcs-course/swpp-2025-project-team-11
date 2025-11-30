@@ -1080,7 +1080,15 @@ private fun PromptOptionsSection(
         }
 
         if (options.isEmpty()) {
-            Text("아직 등록된 프롬프트가 없습니다", color = TextSecondary, fontSize = 12.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("아직 등록된 프롬프트가 없습니다", color = TextSecondary, fontSize = 12.sp)
+                FilterChip(
+                    selected = false,
+                    onClick = onAddNew,
+                    label = { Text("새 프롬프트 추가") },
+                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) }
+                )
+            }
         } else {
             var contextMenuTargetId by remember { mutableStateOf<Long?>(null) }
             val maxMenuWidth = LocalConfiguration.current.screenWidthDp.dp * (2f / 3f)
