@@ -44,6 +44,9 @@ class MailComposeViewModel(
     private val suggestionBuffer = StringBuilder()
     private var pendingSuggestionText: String? = null
     private var pendingSuggestionSubject: String? = null
+    private var skipNextDebouncedSend: Boolean = false
+    private var latestText: String = ""
+    private var latestSubject: String = ""
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -229,6 +232,15 @@ class MailComposeViewModel(
         }
     }
 
+    /**
+     * Use when making a programmatic text change (e.g., accepting a suggestion)
+     * to prevent the immediate text-change callback from triggering a stale send.
+     */
+    fun skipNextTextChangeSend() {
+        skipNextDebouncedSend = true
+        debounceJob?.cancel()
+    }
+
     private fun disconnectWebSocket() {
         wsClient?.disconnect()
         suggestionBuffer.clear()
@@ -264,14 +276,27 @@ class MailComposeViewModel(
     fun onTextChanged(currentText: String, subject: String) {
         if (!_ui.value.isRealtimeEnabled) return
 
+        val sanitizedText = stripSuggestionFromText(currentText)
+
+        latestText = sanitizedText
+        latestSubject = subject
+
+        if (skipNextDebouncedSend) {
+            skipNextDebouncedSend = false
+            return
+        }
+
         debounceJob?.cancel()
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
         debounceJob = viewModelScope.launch {
-            delay(500)
+            delay(700)
+            if (sanitizedText != latestText || subject != latestSubject) {
+                return@launch
+            }
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성 중, 현재 텍스트에 자연스럽게 이어질 말을 추천",
-                text = currentText,
+                text = sanitizedText,
                 subject = subject,
                 maxTokens = 50
             )
@@ -321,7 +346,7 @@ class MailComposeViewModel(
         _ui.update { it.copy(suggestionText = "") }
 
         viewModelScope.launch(Dispatchers.Main) {
-            pendingSuggestionText = currentText
+            pendingSuggestionText = stripSuggestionFromText(currentText)
             pendingSuggestionSubject = subject
         }
 
@@ -363,6 +388,26 @@ class MailComposeViewModel(
                 sendPendingSuggestion()
             }
         }
+    }
+
+    private fun stripSuggestionFromText(text: String): String {
+        // Remove the transient gray suggestion span if it's still present in the HTML
+        var cleaned = text.replace(
+            Regex(
+                """<span[^>]*id=["']ai-suggestion["'][^>]*>.*?</span>""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            ),
+            ""
+        )
+
+        // If a suggestion is showing, strip it when it dangles at the end of the text
+        val suggestion = _ui.value.suggestionText.trim()
+        if (suggestion.isNotEmpty()) {
+            val pattern = Regex("\\s*${Regex.escape(suggestion)}\\s*$")
+            cleaned = cleaned.replace(pattern, "")
+        }
+
+        return cleaned.trimEnd()
     }
 
     private fun parseOutputFromMarkdown(rawText: String): String {
