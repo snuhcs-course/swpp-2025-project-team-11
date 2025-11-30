@@ -235,6 +235,7 @@ def debug_mail_generation_analysis(
     subject: str | None,
     body: str | None,
     to_emails: list[str],
+    attachments: list[dict] | None = None,
 ) -> dict[str, Any]:
     base_ctx = collect_prompt_context(
         user,
@@ -242,6 +243,7 @@ def debug_mail_generation_analysis(
         include_analysis=True,
         include_fewshots=True,
     )
+
     analysis_value = base_ctx.get("analysis")
     fewshots_value = base_ctx.get("fewshots")
 
@@ -250,6 +252,9 @@ def debug_mail_generation_analysis(
 
         raw_inputs = build_prompt_inputs(
             merged_ctx,
+            extra={
+                "attachments": attachments or [],
+            },
         )
         raw_inputs["subject"] = subject or ""
         raw_inputs["body"] = body or ""
@@ -279,6 +284,7 @@ def debug_mail_generation_analysis(
             "analysis": raw_inputs.get("analysis", None),
             "fewshots": raw_inputs.get("fewshots", None),
             "profile": raw_inputs.get("profile"),
+            "attachments": raw_inputs.get("attachments", []),
         }
 
         try:
