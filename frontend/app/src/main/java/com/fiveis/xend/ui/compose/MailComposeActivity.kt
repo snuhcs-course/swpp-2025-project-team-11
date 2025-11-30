@@ -2276,6 +2276,18 @@ private fun ComposeAnalysisContent(isLoading: Boolean, result: AttachmentAnalysi
     }
 }
 
+private enum class MailVariantType {
+    WITHOUT_ANALYSIS,
+    WITH_FEWSHOTS,
+    WITH_ANALYSIS
+}
+
+private data class MailVariantOption(
+    val label: String,
+    val type: MailVariantType,
+    val variant: MailGenerateVariantDto
+)
+
 @Composable
 private fun MailGenerateTestDialog(
     isLoading: Boolean,
@@ -2283,6 +2295,29 @@ private fun MailGenerateTestDialog(
     errorMessage: String?,
     onDismiss: () -> Unit
 ) {
+    val randomizedVariants = remember(result) {
+        result?.let { res ->
+            val labels = listOf("a", "b", "c")
+            val shuffled = listOf(
+                MailVariantOption("", MailVariantType.WITHOUT_ANALYSIS, res.withoutAnalysis),
+                MailVariantOption("", MailVariantType.WITH_FEWSHOTS, res.withFewshots),
+                MailVariantOption("", MailVariantType.WITH_ANALYSIS, res.withAnalysis)
+            ).shuffled()
+            labels.zip(shuffled).map { (label, option) ->
+                option.copy(label = label)
+            }
+        }
+    }
+    var selectedType by remember(result) { mutableStateOf<MailVariantType?>(null) }
+    var selectionResult by remember(result) { mutableStateOf<String?>(null) }
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(selectionResult) {
+        if (selectionResult != null) {
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -2298,7 +2333,7 @@ private fun MailGenerateTestDialog(
                 modifier = Modifier
                     .padding(20.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(
@@ -2342,9 +2377,38 @@ private fun MailGenerateTestDialog(
                     }
 
                     result != null -> {
-                        MailVariantBox(label = "v1", title = "", variant = result.withoutAnalysis)
-                        MailVariantBox(label = "v2", title = "", variant = result.withFewshots)
-                        MailVariantBox(label = "v3", title = "", variant = result.withAnalysis)
+                        randomizedVariants?.forEach { option ->
+                            MailVariantBox(
+                                label = option.label,
+                                title = "",
+                                variant = option.variant,
+                                selected = option.type == selectedType,
+                                onClick = {
+                                    selectedType = if (selectedType == option.type) null else option.type
+                                    selectionResult = null
+                                }
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                selectionResult = when (selectedType) {
+                                    MailVariantType.WITHOUT_ANALYSIS -> "선택된 프롬프트: v1"
+                                    MailVariantType.WITH_FEWSHOTS -> "선택된 프롬프트: v2"
+                                    MailVariantType.WITH_ANALYSIS -> "선택된 프롬프트: v3"
+                                    null -> null
+                                }
+                            },
+                            enabled = selectedType != null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("선택")
+                        }
+                        selectionResult?.let { resultText ->
+                            Text(
+                                text = resultText,
+                                style = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary)
+                            )
+                        }
                     }
 
                     else -> {
@@ -2357,11 +2421,22 @@ private fun MailGenerateTestDialog(
 }
 
 @Composable
-private fun MailVariantBox(label: String, title: String, variant: MailGenerateVariantDto) {
+private fun MailVariantBox(
+    label: String,
+    title: String,
+    variant: MailGenerateVariantDto,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, ComposeOutline, RoundedCornerShape(14.dp))
+            .border(
+                if (selected) 2.dp else 1.dp,
+                if (selected) Blue60 else ComposeOutline,
+                RoundedCornerShape(14.dp)
+            )
+            .clickable { onClick() }
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
