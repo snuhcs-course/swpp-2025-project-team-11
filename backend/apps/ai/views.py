@@ -489,11 +489,15 @@ class MailGenerateAnalysisTestView(AuthRequiredMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        attachment_keys = data.get("attachment_content_keys") or []
+        attachments = get_attachments_for_content_keys(request.user, attachment_keys)
+
         result = debug_mail_generation_analysis(
             user=request.user,
             subject=data.get("subject"),
             body=data.get("body"),
             to_emails=data.get("to_emails"),
+            attachments=attachments,
         )
         return Response(result)
 
