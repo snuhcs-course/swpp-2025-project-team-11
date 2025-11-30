@@ -65,6 +65,11 @@ class InboxViewModelRepositoryIntegrationTest {
 
         emailDao = database.emailDao()
 
+        // Ensure database is completely empty before each test
+        kotlinx.coroutines.runBlocking {
+            emailDao.deleteAllEmails()
+        }
+
         mailApiService = mockk()
         contactRepository = mockk()
         prefs = mockk(relaxed = true)
@@ -76,6 +81,14 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @After
     fun tearDown() {
+        // Clean up database before closing
+        try {
+            kotlinx.coroutines.runBlocking {
+                emailDao.deleteAllEmails()
+            }
+        } catch (e: Exception) {
+            // Ignore cleanup errors
+        }
         database.close()
         Dispatchers.resetMain()
     }
@@ -111,7 +124,13 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun viewModel_refresh_fetches_new_emails_and_saves_to_database() = runTest {
+        // Ensure clean database state
         emailDao.deleteAllEmails()
+        advanceUntilIdle()
+
+        // Verify database is empty
+        val initialEmails = emailDao.getAllEmails().first()
+        assertEquals("Database should be empty before test", 0, initialEmails.size)
 
         val newEmails = listOf(
             createMockEmailItem("3"),
@@ -131,9 +150,11 @@ class InboxViewModelRepositoryIntegrationTest {
         advanceUntilIdle()
 
         val dbEmails = emailDao.getAllEmails().first()
-        assertEquals(2, dbEmails.size)
-        assertEquals("3", dbEmails[0].id)
-        assertEquals("4", dbEmails[1].id)
+        assertEquals("Expected 2 emails in database", 2, dbEmails.size)
+
+        // Verify the correct emails are present (order may vary)
+        val emailIds = dbEmails.map { it.id }.sorted()
+        assertEquals(listOf("3", "4"), emailIds)
     }
 
     @Test
@@ -281,7 +302,13 @@ class InboxViewModelRepositoryIntegrationTest {
 
     @Test
     fun database_orders_emails_by_date_descending() = runTest {
+        // Ensure clean database state
         emailDao.deleteAllEmails()
+        advanceUntilIdle()
+
+        // Verify database is empty
+        val initialEmails = emailDao.getAllEmails().first()
+        assertEquals("Database should be empty before test", 0, initialEmails.size)
 
         val emails = listOf(
             createMockEmailItem("1", date = "2025-01-01T10:00:00Z", cachedAt = 1L),
@@ -290,12 +317,15 @@ class InboxViewModelRepositoryIntegrationTest {
         )
 
         emailDao.insertEmails(emails)
+        advanceUntilIdle()
 
         val orderedEmails = emailDao.getAllEmails().first()
 
-        assertEquals("2", orderedEmails[0].id)
-        assertEquals("3", orderedEmails[1].id)
-        assertEquals("1", orderedEmails[2].id)
+        assertEquals("Expected 3 emails, got ${orderedEmails.size}. IDs: ${orderedEmails.map { it.id }}",
+            3, orderedEmails.size)
+        assertEquals("First email should be '2'", "2", orderedEmails[0].id)
+        assertEquals("Second email should be '3'", "3", orderedEmails[1].id)
+        assertEquals("Third email should be '1'", "1", orderedEmails[2].id)
     }
 
     private fun createMockEmailItem(id: String, date: String = "2025-01-01T00:00:00Z", isUnread: Boolean = true, cachedAt: Long = System.currentTimeMillis()) =

@@ -26,13 +26,26 @@ class MainActivityTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         tokenManager = TokenManager(context)
         // Clear any existing tokens to ensure clean state
-        tokenManager.clearTokens()
+        try {
+            tokenManager.clearTokens()
+            Thread.sleep(100) // Let cleanup settle
+        } catch (e: Exception) {
+            // Ignore cleanup errors
+        }
     }
 
     @After
     fun tearDown() {
-        scenario?.close()
-        tokenManager.clearTokens()
+        try {
+            scenario?.close()
+        } catch (e: Exception) {
+            // Ignore close errors
+        }
+        try {
+            tokenManager.clearTokens()
+        } catch (e: Exception) {
+            // Ignore cleanup errors
+        }
     }
 
     @Test

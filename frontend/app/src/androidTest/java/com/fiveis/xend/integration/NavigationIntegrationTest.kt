@@ -42,10 +42,23 @@ class NavigationIntegrationTest {
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         tokenManager = TokenManager(context)
+        // Clean up any existing tokens to ensure consistent state
+        try {
+            tokenManager.clearTokens()
+        } catch (e: Exception) {
+            // Ignore errors - test will proceed
+        }
+        Thread.sleep(100) // Let cleanup settle
     }
 
     @After
     fun tearDown() {
+        // Clean up tokens after each test
+        try {
+            tokenManager.clearTokens()
+        } catch (e: Exception) {
+            // Ignore cleanup errors
+        }
     }
 
     @Test
