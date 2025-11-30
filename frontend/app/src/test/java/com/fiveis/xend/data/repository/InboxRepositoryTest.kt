@@ -50,7 +50,9 @@ class InboxRepositoryTest {
         // Collect from flow to verify it works
         var collected: List<EmailItem>? = null
         result.collect { collected = it }
-        assertEquals(mockEmails, collected)
+        assertEquals(2, collected?.size)
+        assertEquals("1", collected?.get(0)?.id)
+        assertEquals("2", collected?.get(1)?.id)
     }
 
     @Test

@@ -57,6 +57,12 @@ class ProfileViewModelTest {
                 info = "Test info"
             )
         )
+        every { profileRepository.observeProfile() } returns kotlinx.coroutines.flow.flowOf(
+            ProfileData(
+                displayName = "Test User",
+                info = "Test info"
+            )
+        )
     }
 
     @After
@@ -157,7 +163,7 @@ class ProfileViewModelTest {
             info = "Updated Info"
         )
         coEvery {
-            profileRepository.updateProfile(any(), any())
+            profileRepository.updateProfile(any(), any(), any())
         } returns ProfileResult.Success(updatedProfile)
 
         viewModel = ProfileViewModel(context, authRepository, profileRepository)
@@ -179,7 +185,7 @@ class ProfileViewModelTest {
     @Test
     fun test_saveProfile_failure() = runTest {
         coEvery {
-            profileRepository.updateProfile(any(), any())
+            profileRepository.updateProfile(any(), any(), any())
         } returns ProfileResult.Failure("Save failed")
 
         viewModel = ProfileViewModel(context, authRepository, profileRepository)

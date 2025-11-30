@@ -41,8 +41,8 @@ class MailDetailScreenExtendedTest {
         composeTestRule.setContent {
             MailDetailScreen(uiState = uiState, onBack = {})
         }
-        // parseSenderEmail returns "Sender (sender@test.com)" not just "Sender"
-        composeTestRule.onNodeWithText("Sender (sender@test.com)").assertIsDisplayed()
+        // parseSenderEmail returns "Sender" as display name (not with email in parenthesis)
+        composeTestRule.onNodeWithText("Sender").assertIsDisplayed()
         composeTestRule.onNodeWithText("<sender@test.com>").assertIsDisplayed()
     }
 
@@ -52,8 +52,8 @@ class MailDetailScreenExtendedTest {
         composeTestRule.setContent {
             MailDetailScreen(uiState = uiState, onBack = {})
         }
-        // parseSenderEmail returns "Recipient (recipient@test.com)", so with "To. " prefix it becomes:
-        composeTestRule.onNodeWithText("To. Recipient (recipient@test.com)").assertIsDisplayed()
+        // parseSenderEmail returns "Recipient" as display name, with "To. " prefix
+        composeTestRule.onNodeWithText("To. Recipient").assertIsDisplayed()
         composeTestRule.onNodeWithText("<recipient@test.com>").assertIsDisplayed()
     }
 
@@ -141,7 +141,7 @@ class MailDetailScreenExtendedTest {
     }
 
     @Test
-    fun analysisPopup_copy_guide_action() {
+    fun analysisPopup_shows_auto_reflection_message() {
         val attachment = Attachment("1", "f.pdf", "pdf", 100)
         val result = com.fiveis.xend.data.model.AttachmentAnalysisResponse(
             summary = "s", insights = "i", mailGuide = "Guide Text"
@@ -156,13 +156,12 @@ class MailDetailScreenExtendedTest {
             MailDetailScreen(uiState = uiState, onBack = {})
         }
 
-        composeTestRule.onNodeWithText("답장 가이드 복사").performClick()
-        // Cannot easily verify Toast/Clipboard without further abstraction, 
-        // but verifying the click doesn't crash is valuable.
+        // The popup now shows an info message instead of a copy button
+        composeTestRule.onNodeWithText("답장 작성 가이드는 답장 생성 시 자동으로 반영돼요.").assertIsDisplayed()
     }
 
     @Test
-    fun analysisPopup_copy_disabled_when_empty() {
+    fun analysisPopup_shows_info_message_even_when_guide_empty() {
         val attachment = Attachment("1", "f.pdf", "pdf", 100)
         val result = com.fiveis.xend.data.model.AttachmentAnalysisResponse(
             summary = "s", insights = "i", mailGuide = ""
@@ -177,10 +176,8 @@ class MailDetailScreenExtendedTest {
             MailDetailScreen(uiState = uiState, onBack = {})
         }
 
-        // Logic says clickable(enabled = copyEnabled). 
-        // We can check if performing click does nothing visible (hard) 
-        // or just ensure it renders.
-        composeTestRule.onNodeWithText("답장 가이드 복사").assertIsDisplayed()
+        // The info message is shown regardless of whether mailGuide is empty
+        composeTestRule.onNodeWithText("답장 작성 가이드는 답장 생성 시 자동으로 반영돼요.").assertIsDisplayed()
     }
     
     @Test

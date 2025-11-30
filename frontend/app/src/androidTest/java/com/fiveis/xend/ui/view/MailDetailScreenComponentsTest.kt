@@ -103,9 +103,9 @@ class MailDetailScreenComponentsTest {
         
         composeTestRule.onNodeWithText("답장 작성 가이드").assertIsDisplayed()
         composeTestRule.onNodeWithText("Guide Line 1").assertIsDisplayed()
-        
-        // Copy button
-        composeTestRule.onNodeWithText("답장 가이드 복사").assertIsDisplayed()
+
+        // Info message instead of copy button
+        composeTestRule.onNodeWithText("답장 작성 가이드는 답장 생성 시 자동으로 반영돼요.").assertIsDisplayed()
     }
 
     @Test

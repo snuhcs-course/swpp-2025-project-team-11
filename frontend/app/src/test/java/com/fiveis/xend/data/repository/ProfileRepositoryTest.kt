@@ -1,6 +1,8 @@
 package com.fiveis.xend.data.repository
 
 import android.content.Context
+import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.database.ProfileDao
 import com.fiveis.xend.data.model.ProfileData
 import com.fiveis.xend.data.model.UpdateProfileRequest
 import com.fiveis.xend.network.ProfileApiService
@@ -21,15 +23,19 @@ class ProfileRepositoryTest {
 
     private lateinit var context: Context
     private lateinit var apiService: ProfileApiService
+    private lateinit var profileDao: ProfileDao
     private lateinit var repository: ProfileRepository
 
     @Before
     fun setup() {
         context = mockk(relaxed = true)
         apiService = mockk()
+        profileDao = mockk(relaxed = true)
 
         mockkObject(RetrofitClient)
+        mockkObject(AppDatabase)
         every { RetrofitClient.getProfileApiService(any()) } returns apiService
+        every { AppDatabase.getDatabase(any()).profileDao() } returns profileDao
 
         repository = ProfileRepository(context)
     }
@@ -93,7 +99,7 @@ class ProfileRepositoryTest {
             apiService.patchProfile(any())
         } returns Response.success(mockProfileData)
 
-        val result = repository.updateProfile("Updated User", "Updated info")
+        val result = repository.updateProfile("Updated User", "Updated info", null)
 
         assertTrue(result is ProfileResult.Success)
         assertEquals(mockProfileData, (result as ProfileResult.Success).data)
@@ -103,7 +109,7 @@ class ProfileRepositoryTest {
     fun test_updateProfile_successWithNullBody() = runTest {
         coEvery { apiService.patchProfile(any()) } returns Response.success(null)
 
-        val result = repository.updateProfile("Test", "Test")
+        val result = repository.updateProfile("Test", "Test", null)
 
         assertTrue(result is ProfileResult.Failure)
         assertEquals("프로필 업데이트 응답이 없습니다", (result as ProfileResult.Failure).message)
@@ -116,7 +122,7 @@ class ProfileRepositoryTest {
             "Bad Request".toResponseBody()
         )
 
-        val result = repository.updateProfile("Test", "Test")
+        val result = repository.updateProfile("Test", "Test", null)
 
         assertTrue(result is ProfileResult.Failure)
         assertTrue((result as ProfileResult.Failure).message.contains("HTTP 400"))
@@ -126,7 +132,7 @@ class ProfileRepositoryTest {
     fun test_updateProfile_exception() = runTest {
         coEvery { apiService.patchProfile(any()) } throws Exception("Connection timeout")
 
-        val result = repository.updateProfile("Test", "Test")
+        val result = repository.updateProfile("Test", "Test", null)
 
         assertTrue(result is ProfileResult.Failure)
         assertTrue((result as ProfileResult.Failure).message.contains("Connection timeout"))
@@ -143,7 +149,7 @@ class ProfileRepositoryTest {
             apiService.patchProfile(any())
         } returns Response.success(mockProfileData)
 
-        val result = repository.updateProfile(null, "Info only")
+        val result = repository.updateProfile(null, "Info only", null)
 
         assertTrue(result is ProfileResult.Success)
     }
@@ -159,7 +165,7 @@ class ProfileRepositoryTest {
             apiService.patchProfile(any())
         } returns Response.success(mockProfileData)
 
-        val result = repository.updateProfile("Name only", null)
+        val result = repository.updateProfile("Name only", null, null)
 
         assertTrue(result is ProfileResult.Success)
     }

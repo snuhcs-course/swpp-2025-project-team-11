@@ -43,7 +43,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -67,7 +67,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -91,7 +91,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -115,7 +115,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -140,7 +140,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = { composedContact = it },
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -177,7 +177,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -216,7 +216,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -246,7 +246,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -284,7 +284,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = { openedGroupId = it },
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -309,7 +309,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -333,7 +333,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -357,7 +357,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -381,7 +381,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -405,7 +405,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -429,7 +429,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -458,7 +458,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { name, email, _, _, _, _ ->
+                onUpdateContact = { name, email, _, _, _, _, _ ->
                     updatedName = name
                     updatedEmail = email
                 },
@@ -507,7 +507,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ ->
+                onUpdateContact = { _, _, _, _, _, _, _ ->
                     updateCalled = true
                 },
                 onClearEditError = {}
@@ -542,7 +542,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -567,7 +567,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -592,7 +592,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -617,7 +617,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -645,7 +645,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, groupId ->
+                onUpdateContact = { _, _, _, _, _, groupId, _ ->
                     updatedGroupId = groupId
                 },
                 onClearEditError = {}
@@ -682,7 +682,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }
@@ -716,7 +716,7 @@ class ContactDetailScreenTest {
                 onRefresh = {},
                 onOpenGroup = {},
                 onComposeMail = {},
-                onUpdateContact = { _, _, _, _, _, _ -> },
+                onUpdateContact = { _, _, _, _, _, _, _ -> },
                 onClearEditError = {}
             )
         }

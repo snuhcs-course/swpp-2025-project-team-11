@@ -134,6 +134,8 @@ class MailDetailScreenUiTest {
             )
         }
 
+        composeTestRule.onNodeWithText("John Doe").assertIsDisplayed()
+        composeTestRule.onNodeWithText("<john@test.com>").assertIsDisplayed()
         composeTestRule.onNodeWithText("2024.12.19").assertIsDisplayed()
     }
 

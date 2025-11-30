@@ -39,7 +39,7 @@ class AddContactIntegrationTest {
         assertFalse(state.isLoading)
         assertNotNull(state.error)
         assertEquals("이름을 입력해 주세요.", state.error)
-        assertNull(state.lastSuccessMsg)
+        assertNull(state.successMessage)
     }
 
     @Test
@@ -57,7 +57,7 @@ class AddContactIntegrationTest {
         assertFalse(state.isLoading)
         assertNotNull(state.error)
         assertEquals("이메일을 입력해 주세요.", state.error)
-        assertNull(state.lastSuccessMsg)
+        assertNull(state.successMessage)
     }
 
     @Test
@@ -106,6 +106,6 @@ class AddContactIntegrationTest {
         // Then
         assertFalse(state.isLoading)
         assertNull(state.error)
-        assertNull(state.lastSuccessMsg)
+        assertNull(state.successMessage)
     }
 }

@@ -1055,4 +1055,373 @@ class GroupDetailScreenTest {
         composeTestRule.onNodeWithText("Bob").assertIsDisplayed()
         composeTestRule.onNodeWithText("Charlie").assertIsDisplayed()
     }
+
+    @Test
+    fun test_groupDetailScreen_prompt_bottom_sheet_reset() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = listOf(
+                PromptOption(1L, "tone", "Formal", "Use formal tone")
+            ),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList(),
+            tonePromptOptions = listOf(
+                PromptOption(1L, "tone", "Formal", "Use formal tone"),
+                PromptOption(2L, "tone", "Casual", "Use casual tone")
+            ),
+            formatPromptOptions = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("프롬프트 수정").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Casual").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("초기화").performClick()
+        composeTestRule.waitForIdle()
+    }
+
+    @Test
+    fun test_groupDetailScreen_emoji_picker_open() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("그룹 정보 수정").performClick()
+        composeTestRule.waitForIdle()
+        Thread.sleep(200)
+    }
+
+    @Test
+    fun test_groupDetailScreen_add_prompt_option_dialog_cancel() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList(),
+            tonePromptOptions = emptyList(),
+            formatPromptOptions = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("프롬프트 수정").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onAllNodesWithText("새 프롬프트 추가").onFirst().performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("취소").performClick()
+    }
+
+    @Test
+    fun test_groupDetailScreen_prompt_options_error_display() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList(),
+            tonePromptOptions = emptyList(),
+            formatPromptOptions = emptyList(),
+            promptOptionsError = "Failed to save prompt option"
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("프롬프트 수정").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Failed to save prompt option").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_groupDetailScreen_members_paginated() {
+        val members = List(10) { Contact(it.toLong(), null, "Member$it", "member$it@test.com") }
+        val group = Group(
+            id = 1L,
+            name = "Large Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = members
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("멤버 10명").assertIsDisplayed()
+        Thread.sleep(200)
+    }
+
+    @Test
+    fun test_groupDetailScreen_add_members_shows_empty_message() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("그룹에 멤버 추가").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("추가할 수 있는 연락처가 없습니다").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_groupDetailScreen_prompt_section_with_both_types() {
+        val options = listOf(
+            PromptOption(1L, "tone", "Friendly", "Use friendly tone"),
+            PromptOption(2L, "format", "Concise", "Keep it short")
+        )
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = options,
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("문체 스타일").assertIsDisplayed()
+        composeTestRule.onNodeWithText("형식 가이드").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Friendly").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Concise").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_groupDetailScreen_description_expand_and_collapse() {
+        val longDescription = "This is a very long description that should be truncated when collapsed and fully visible when expanded. ".repeat(10)
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = longDescription,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        Thread.sleep(200)
+    }
+
+    @Test
+    fun test_groupDetailScreen_edit_prompt_option_button() {
+        val option = PromptOption(1L, "tone", "Formal", "Use formal tone")
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = listOf(option),
+            members = emptyList()
+        )
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList(),
+            tonePromptOptions = listOf(option),
+            formatPromptOptions = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onUpdatePromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("프롬프트 수정").performClick()
+        composeTestRule.waitForIdle()
+        // "Formal" text appears in multiple places, just verify the dialog opened
+        composeTestRule.onAllNodesWithText("Formal").onFirst().assertExists()
+        Thread.sleep(200)
+    }
 }

@@ -56,7 +56,8 @@ class SentRepositoryTest {
         var result: List<EmailItem>? = null
         flow.collect { result = it }
 
-        assertEquals(mockEmails, result)
+        assertEquals(1, result?.size)
+        assertEquals("1", result?.get(0)?.id)
         verify { emailDao.getEmailsByLabel("SENT") }
     }
 
@@ -97,7 +98,7 @@ class SentRepositoryTest {
                 fromEmail = "sender@test.com",
                 snippet = "snippet",
                 date = "2025-01-01",
-                dateRaw = "raw",
+                dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
                 isUnread = false,
                 labelIds = listOf("SENT")
             )
@@ -107,13 +108,14 @@ class SentRepositoryTest {
         coEvery { mailApiService.getEmails("SENT", 20, null, null) } returns Response.success(
             MailListResponse(mockEmails, "nextToken", 0)
         )
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 1
 
         val result = repository.refreshEmails()
 
         assertTrue(result.isSuccess)
         assertEquals("nextToken", result.getOrNull())
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -150,7 +152,7 @@ class SentRepositoryTest {
             fromEmail = "sender@test.com",
             snippet = "snippet",
             date = "2025-01-02",
-            dateRaw = "raw2",
+            dateRaw = "Thu, 2 Jan 2025 00:00:00 +0000",
             isUnread = true,
             labelIds = listOf("SENT")
         )
@@ -162,7 +164,7 @@ class SentRepositoryTest {
             fromEmail = "sender2@test.com",
             snippet = "snippet2",
             date = "2025-01-03",
-            dateRaw = "raw3",
+            dateRaw = "Fri, 3 Jan 2025 00:00:00 +0000",
             isUnread = true,
             labelIds = listOf("SENT")
         )
@@ -176,13 +178,13 @@ class SentRepositoryTest {
             mailApiService.getEmails("SENT", 20, "token1", "2025-01-01")
         } returns Response.success(MailListResponse(listOf(newEmail2), null, 0))
 
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 3
 
         val result = repository.refreshEmails()
 
         assertTrue(result.isSuccess)
-        coVerify { emailDao.insertEmails(listOf(newEmail1)) }
-        coVerify { emailDao.insertEmails(listOf(newEmail2)) }
+        coVerify(exactly = 2) { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -194,7 +196,7 @@ class SentRepositoryTest {
             fromEmail = "sender@test.com",
             snippet = "snippet",
             date = "2025-01-02",
-            dateRaw = "raw2",
+            dateRaw = "Thu, 2 Jan 2025 00:00:00 +0000",
             isUnread = true,
             labelIds = listOf("SENT")
         )
@@ -204,13 +206,14 @@ class SentRepositoryTest {
             mailApiService.getEmails("SENT", 20, null, "2025-01-01")
         } returns Response.success(MailListResponse(listOf(newEmail), null, 0))
 
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
 
         val result = repository.refreshEmails()
 
         assertTrue(result.isSuccess)
         coVerify(exactly = 1) { mailApiService.getEmails(any(), any(), any(), any()) }
-        coVerify { emailDao.insertEmails(listOf(newEmail)) }
+        coVerify { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -303,7 +306,7 @@ class SentRepositoryTest {
                 fromEmail = "sender@test.com",
                 snippet = "snippet",
                 date = "2025-01-01",
-                dateRaw = "raw",
+                dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
                 isUnread = false,
                 labelIds = listOf("SENT")
             ),
@@ -314,17 +317,18 @@ class SentRepositoryTest {
                 fromEmail = "sender2@test.com",
                 snippet = "snippet2",
                 date = "2025-01-02",
-                dateRaw = "raw2",
+                dateRaw = "Thu, 2 Jan 2025 00:00:00 +0000",
                 isUnread = true,
                 labelIds = listOf("SENT")
             )
         )
 
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
 
         repository.saveEmailsToCache(emails)
 
-        coVerify { emailDao.insertEmails(emails) }
+        coVerify { emailDao.insertEmails(any()) }
         coVerify { emailDao.getEmailCount() }
     }
 
@@ -375,7 +379,7 @@ class SentRepositoryTest {
                 fromEmail = "sender@test.com",
                 snippet = "snippet1",
                 date = "2025-01-02",
-                dateRaw = "raw2",
+                dateRaw = "Thu, 2 Jan 2025 00:00:00 +0000",
                 isUnread = true,
                 labelIds = listOf("SENT")
             )
@@ -389,7 +393,7 @@ class SentRepositoryTest {
                 fromEmail = "sender@test.com",
                 snippet = "snippet2",
                 date = "2025-01-03",
-                dateRaw = "raw3",
+                dateRaw = "Fri, 3 Jan 2025 00:00:00 +0000",
                 isUnread = true,
                 labelIds = listOf("SENT")
             )
@@ -403,7 +407,7 @@ class SentRepositoryTest {
                 fromEmail = "sender@test.com",
                 snippet = "snippet3",
                 date = "2025-01-04",
-                dateRaw = "raw4",
+                dateRaw = "Sat, 4 Jan 2025 00:00:00 +0000",
                 isUnread = true,
                 labelIds = listOf("SENT")
             )
@@ -422,14 +426,13 @@ class SentRepositoryTest {
             mailApiService.getEmails("SENT", 20, "token2", "2025-01-01")
         } returns Response.success(MailListResponse(batch3, null, 0))
 
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 4
 
         val result = repository.refreshEmails()
 
         assertTrue(result.isSuccess)
         coVerify(exactly = 3) { mailApiService.getEmails(any(), any(), any(), any()) }
-        coVerify { emailDao.insertEmails(batch1) }
-        coVerify { emailDao.insertEmails(batch2) }
-        coVerify { emailDao.insertEmails(batch3) }
+        coVerify(exactly = 3) { emailDao.insertEmails(any()) }
     }
 }

@@ -675,7 +675,10 @@ class MailComposeViewModelTest {
         viewModel.enableRealtimeMode(true)
         advanceUntilIdle()
 
-        assertFalse(viewModel.ui.value.isRealtimeEnabled)
+        // When onClose is called while still enabled, isRealtimeEnabled stays true but status becomes ERROR
+        assertTrue(viewModel.ui.value.isRealtimeEnabled)
+        assertEquals(com.fiveis.xend.ui.compose.RealtimeConnectionStatus.ERROR, viewModel.ui.value.realtimeStatus)
+        assertNotNull(viewModel.ui.value.realtimeErrorMessage)
     }
 
     @Test

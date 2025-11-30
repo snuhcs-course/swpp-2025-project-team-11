@@ -97,7 +97,8 @@ class MailDetailScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("김철수 (chulsoo@test.com)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("김철수").assertIsDisplayed()
+        composeTestRule.onNodeWithText("<chulsoo@test.com>").assertIsDisplayed()
     }
 
     @Test
