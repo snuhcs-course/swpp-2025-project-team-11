@@ -240,6 +240,10 @@ class MailDetailScreenTest {
             MailDetailScreen(uiState = uiState, onBack = {}, onReply = {})
         }
 
+        // Wait for UI to be ready
+        composeTestRule.waitForIdle()
+        Thread.sleep(200)
+
         // Then
         composeTestRule.onNodeWithText("simple@test.com").assertIsDisplayed()
     }
