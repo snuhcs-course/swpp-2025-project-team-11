@@ -19,15 +19,11 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ## Features
 
-### What's New in Iteration 4
-- **Addition of tone analysis module**: Analyze and apply the user's writing style based on emails previously sent to the same recipient during email generation
-- **Email composition prompt preview**: Review the prompt currently used by the AI to generate emails
-- **Attachment preview and AI analysis**: In-app attachment preview and AI-driven analysis of attachment contents
-- **Profile information management**: Enter details such as name and affiliation to be utilized in email generation
-- **Email draft saving**
-- **Redo/undo for AI-generated content**
-- **Contact search**
-- **Overall user interface enhancements**
+### What's New in Iteration 5
+- **User Language Preference in Profile**: Users can now set their preferred language in their profile. All AI-generated mails adapt to the chosen language in default.
+- **Read Status Synchronization**: Email read/unread status now syncs reliably across all devices and sessions.
+- **Attachment Support When Composing Emails**: Users can now attach files directly during email composition. Attachments are handled throughout the generation and sending flow.
+- **Email Deletion**: Emails can be deleted directly from the inbox with proper synchronization across the system. (It goes to trash page in Gmail)
 
 ### Previous Iterations
 - **Real-time AI Suggestions**: Live text completion as you type with WebSocket streaming
@@ -36,10 +32,16 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 - **Offline-First Architecture**: Local database caching with incremental sync
 - **Rich Text Editing**: Full formatting support (bold, italic, underline, colors, font sizes)
 - **Template System**: Save and reuse frequently used email templates
-
 - **Streaming Draft Generation**: First sentence appears quickly; content streams until completion
 - **Relationship-Aware Tone**: Select **Group** (e.g., Manager/Clients) and **Tone** (e.g., Polite/Formal) and see rules applied
 - **Inline Reply Options**: Positive / Neutral / Firm candidates shown inline; insert with a tap
+- **Tone Analysis Module**: Analyze and apply the user's writing style based on previous emails to the same recipient
+- **Email Composition Prompt Preview**: Review the prompt currently used by the AI to generate emails
+- **Attachment Preview & AI Analysis**: Preview attachments and analyze their contents with AI
+- **Profile Information Management**: Enter details such as name and affiliation to be used in email generation
+- **Email Draft Saving**
+- **Redo/Undo for AI-Generated Content**
+- **Contact Search**
 
 ---
 
@@ -52,20 +54,20 @@ An AI-powered email drafting assistant that generates **polite, relationship-awa
 
 ### Installation
 
-#### For Iteration 4 Demo
+#### For Iteration 5 Demo
 
-> **Branch**: `iteration-4-demo`
+> **Branch**: `iteration-5-demo`
 
 ```bash
 git clone https://github.com/snuhcs-course/swpp-2025-project-team-11.git
 cd swpp-2025-project-team-11
-git switch iteration-4-demo
+git switch iteration-5-demo
 ```
 
 **Backend Setup**
 ```bash
 cd backend
-cp .env.example .env   # Configure environment variables
+cp .env_example .env   # Configure environment variables
 poetry install
 python manage.py migrate
 python manage.py runserver
@@ -96,13 +98,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 
 ```bash
 git switch iteration-1-demo
-cp .env.example .env
+cp .env_example .env
 docker compose up -d --build
 ```
 
 Default URL: http://localhost/
 
-## What Iteration 4 Demonstrates
+## What Iteration 5 Demonstrates
 
 ### Core Features
 - **Gmail Integration**: OAuth 2.0 authentication and inbox synchronization
@@ -125,3 +127,4 @@ Default URL: http://localhost/
 - **Iteration 1 Demo**: https://drive.google.com/file/d/1to4deCD6jBssx2V_oZgZU5E5Os2PlfP1/view?usp=sharing
 - **Iteration 3 Demo**: https://drive.google.com/file/d/1UmfNOg-AQAKq9O-n2GzkcnLeweSbvZ1W/view?usp=sharing
 - **Iteration 4 Demo**: https://drive.google.com/file/d/1neQrvApVfsdF6zUwdBuIUTQQ30xQDPFO/view?usp=sharing
+- **Iteration 5 Demo**: https://drive.google.com/file/d/1ZWDsM6QpEsYzoJjJ7BHg5ctzA1HK2hZF/view?usp=sharing
