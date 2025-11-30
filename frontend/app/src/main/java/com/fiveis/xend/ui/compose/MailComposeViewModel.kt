@@ -34,6 +34,7 @@ class MailComposeViewModel(
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
     private var pendingSuggestionText: String? = null
+    private var pendingSuggestionSubject: String? = null
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -174,7 +175,7 @@ class MailComposeViewModel(
         _ui.update { it.copy(suggestionText = "") }
     }
 
-    fun onTextChanged(currentText: String) {
+    fun onTextChanged(currentText: String, subject: String) {
         if (!_ui.value.isRealtimeEnabled) return
 
         debounceJob?.cancel()
@@ -183,8 +184,9 @@ class MailComposeViewModel(
         debounceJob = viewModelScope.launch {
             delay(500)
             wsClient?.sendMessage(
-                systemPrompt = "메일 초안 작성",
+                systemPrompt = "메일 초안 작성 중, 현재 텍스트에 자연스럽게 이어질 말을 추천",
                 text = currentText,
+                subject = subject,
                 maxTokens = 50
             )
         }
@@ -225,7 +227,7 @@ class MailComposeViewModel(
     /**
      * Request new suggestion immediately (for tab completion)
      */
-    fun requestImmediateSuggestion(currentText: String, force: Boolean = false) {
+    fun requestImmediateSuggestion(currentText: String, subject: String, force: Boolean = false) {
         if (!_ui.value.isRealtimeEnabled && !force) return
 
         debounceJob?.cancel()
@@ -234,6 +236,7 @@ class MailComposeViewModel(
 
         viewModelScope.launch(Dispatchers.Main) {
             pendingSuggestionText = currentText
+            pendingSuggestionSubject = subject
         }
 
         wsClient?.let { client ->
@@ -250,11 +253,14 @@ class MailComposeViewModel(
     private fun sendPendingSuggestion() {
         viewModelScope.launch(Dispatchers.Main) {
             val text = pendingSuggestionText ?: return@launch
+            val subject = pendingSuggestionSubject ?: ""
             pendingSuggestionText = null
+            pendingSuggestionSubject = null
             delay(100) // Short delay to let the UI update
             wsClient?.sendMessage(
-                systemPrompt = "메일 초안 작성",
+                systemPrompt = "메일 초안 작성 중, 현재 텍스트에 자연스럽게 이어질 말을 추천",
                 text = text,
+                subject = subject,
                 maxTokens = 50
             )
         }
