@@ -1,22 +1,32 @@
 import time
 from collections.abc import Generator
+from typing import Any
 
 from apps.ai.services.chains import body_chain, plan_chain, subject_chain, validator_chain
 from apps.ai.services.graph import mail_graph
 from apps.ai.services.models import ValidationResult
 from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
 from apps.ai.services.utils import build_prompt_inputs, collect_prompt_context, heartbeat, sse_event
+from apps.core.utils.async_stream import as_async_stream
 
 
+@as_async_stream
 def stream_mail_generation(
     user,
     subject: str | None,
     body: str | None,
     to_emails: list[str],
+    attachments: list[dict] | None = None,
 ) -> Generator[str]:
 
     ctx = collect_prompt_context(user, to_emails)
-    raw_inputs = build_prompt_inputs(ctx)
+    raw_inputs = build_prompt_inputs(
+        ctx,
+        extra={
+            "attachments": attachments or [],
+        },
+    )
+
     raw_inputs["subject"] = subject or ""
     raw_inputs["body"] = body or ""
 
@@ -54,6 +64,9 @@ def stream_mail_generation(
         "recipient_role": raw_inputs.get("recipient_role"),
         "plan_text": "",
         "analysis": raw_inputs.get("analysis", None),
+        "fewshots": raw_inputs.get("fewshots"),
+        "profile": raw_inputs.get("profile"),
+        "attachments": raw_inputs.get("attachments", []),
     }
 
     try:
@@ -75,11 +88,13 @@ def stream_mail_generation(
         yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))
 
 
+@as_async_stream
 def stream_mail_generation_with_plan(
     user: dict,
     subject: str | None,
     body: str | None,
     to_emails: list[str],
+    attachments: list[dict] | None = None,
 ) -> Generator[str, None, None]:
 
     yield sse_event("ready", {"ts": int(time.time() * 1000)}, retry_ms=5000)
@@ -90,6 +105,7 @@ def stream_mail_generation_with_plan(
             "subject": subject,
             "body": body,
             "to_emails": to_emails,
+            "attachments": attachments,
         }
     )
 
@@ -99,16 +115,9 @@ def stream_mail_generation_with_plan(
     body_inputs = state["body_inputs"]
     locked_title_masked = state["locked_title"]
 
-    ctx = collect_prompt_context(user, to_emails)
-    prompt_inputs = build_prompt_inputs(ctx)
-
-    for k, v in prompt_inputs.items():
-        if v is not None:
-            masked_inputs[k] = v
-
     yield sse_event("plan.start", {}, eid="plan-0")
 
-    masked_plan_chunks: list[str] = []
+    plan_chunks: list[str] = []
 
     raw_stream = plan_chain.stream(masked_inputs)
 
@@ -120,20 +129,17 @@ def stream_mail_generation_with_plan(
         text = text.strip()
         if not text:
             return
-        for unmasked in unmask_stream([text], req_id, mapping):
-            if not unmasked:
-                continue
-            yield sse_event(
-                "plan.delta",
-                {"idx": para_idx, "text": unmasked + "\n"},
-                eid=f"plan-{para_idx}",
-            )
+        yield sse_event(
+            "plan.delta",
+            {"idx": para_idx, "text": text + "\n"},
+            eid=f"plan-{para_idx}",
+        )
         para_idx += 1
 
     for ch in raw_stream:
         if not ch:
             continue
-        masked_plan_chunks.append(ch)
+        plan_chunks.append(ch)
         paragraph_buf += ch
 
         if "\n\n" in paragraph_buf:
@@ -155,8 +161,8 @@ def stream_mail_generation_with_plan(
 
     yield sse_event("plan.done", {}, eid="plan-done")
 
-    masked_plan_text = "".join(masked_plan_chunks)
-    body_inputs["plan_text"] = masked_plan_text
+    plan_text = "".join(plan_chunks)
+    body_inputs["plan_text"] = plan_text
 
     unmasked_title = "".join(unmask_stream([locked_title_masked], req_id, mapping)) if locked_title_masked else ""
     yield sse_event("subject", {"title": unmasked_title, "text": unmasked_title}, eid="0")
@@ -222,3 +228,162 @@ def stream_mail_generation_with_plan(
 
         yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))
         mapping.clear()
+
+
+def debug_mail_generation_analysis(
+    user,
+    subject: str | None,
+    body: str | None,
+    to_emails: list[str],
+    attachments: list[dict] | None = None,
+) -> dict[str, Any]:
+    base_ctx = collect_prompt_context(
+        user,
+        to_emails,
+        include_analysis=True,
+        include_fewshots=True,
+    )
+
+    analysis_value = base_ctx.get("analysis")
+    fewshots_value = base_ctx.get("fewshots")
+
+    def _run_once(override_ctx: dict[str, Any]) -> dict[str, str]:
+        merged_ctx: dict[str, Any] = {**base_ctx, **override_ctx}
+
+        raw_inputs = build_prompt_inputs(
+            merged_ctx,
+            extra={
+                "attachments": attachments or [],
+            },
+        )
+        raw_inputs["subject"] = subject or ""
+        raw_inputs["body"] = body or ""
+
+        req_id = make_req_id()
+        masker = PiiMasker(req_id)
+        masked_inputs, mapping = masker.mask_inputs(raw_inputs)
+
+        try:
+            locked_title = (subject_chain.invoke(masked_inputs) or "").strip()
+        except Exception:
+            locked_title = ""
+
+        unmasked_title = (locked_title and masker and "".join(unmask_stream([locked_title], req_id, mapping))) or locked_title
+
+        locked_inputs = {
+            "locked_subject": locked_title,
+            "body": masked_inputs.get("body", ""),
+            "language": raw_inputs.get("language"),
+            "recipients": raw_inputs.get("recipients"),
+            "group_name": raw_inputs.get("group_name"),
+            "group_description": raw_inputs.get("group_description"),
+            "prompt_text": raw_inputs.get("prompt_text"),
+            "sender_role": raw_inputs.get("sender_role"),
+            "recipient_role": raw_inputs.get("recipient_role"),
+            "plan_text": "",
+            "analysis": raw_inputs.get("analysis", None),
+            "fewshots": raw_inputs.get("fewshots", None),
+            "profile": raw_inputs.get("profile"),
+            "attachments": raw_inputs.get("attachments", []),
+        }
+
+        try:
+            raw_body = body_chain.invoke(locked_inputs) or ""
+        except Exception:
+            raw_body = ""
+
+        unmasked_body = "".join(unmask_stream([raw_body], req_id, mapping)) if raw_body else raw_body
+
+        mapping.clear()
+
+        return {
+            "subject": unmasked_title,
+            "body": unmasked_body,
+        }
+
+    result_without_any = _run_once({"analysis": None, "fewshots": None})
+
+    result_with_analysis = _run_once({"fewshots": None})
+
+    result_with_fewshots = _run_once({"analysis": None})
+
+    return {
+        "analysis": analysis_value,
+        "fewshots": fewshots_value,
+        "without_analysis": result_without_any,
+        "with_analysis": result_with_analysis,
+        "with_fewshots": result_with_fewshots,
+    }
+
+
+def stream_mail_generation_test() -> Generator[str]:
+    """
+    테스트용 더미 스트리밍 함수.
+    실제 AI API 대신 긴 더미 텍스트를 인위적인 딜레이를 두고 스트리밍합니다.
+    """
+    import random
+
+    # 더미 텍스트 - 충분히 긴 내용
+    dummy_paragraphs = [
+        "Dear valued recipient, I hope this email finds you well and in good spirits. "
+        "I am writing to you today regarding an important matter that requires your attention. ",
+        "As we discussed in our previous meeting, there are several key points that we need to address "
+        "moving forward. First and foremost, we need to establish a clear timeline for the project deliverables. ",
+        "The stakeholders have expressed their concerns about the current progress, and it is crucial that we "
+        "demonstrate our commitment to meeting the established deadlines. ",
+        "In light of recent developments, I would like to propose a series of strategic initiatives that could "
+        "significantly enhance our operational efficiency. These initiatives include process optimization, "
+        "resource allocation improvements, and enhanced communication protocols. ",
+        "Furthermore, it is essential that we maintain open lines of communication throughout this process. "
+        "Regular status updates and feedback sessions will be instrumental in ensuring that we remain aligned "
+        "with our objectives. ",
+        "I have attached several documents for your review, which contain detailed information about the proposed "
+        "changes and their potential impact on our current operations. Please take the time to thoroughly examine "
+        "these materials before our next meeting. ",
+        "Your expertise and insights are invaluable to this project, and I genuinely appreciate your continued "
+        "dedication and hard work. Together, I am confident that we can overcome any challenges that may arise "
+        "and achieve remarkable results. ",
+        "Should you have any questions or concerns, please do not hesitate to reach out to me directly. "
+        "I am always available to discuss any aspect of this project in greater detail. ",
+        "Thank you for your time and consideration. I look forward to our continued collaboration and to seeing "
+        "the positive outcomes of our collective efforts. ",
+        "Best regards and warm wishes for a productive and successful week ahead. " "Let us continue to strive for excellence in all that we do.",
+    ]
+
+    dummy_body = "".join(dummy_paragraphs)
+    dummy_subject = "Important Update: Project Status and Next Steps"
+
+    seq = 0
+
+    # 1. ready 이벤트
+    yield sse_event("ready", {"ts": int(time.time() * 1000)}, retry_ms=5000)
+    time.sleep(0.1)  # 100ms 딜레이
+
+    # 2. subject 이벤트
+    yield sse_event("subject", {"title": dummy_subject, "text": dummy_subject + "\n\n"}, eid="0")
+    seq += 1
+    time.sleep(0.2)  # 200ms 딜레이
+
+    # 3. body 스트리밍 - 단어별로 끊어서 전송
+    words = dummy_body.split(" ")
+    chunk_size = random.randint(2, 5)  # 2-5 단어씩 묶어서 전송
+
+    for i in range(0, len(words), chunk_size):
+        chunk_words = words[i : i + chunk_size]
+        chunk_text = " ".join(chunk_words)
+        if i + chunk_size < len(words):
+            chunk_text += " "  # 마지막이 아니면 공백 추가
+
+        yield sse_event("body.delta", {"seq": seq - 1, "text": chunk_text}, eid=str(seq))
+        seq += 1
+
+        # 무작위 딜레이 (50-150ms)
+        delay = random.uniform(0.05, 0.15)
+        time.sleep(delay)
+
+        # 가끔 heartbeat 전송 (매 20개 청크마다)
+        if seq % 20 == 0:
+            yield heartbeat()
+
+    # 4. done 이벤트
+    yield sse_event("done", {"reason": "stop"}, eid=str(seq + 1))

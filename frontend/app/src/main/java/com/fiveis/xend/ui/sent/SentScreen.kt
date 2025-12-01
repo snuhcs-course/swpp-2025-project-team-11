@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.sent
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -28,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +70,8 @@ import androidx.compose.ui.unit.sp
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
+import com.fiveis.xend.utils.EmailUtils
+import kotlin.math.absoluteValue
 
 @Composable
 fun SentScreen(
@@ -80,33 +83,37 @@ fun SentScreen(
     onRefresh: () -> Unit = {},
     onLoadMore: () -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
+    contactsByEmail: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-
     // 스크롤 방향 감지
     var showBottomBar by remember { mutableStateOf(true) }
     var previousIndex by remember { mutableStateOf(0) }
     var previousScrollOffset by remember { mutableStateOf(0) }
+    val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
+    var accumulatedDelta by remember { mutableStateOf(0f) }
 
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (currentIndex, currentOffset) ->
-            // 맨 위에 있을 때는 항상 표시
             if (currentIndex == 0 && currentOffset == 0) {
                 showBottomBar = true
+                accumulatedDelta = 0f
             } else {
-                // 스크롤 방향 감지
+                val offsetDelta = (currentOffset - previousScrollOffset).absoluteValue.toFloat()
                 val isScrollingDown = if (currentIndex != previousIndex) {
                     currentIndex > previousIndex
                 } else {
                     currentOffset > previousScrollOffset
                 }
-
-                showBottomBar = !isScrollingDown
+                accumulatedDelta += offsetDelta
+                if (accumulatedDelta > scrollThresholdPx) {
+                    showBottomBar = !isScrollingDown
+                    accumulatedDelta = 0f
+                }
             }
-
             previousIndex = currentIndex
             previousScrollOffset = currentOffset
         }
@@ -122,24 +129,14 @@ fun SentScreen(
                         easing = FastOutSlowInEasing
                     ),
                     initialOffsetY = { it }
-                ) + fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                ),
+                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
                 exit = slideOutVertically(
                     animationSpec = tween(
                         durationMillis = 150,
                         easing = FastOutSlowInEasing
                     ),
                     targetOffsetY = { it }
-                ) + fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                )
+                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
             ) {
                 BottomNavBar(selected = "sent", onSelect = onBottomNavChange)
             }
@@ -166,7 +163,8 @@ fun SentScreen(
                         onLoadMore = onLoadMore,
                         isRefreshing = uiState.isRefreshing,
                         isLoadingMore = uiState.isLoading,
-                        listState = listState
+                        listState = listState,
+                        contactsByEmail = contactsByEmail
                     )
                 }
             }
@@ -182,29 +180,19 @@ fun SentScreen(
                         easing = FastOutSlowInEasing
                     ),
                     initialOffsetY = { it }
-                ) + fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                ),
+                ) + fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)),
                 exit = slideOutVertically(
                     animationSpec = tween(
                         durationMillis = 150,
                         easing = FastOutSlowInEasing
                     ),
                     targetOffsetY = { it }
-                ) + fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutSlowInEasing
-                    )
-                )
+                ) + fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
             ) {
                 FloatingActionButton(
                     onClick = onFabClick,
                     modifier = Modifier
-                        .offset(y = 28.dp) // 하단바와 겹치도록 아래로 이동
+                        .offset(y = 28.dp)
                         .padding(bottom = navBarPadding.calculateBottomPadding())
                         .size(56.dp),
                     containerColor = Blue80,
@@ -288,7 +276,8 @@ private fun EmailList(
     onLoadMore: () -> Unit,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    contactsByEmail: Map<String, String> = emptyMap()
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -301,7 +290,11 @@ private fun EmailList(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             items(items = emails, key = { it.id }) { item ->
-                EmailRow(item = item, onClick = { onEmailClick(item) })
+                EmailRow(
+                    item = item,
+                    contactsByEmail = contactsByEmail,
+                    onClick = { onEmailClick(item) }
+                )
                 HorizontalDivider(
                     modifier = Modifier,
                     thickness = DividerDefaults.Thickness,
@@ -340,22 +333,11 @@ private fun EmailList(
                     false
                 } else {
                     // Trigger when last visible item is within 3 items from the end
-                    val shouldLoad = lastVisibleItem.index >= totalItems - 4
-                    if (shouldLoad) {
-                        Log.d("SentScreen", "Near bottom: lastVisible=${lastVisibleItem.index}, total=$totalItems")
-                    }
-                    shouldLoad
+                    lastVisibleItem.index >= totalItems - 4
                 }
             }.collect { shouldLoadMore ->
-                Log.d(
-                    "SentScreen",
-                    "shouldLoadMore=$shouldLoadMore, isRefreshing=$isRefreshing, isLoadingMore=$isLoadingMore"
-                )
                 if (shouldLoadMore && !isLoadingMore) {
-                    Log.d("SentScreen", "Triggering loadMore")
                     onLoadMore()
-                } else {
-                    Log.d("SentScreen", "Not triggering loadMore - conditions not met")
                 }
             }
         }
@@ -374,10 +356,10 @@ fun EmailListContent(
     isLoadingMore: Boolean,
     error: String?,
     onScrollChange: (Int, Int) -> Unit = { _, _ -> },
-    onScrollStopped: () -> Unit = {}
+    onScrollStopped: () -> Unit = {},
+    contactsByEmail: Map<String, String> = emptyMap(),
+    listState: LazyListState = rememberLazyListState()
 ) {
-    val listState = rememberLazyListState()
-
     // 스크롤 멈춤 감지
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -413,13 +395,20 @@ fun EmailListContent(
             onLoadMore = onLoadMore,
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
-            listState = listState
+            listState = listState,
+            contactsByEmail = contactsByEmail
         )
     }
 }
 
 @Composable
-private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
+private fun EmailRow(item: EmailItem, contactsByEmail: Map<String, String>, onClick: () -> Unit) {
+    val recipientDisplay = remember(item.toEmail, contactsByEmail) {
+        formatRecipientDisplay(item.toEmail, contactsByEmail)
+    }
+    val formattedDate = remember(item.displayDate, item.dateTimestamp, item.date) {
+        item.displayDate.ifBlank { EmailUtils.formatDisplayDate(item.dateTimestamp, item.date) }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -429,7 +418,7 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .semantics { contentDescription = "메일 항목: ${item.subject}" },
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -440,18 +429,23 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                         .size(6.dp)
                         .background(Color(0xFFEA4335), CircleShape)
                 )
+            } else {
+                Spacer(
+                    modifier = Modifier
+                        .padding(top = 3.dp, end = 8.dp)
+                        .size(6.dp)
+                )
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val recipientDisplay = formatRecipientDisplay(item.toEmail)
                     Text(
                         text = "To: $recipientDisplay",
                         color = if (item.isUnread) Color(0xFF202124) else Color(0xFF5F6368),
@@ -463,9 +457,8 @@ private fun EmailRow(item: EmailItem, onClick: () -> Unit) {
                     )
 
                     Spacer(Modifier.width(8.dp))
-// 날짜 포매팅 해야함
                     Text(
-                        text = item.date,
+                        text = formattedDate,
                         color = Color(0xFF5F6368),
                         fontSize = 12.sp
                     )
@@ -584,10 +577,14 @@ private fun extractDisplayName(emailField: String): String {
         ?: emailField.substringBefore("<").trim().ifEmpty { emailField }
 }
 
-private fun formatRecipientDisplay(rawToField: String): String {
+private fun formatRecipientDisplay(rawToField: String, contactsByEmail: Map<String, String>): String {
     val recipients = rawToField.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     if (recipients.isEmpty()) return "알 수 없음"
 
-    val primary = extractDisplayName(recipients.first())
+    val primaryRaw = recipients.first()
+    val primaryEmail = EmailUtils.extractEmailAddress(primaryRaw).lowercase()
+    val contactName = contactsByEmail[primaryEmail]
+    val fallbackName = extractDisplayName(primaryRaw)
+    val primary = contactName ?: fallbackName
     return if (recipients.size > 1) "$primary 외 ${recipients.size - 1}명" else primary
 }

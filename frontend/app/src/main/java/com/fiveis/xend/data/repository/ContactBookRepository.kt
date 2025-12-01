@@ -9,10 +9,9 @@ import com.fiveis.xend.data.database.entity.ContactEntity
 import com.fiveis.xend.data.database.entity.GroupEntity
 import com.fiveis.xend.data.database.entity.GroupPromptOptionCrossRef
 import com.fiveis.xend.data.database.entity.PromptOptionEntity
-import com.fiveis.xend.data.model.AddContactRequest
-import com.fiveis.xend.data.model.AddContactRequestContext
 import com.fiveis.xend.data.model.AddGroupRequest
 import com.fiveis.xend.data.model.Contact
+import com.fiveis.xend.data.model.ContactRequestBuilder
 import com.fiveis.xend.data.model.ContactResponse
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.GroupResponse
@@ -43,9 +42,9 @@ data class ContactData(val contacts: List<Contact>) : ContactBookData
 
 class ContactBookRepository(
     context: Context,
-    private val db: AppDatabase = AppDatabase.getDatabase(context)
-) {
+    private val db: AppDatabase = AppDatabase.getDatabase(context),
     private val api: ContactApiService = RetrofitClient.getContactApiService(context)
+) {
 
     // Room 주입
     private val groupDao = db.groupDao()
@@ -187,15 +186,19 @@ class ContactBookRepository(
         email: String,
         groupId: Long?,
         senderRole: String?,
-        recipientRole: String,
-        personalPrompt: String?
+        recipientRole: String?,
+        personalPrompt: String?,
+        languagePreference: String? = null
     ): ContactResponse {
-        val requestContext = AddContactRequestContext(
-            senderRole = senderRole ?: "",
-            recipientRole = recipientRole,
-            personalPrompt = personalPrompt ?: ""
-        )
-        val request = AddContactRequest(name = name, email = email, groupId = groupId, context = requestContext)
+        val request = ContactRequestBuilder()
+            .name(name)
+            .email(email)
+            .groupId(groupId)
+            .senderRole(senderRole)
+            .recipientRole(recipientRole)
+            .personalPrompt(personalPrompt)
+            .languagePreference(languagePreference)
+            .build()
         val res = api.addContact(request)
         if (!res.isSuccessful) {
             val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
@@ -248,7 +251,8 @@ class ContactBookRepository(
         senderRole: String?,
         recipientRole: String?,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String?
     ) {
         val payload = mutableMapOf<String, Any?>(
             "name" to name,
@@ -259,6 +263,7 @@ class ContactBookRepository(
         if (senderRole != null) contextPayload["sender_role"] = senderRole
         if (recipientRole != null) contextPayload["recipient_role"] = recipientRole
         if (personalPrompt != null) contextPayload["personal_prompt"] = personalPrompt
+        if (languagePreference != null) contextPayload["language_preference"] = languagePreference
         if (contextPayload.isNotEmpty()) {
             payload["context"] = contextPayload
         }
@@ -284,11 +289,17 @@ class ContactBookRepository(
     suspend fun addGroup(
         name: String,
         description: String,
-        emoji: String? = null,
+        emoji: String = "",
         options: List<PromptOption>
     ): GroupResponse {
+        val normalizedEmoji = emoji.ifEmpty { "" }
         val request =
-            AddGroupRequest(name = name, description = description, emoji = emoji, optionIds = options.map { it.id })
+            AddGroupRequest(
+                name = name,
+                description = description,
+                emoji = normalizedEmoji,
+                optionIds = options.map { it.id }
+            )
         val res = api.addGroup(request)
         if (!res.isSuccessful) {
             val body = res.errorBody()?.string()?.take(500) ?: "Unknown error"
@@ -319,11 +330,14 @@ class ContactBookRepository(
         groupId: Long,
         name: String? = null,
         description: String? = null,
+        emoji: String? = null,
+        emojiProvided: Boolean = false,
         optionIds: List<Long>? = null
     ): GroupResponse {
-        val payload = mutableMapOf<String, Any>()
+        val payload = mutableMapOf<String, Any?>()
         if (name != null) payload["name"] = name
         if (description != null) payload["description"] = description
+        if (emojiProvided) payload["emoji"] = emoji ?: ""
         if (optionIds != null) payload["option_ids"] = optionIds
         require(payload.isNotEmpty()) { "updateGroup payload is empty" }
 
@@ -439,6 +453,7 @@ private fun GroupResponse.toEntities(): Triple<GroupEntity, List<PromptOptionEnt
         id = id,
         name = name,
         description = description,
+        emoji = emoji,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

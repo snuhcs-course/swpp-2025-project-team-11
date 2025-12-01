@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -36,8 +38,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -70,9 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -82,10 +82,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
 import com.fiveis.xend.data.model.Attachment
 import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.EmailItem
+import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.theme.AttachmentExcelBg
 import com.fiveis.xend.ui.theme.AttachmentHeaderText
 import com.fiveis.xend.ui.theme.AttachmentImageBg
@@ -94,11 +96,15 @@ import com.fiveis.xend.ui.theme.Blue40
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.ComposeBackground
 import com.fiveis.xend.ui.theme.ComposeOutline
+import com.fiveis.xend.ui.theme.Gray600
 import com.fiveis.xend.ui.theme.MailDetailBodyBg
 import com.fiveis.xend.ui.theme.Purple60
 import com.fiveis.xend.ui.theme.TextPrimary
 import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
+import com.fiveis.xend.utils.EmailUtils
+import com.fiveis.xend.utils.formatFileSize
+import com.fiveis.xend.utils.shortenFilename
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -111,6 +117,7 @@ fun MailDetailScreen(
     knownContactsByEmail: Map<String, Contact> = emptyMap(),
     onBack: () -> Unit,
     onReply: () -> Unit = {},
+    onAddContactClick: (String, String) -> Unit = { _, _ -> },
     onDownloadAttachment: (Attachment) -> Unit = {},
     onAnalyzeAttachment: (Attachment) -> Unit = {},
     onDismissAnalysis: () -> Unit = {},
@@ -123,7 +130,6 @@ fun MailDetailScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
     var attachmentToDownload by remember { mutableStateOf<Attachment?>(null) }
 
     LaunchedEffect(uiState.downloadSuccessMessage) {
@@ -200,7 +206,8 @@ fun MailDetailScreen(
                         onAttachmentClick = { selected -> attachmentToDownload = selected },
                         onAnalyzeAttachment = onAnalyzeAttachment,
                         onPreviewAttachment = onPreviewAttachment,
-                        onOpenAttachmentExternally = onOpenAttachmentExternally
+                        onOpenAttachmentExternally = onOpenAttachmentExternally,
+                        onAddContactClick = onAddContactClick
                     )
                 }
             }
@@ -232,11 +239,7 @@ fun MailDetailScreen(
             isLoading = uiState.isAnalyzingAttachment,
             result = uiState.analysisResult,
             errorMessage = uiState.analysisErrorMessage,
-            onDismiss = onDismissAnalysis,
-            onCopyGuide = { text ->
-                clipboardManager.setText(AnnotatedString(text))
-                Toast.makeText(context, "답장 가이드가 복사되었습니다.", Toast.LENGTH_SHORT).show()
-            }
+            onDismiss = onDismissAnalysis
         )
     }
 
@@ -362,7 +365,8 @@ private fun MailDetailContent(
     onAttachmentClick: (Attachment) -> Unit,
     onAnalyzeAttachment: (Attachment) -> Unit,
     onPreviewAttachment: (Attachment) -> Unit,
-    onOpenAttachmentExternally: (Attachment) -> Unit
+    onOpenAttachmentExternally: (Attachment) -> Unit,
+    onAddContactClick: (String, String) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -382,7 +386,8 @@ private fun MailDetailContent(
             recipientEmail = mail.toEmail,
             isSentMail = isSentMail,
             date = mail.date,
-            knownContactsByEmail = knownContactsByEmail
+            knownContactsByEmail = knownContactsByEmail,
+            onAddContactClick = onAddContactClick
         )
         HorizontalDivider(
             thickness = 1.dp,
@@ -414,34 +419,83 @@ private fun SenderInfoSection(
     recipientEmail: String,
     isSentMail: Boolean,
     date: String,
-    knownContactsByEmail: Map<String, Contact>
+    knownContactsByEmail: Map<String, Contact>,
+    onAddContactClick: (String, String) -> Unit
 ) {
     val (displayName, displayEmail) = if (isSentMail) {
         parseSenderEmail(recipientEmail)
     } else {
         parseSenderEmail(senderEmail)
     }
-    val normalized = displayEmail.trim().lowercase()
+    val normalized = displayEmail.trim().lowercase(Locale.ROOT)
     val savedContact = knownContactsByEmail[normalized]
     val resolvedDisplayName = savedContact?.name?.takeIf { it.isNotBlank() } ?: displayName
+    val showAddContactButton = !isSentMail && savedContact == null
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
-        Text(
-            text = if (isSentMail) "To. $resolvedDisplayName" else resolvedDisplayName,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val spacing = 6.dp
+            val buttonSize = 20.dp
+            val textMaxWidth = if (showAddContactButton) {
+                (maxWidth - buttonSize - spacing).coerceAtLeast(0.dp)
+            } else {
+                maxWidth
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing)
+            ) {
+                Text(
+                    text = if (isSentMail) "To. $resolvedDisplayName" else resolvedDisplayName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    modifier = Modifier.widthIn(max = textMaxWidth),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (showAddContactButton) {
+                    IconButton(
+                        modifier = Modifier.size(buttonSize),
+                        onClick = {
+                            val rawName = EmailUtils
+                                .extractSenderName(senderEmail)
+                                .ifBlank { displayEmail }
+                            onAddContactClick(rawName, displayEmail)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PersonAdd,
+                            contentDescription = "연락처 추가",
+                            tint = Blue60,
+                            modifier = Modifier.size(18.dp)
+                        )
+//                        Spacer(modifier = Modifier.width(4.dp))
+//                        Text(
+//                            text = "연락처 추가",
+//                            fontSize = 13.sp,
+//                            color = Blue60,
+//                            fontWeight = FontWeight.Medium
+//                        )
+                    }
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "<$displayEmail>",
             fontSize = 13.sp,
             color = TextSecondary
         )
+
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = date,
@@ -613,13 +667,15 @@ private fun AttachmentSection(
             attachments.forEach { attachment ->
                 val previewType = attachment.previewType()
                 val supportsPreview = previewType != AttachmentPreviewType.UNSUPPORTED
+                val supportsAnalysis = attachment.supportsAnalysis()
                 AttachmentItem(
                     attachment = attachment,
                     onClick = { onAttachmentClick(attachment) },
                     onAnalyze = { onAnalyzeAttachment(attachment) },
                     onPreview = { onPreviewAttachment(attachment) },
                     onOpenExternal = { onOpenAttachmentExternally(attachment) },
-                    supportsPreview = supportsPreview
+                    supportsPreview = supportsPreview,
+                    supportsAnalysis = supportsAnalysis
                 )
             }
         }
@@ -633,7 +689,8 @@ private fun AttachmentItem(
     onAnalyze: () -> Unit,
     onPreview: () -> Unit,
     onOpenExternal: () -> Unit,
-    supportsPreview: Boolean
+    supportsPreview: Boolean,
+    supportsAnalysis: Boolean
 ) {
     Surface(
         modifier = Modifier
@@ -661,7 +718,7 @@ private fun AttachmentItem(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = attachment.filename,
+                        text = shortenFilename(attachment.filename, 25),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary,
@@ -679,7 +736,9 @@ private fun AttachmentItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AiAnalysisBadge(onClick = onAnalyze)
+                if (supportsAnalysis) {
+                    AiAnalysisBadge(onClick = onAnalyze)
+                }
                 PreviewButton(
                     onClick = {
                         if (supportsPreview) {
@@ -839,8 +898,7 @@ private fun AttachmentAnalysisPopup(
     isLoading: Boolean,
     result: AttachmentAnalysisResponse?,
     errorMessage: String?,
-    onDismiss: () -> Unit,
-    onCopyGuide: (String) -> Unit
+    onDismiss: () -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -870,8 +928,7 @@ private fun AttachmentAnalysisPopup(
                     AnalysisContent(
                         isLoading = isLoading,
                         result = result,
-                        errorMessage = errorMessage,
-                        onCopyGuide = onCopyGuide
+                        errorMessage = errorMessage
                     )
                 }
             }
@@ -925,12 +982,7 @@ private fun AnalysisHeader(attachment: Attachment, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun AnalysisContent(
-    isLoading: Boolean,
-    result: AttachmentAnalysisResponse?,
-    errorMessage: String?,
-    onCopyGuide: (String) -> Unit
-) {
+private fun AnalysisContent(isLoading: Boolean, result: AttachmentAnalysisResponse?, errorMessage: String?) {
     when {
         isLoading -> {
             Column(
@@ -960,7 +1012,7 @@ private fun AnalysisContent(
                     color = MaterialTheme.colorScheme.error
                 )
                 Text(
-                    text = "잠시 후 다시 시도해주세요.",
+                    text = "잠시 후 다시 시도해 주세요.",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
@@ -980,115 +1032,46 @@ private fun AnalysisContent(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                AnalysisSection(
+                AttachmentAnalysisSection(
                     title = "주요 내용 요약",
                     backgroundColor = Color(0xFFF8FAFC),
                     borderColor = Color(0xFFE2E8F0),
                     contentLines = result.summary.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 )
-                AnalysisSection(
+                AttachmentAnalysisSection(
                     title = "핵심 시사점",
                     backgroundColor = Color(0xFFFFF7ED),
                     borderColor = Color(0xFFFED7AA),
                     contentLines = result.insights.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 )
-                AnalysisSection(
+                AttachmentAnalysisSection(
                     title = "답장 작성 가이드",
                     backgroundColor = Color(0xFFFAF5FF),
                     borderColor = Color(0xFFDDD6FE),
                     contentLines = result.mailGuide.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val guideText = result.mailGuide
-                    val copyEnabled = guideText.isNotBlank()
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        color = Color(0xFFF1F5F9),
-                        modifier = Modifier.clickable(
-                            enabled = copyEnabled,
-                            onClick = { if (copyEnabled) onCopyGuide(guideText) }
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "답장 가이드 복사",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "답장 가이드 복사",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = "답장 작성 가이드는 답장 생성 시 자동으로 반영돼요.",
+                    fontSize = 13.sp,
+                    color = Gray600
+                )
             }
         }
     }
 }
 
-@Composable
-private fun AnalysisSection(title: String, backgroundColor: Color, borderColor: Color, contentLines: List<String>) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = backgroundColor,
-            border = BorderStroke(1.dp, borderColor),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (contentLines.isEmpty()) {
-                    Text(
-                        text = "표시할 내용이 없습니다.",
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
-                } else {
-                    contentLines.forEach { line ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 9.dp)
-                                    .size(6.dp)
-                                    .background(color = Purple60, shape = CircleShape)
-                            )
-                            Text(
-                                text = line,
-                                fontSize = 13.sp,
-                                color = TextPrimary
-                            )
-                        }
-                    }
-                }
-            }
-        }
+private fun Attachment.supportsAnalysis(): Boolean {
+    val allowedTokens = setOf("pdf", "txt", "csv", "xlsx", "xls", "docx")
+    val sizeOk = size <= 10 * 1024 * 1024
+    if (!sizeOk) return false
+
+    val mime = mimeType.lowercase(Locale.getDefault())
+    val filenameLower = filename.lowercase(Locale.getDefault())
+    val typeOk = allowedTokens.any { token ->
+        mime.contains(token) || filenameLower.endsWith(".$token")
     }
+    return typeOk
 }
 
 @Composable
@@ -1308,11 +1291,7 @@ private fun PdfPagePreview(renderer: PdfRenderer, pageIndex: Int) {
         bitmap = null
         val renderedBitmap = withContext(Dispatchers.IO) {
             renderer.openPage(pageIndex).use { page ->
-                val rendered = Bitmap.createBitmap(
-                    page.width * 2,
-                    page.height * 2,
-                    Bitmap.Config.ARGB_8888
-                )
+                val rendered = createBitmap(page.width * 2, page.height * 2)
                 page.render(rendered, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                 rendered
             }
@@ -1430,22 +1409,6 @@ private fun attachmentBadgeColor(filename: String): Color {
     }
 }
 
-private fun formatFileSize(size: Long): String {
-    if (size <= 0) return "0B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var value = size.toDouble()
-    var index = 0
-    while (value >= 1024 && index < units.lastIndex) {
-        value /= 1024
-        index++
-    }
-    return if (index == 0) {
-        "${size}B"
-    } else {
-        String.format(Locale.getDefault(), "%.1f%s", value, units[index])
-    }
-}
-
 /**
  * 발신자 이메일을 파싱하는 함수
  * 입력: "김대표 <kim@company.com>" 또는 "kim@company.com"
@@ -1458,7 +1421,7 @@ private fun parseSenderEmail(senderEmail: String): Pair<String, String> {
     return if (matchResult != null) {
         val name = matchResult.groupValues[1].trim()
         val email = matchResult.groupValues[2].trim()
-        "$name ($email)" to email
+        name to email
     } else {
         senderEmail.trim() to senderEmail.trim()
     }

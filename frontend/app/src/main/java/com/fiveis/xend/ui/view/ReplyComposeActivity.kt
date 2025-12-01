@@ -66,13 +66,15 @@ class ReplyComposeActivity : ComponentActivity() {
                     "${contact.name} <${contact.email}>"
                 } ?: senderEmailRaw
                 val senderGroupNames = senderContact?.group?.name?.let { arrayListOf(it) } ?: arrayListOf()
+                val messageId = intent.getStringExtra("message_id")
 
                 // 답장 옵션 자동 로딩
                 LaunchedEffect(Unit) {
                     viewModel.startReplyOptions(
                         subject = subject,
                         body = body,
-                        toEmail = senderEmailAddress
+                        toEmail = senderEmailAddress,
+                        messageId = messageId
                     )
                 }
 
@@ -112,7 +114,7 @@ class ReplyComposeActivity : ComponentActivity() {
                         startActivity(intent)
                     },
                     onGenerateMore = {
-                        viewModel.startReplyOptions(subject, body, senderEmailAddress)
+                        viewModel.startReplyOptions(subject, body, senderEmailAddress, messageId)
                     },
                     onUseOption = { selectedOption ->
                         // 선택한 옵션으로 직접 작성 화면으로 이동

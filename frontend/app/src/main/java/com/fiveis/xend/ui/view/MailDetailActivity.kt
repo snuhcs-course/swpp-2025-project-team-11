@@ -3,19 +3,30 @@ package com.fiveis.xend.ui.view
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.fiveis.xend.data.database.AppDatabase
+import com.fiveis.xend.data.model.Group
+import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.ContactLookupViewModel
+import com.fiveis.xend.ui.inbox.AddContactDialog
 import com.fiveis.xend.ui.theme.XendTheme
+import kotlinx.coroutines.launch
 
 class MailDetailActivity : ComponentActivity() {
     private val viewModel: MailDetailViewModel by viewModels {
@@ -45,10 +56,24 @@ class MailDetailActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val appContext = applicationContext
         setContent {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val knownContacts by contactLookupViewModel.byEmail.collectAsState()
+                val contactRepository = remember { ContactBookRepository(appContext) }
+                val coroutineScope = rememberCoroutineScope()
+                var showAddContactDialog by remember { mutableStateOf(false) }
+                var pendingContactName by remember { mutableStateOf("") }
+                var pendingContactEmail by remember { mutableStateOf("") }
+                var availableGroups by remember { mutableStateOf<List<Group>>(emptyList()) }
+                val context = LocalContext.current
+
+                LaunchedEffect(Unit) {
+                    contactRepository.observeGroups().collect { groups ->
+                        availableGroups = groups
+                    }
+                }
                 MailDetailScreen(
                     uiState = uiState,
                     knownContactsByEmail = knownContacts,
@@ -60,6 +85,7 @@ class MailDetailActivity : ComponentActivity() {
                                 putExtra("date", mail.date)
                                 putExtra("subject", addReplyPrefix(mail.subject))
                                 putExtra("body", mail.body)
+                                putExtra("message_id", mail.id)
                             }
                             startActivity(intent)
                         }
@@ -90,8 +116,45 @@ class MailDetailActivity : ComponentActivity() {
                     },
                     onClearExternalOpenError = {
                         viewModel.clearExternalOpenError()
+                    },
+                    onAddContactClick = { name, email ->
+                        pendingContactName = name
+                        pendingContactEmail = email
+                        showAddContactDialog = true
                     }
                 )
+
+                if (showAddContactDialog) {
+                    AddContactDialog(
+                        senderName = pendingContactName.ifBlank { pendingContactEmail },
+                        senderEmail = pendingContactEmail,
+                        groups = availableGroups,
+                        onDismiss = { showAddContactDialog = false },
+                        onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
+                            coroutineScope.launch {
+                                try {
+                                    contactRepository.addContact(
+                                        name = name,
+                                        email = email,
+                                        groupId = groupId,
+                                        senderRole = senderRole,
+                                        recipientRole = recipientRole,
+                                        personalPrompt = personalPrompt,
+                                        languagePreference = language
+                                    )
+                                    // 연락처 추가 성공 - 다이얼로그 닫기
+                                    showAddContactDialog = false
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "연락처 추가 실패: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        }
+                    )
+                }
             }
         }
     }

@@ -2,13 +2,11 @@ package com.fiveis.xend.ui.profile
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
@@ -41,12 +39,7 @@ class ProfileActivity : ComponentActivity() {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
 
-                // Toast 표시
-                LaunchedEffect(uiState.showLogoutSuccessToast) {
-                    if (uiState.showLogoutSuccessToast) {
-                        Toast.makeText(this@ProfileActivity, "로그아웃 성공!", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                // 로그아웃 성공 Toast 제거 (화면 전환으로 충분)
 
                 // 로그아웃 성공 시 로그인 화면으로 이동
                 if (uiState.logoutSuccess) {
@@ -75,6 +68,9 @@ class ProfileActivity : ComponentActivity() {
                     },
                     onUpdateInfo = { info ->
                         viewModel.updateInfo(info)
+                    },
+                    onUpdateLanguagePreference = { language ->
+                        viewModel.updateLanguagePreference(language)
                     },
                     onSaveProfile = {
                         viewModel.saveProfile()

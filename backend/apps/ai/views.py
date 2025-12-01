@@ -10,23 +10,32 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from ..core.mixins import AuthRequiredMixin
+from ..core.renderers import SSERenderer
 from ..core.utils.docs import extend_schema_with_common_errors
 from .serializers import (
     AttachmentAnalysisResponseSerializer,
     AttachmentAnalyzeFromMailSerializer,
     AttachmentAnalyzeUploadSerializer,
+    MailGenerateAnalysisResponseSerializer,
     MailGenerateRequest,
     PromptPreviewRequestSerializer,
     ReplyGenerateRequest,
 )
 from .services.attachment_analysis import analyze_gmail_attachment, analyze_uploaded_file
-from .services.mail_generation import stream_mail_generation, stream_mail_generation_with_plan
+from .services.mail_generation import (
+    debug_mail_generation_analysis,
+    stream_mail_generation,
+    stream_mail_generation_test,
+    stream_mail_generation_with_plan,
+)
 from .services.prompt_preview import generate_prompt_preview
 from .services.reply import stream_reply_options_llm
+from .services.utils import get_attachments_for_content_keys, get_attachments_for_message
 
 
 class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = MailGenerateRequest
+    renderer_classes = [SSERenderer]
 
     @extend_schema(
         operation_id="mail_generate_stream",
@@ -113,11 +122,15 @@ class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        attachment_keys = data.get("attachment_content_keys") or []
+        attachments = get_attachments_for_content_keys(request.user, attachment_keys)
+
         gen = stream_mail_generation(
             user=request.user,
             subject=data.get("subject"),
             body=data.get("body"),
             to_emails=data.get("to_emails"),
+            attachments=attachments,
         )
 
         resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
@@ -128,6 +141,7 @@ class MailGenerateStreamView(AuthRequiredMixin, generics.GenericAPIView):
 
 class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = MailGenerateRequest
+    renderer_classes = [SSERenderer]
 
     @extend_schema(
         operation_id="mail_generate_with_plan_stream",
@@ -233,11 +247,15 @@ class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        attachment_keys = data.get("attachment_content_keys") or []
+        attachments = get_attachments_for_content_keys(request.user, attachment_keys)
+
         gen = stream_mail_generation_with_plan(
             user=request.user,
             subject=data.get("subject"),
             body=data.get("body"),
             to_emails=data.get("to_emails"),
+            attachments=attachments,
         )
 
         resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
@@ -248,6 +266,7 @@ class MailGenerateWithPlanStreamView(AuthRequiredMixin, generics.GenericAPIView)
 
 class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
     serializer_class = ReplyGenerateRequest
+    renderer_classes = [SSERenderer]
 
     @extend_schema(
         operation_id="reply_generate_stream",
@@ -310,15 +329,19 @@ class ReplyOptionsStreamView(AuthRequiredMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        def gen():
-            yield from stream_reply_options_llm(
+        message_id = data.get("message_id") or ""
+        attachments = get_attachments_for_message(request.user, message_id) if message_id else []
+
+        resp = StreamingHttpResponse(
+            stream_reply_options_llm(
                 user=request.user,
                 subject=data.get("subject"),
                 body=data.get("body"),
                 to_email=data.get("to_email"),
-            )
-
-        resp = StreamingHttpResponse(gen(), content_type="text/event-stream; charset=utf-8")
+                attachments=attachments,
+            ),
+            content_type="text/event-stream; charset=utf-8",
+        )
         resp["Cache-Control"] = "no-cache"
         resp["X-Accel-Buffering"] = "no"
         return resp
@@ -409,6 +432,7 @@ class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
                             "summary": "회의록 요약: 주요 의사결정은 API 런칭 일정 연기.",
                             "insights": "성능 이슈로 캐시 도입 필요. QA 일정 재조정.",
                             "mail_guide": "PM에게 일정 변경 공지 및 대안(캐시 전략) 제안 메일.",
+                            "content_key": "메일 생성 시 필요한 키",
                         },
                     )
                 ],
@@ -433,3 +457,74 @@ class AttachmentAnalyzeUploadView(AuthRequiredMixin, generics.GenericAPIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class MailGenerateAnalysisTestView(AuthRequiredMixin, generics.GenericAPIView):
+    serializer_class = MailGenerateRequest
+
+    @extend_schema(
+        summary="[Debug] Generate mail with/without analysis (non-streaming)",
+        request=MailGenerateRequest,
+        responses={
+            200: OpenApiResponse(
+                response=MailGenerateAnalysisResponseSerializer,
+                examples=[
+                    OpenApiExample(
+                        "Success",
+                        value={
+                            "analysis": "수신자가 최근 회의에서 언급한 요청사항을 기반으로 공손한 톤 권장.",
+                            "without_analysis": {"subject": "프로젝트 관련 안내드립니다", "body": "안녕하세요. 프로젝트 관련하여 안내드립니다..."},
+                            "with_analysis": {
+                                "subject": "요청하신 프로젝트 관련 안내드립니다",
+                                "body": "안녕하세요. 지난 회의에서 요청하신 내용을 바탕으로...",
+                            },
+                        },
+                    )
+                ],
+            ),
+        },
+    )
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        attachment_keys = data.get("attachment_content_keys") or []
+        attachments = get_attachments_for_content_keys(request.user, attachment_keys)
+
+        result = debug_mail_generation_analysis(
+            user=request.user,
+            subject=data.get("subject"),
+            body=data.get("body"),
+            to_emails=data.get("to_emails"),
+            attachments=attachments,
+        )
+        return Response(result)
+
+
+class MailGenerateStreamTestView(AuthRequiredMixin, generics.GenericAPIView):
+    renderer_classes = [SSERenderer]
+
+    @extend_schema(
+        operation_id="mail_generate_stream_test",
+        summary="Generate mail via streaming (SSE) - TEST with dummy data",
+        description=(
+            "테스트용 SSE 엔드포인트. 실제 AI API 대신 더미 텍스트를 스트리밍합니다.\n"
+            "- 인위적인 딜레이를 두고 긴 더미 텍스트를 전송\n"
+            "- 실제 엔드포인트와 동일한 이벤트 형식 사용\n"
+            "- 프론트엔드 스트리밍 테스트용\n"
+            "- 빈 요청({})도 허용됨"
+        ),
+        request=None,
+        responses={
+            200: (OpenApiTypes.STR, "text/event-stream"),
+        },
+    )
+    def post(self, request):
+        # 테스트용이므로 validation 없이 바로 더미 스트림 전송
+        gen = stream_mail_generation_test()
+
+        resp = StreamingHttpResponse(gen, content_type="text/event-stream; charset=utf-8")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp

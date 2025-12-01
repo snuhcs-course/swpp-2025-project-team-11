@@ -7,17 +7,25 @@ from collections.abc import Generator
 from apps.ai.services.chains import plan_chain, reply_body_chain
 from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
 from apps.ai.services.utils import build_prompt_inputs, collect_prompt_context, sse_event
+from apps.core.utils.async_stream import as_async_stream
 
 
+@as_async_stream
 def stream_reply_options_llm(
     *,
     user,
     subject: str | None,
     body: str | None,
     to_email: str,
+    attachments: list[dict] | None = None,
 ) -> Generator[str]:
     ctx = collect_prompt_context(user, [to_email])
-    raw = build_prompt_inputs(ctx)
+    raw = build_prompt_inputs(
+        ctx,
+        extra={
+            "attachments": attachments or [],
+        },
+    )
     raw["incoming_subject"] = subject or ""
     raw["incoming_body"] = body or ""
 
@@ -41,6 +49,7 @@ def stream_reply_options_llm(
         "prompt_text": masked_inputs.get("prompt_text"),
         "sender_role": masked_inputs.get("sender_role"),
         "recipient_role": masked_inputs.get("recipient_role"),
+        "attachments": masked_inputs.get("attachments", []),
     }
     try:
         plan = plan_chain.invoke(plan_inputs)
@@ -78,6 +87,10 @@ def stream_reply_options_llm(
         "prompt_text": masked_inputs.get("prompt_text"),
         "sender_role": masked_inputs.get("sender_role"),
         "recipient_role": masked_inputs.get("recipient_role"),
+        "analysis": masked_inputs.get("analysis"),
+        "fewshots": masked_inputs.get("fewshots"),
+        "profile": masked_inputs.get("profile"),
+        "attachments": masked_inputs.get("attachments", []),
     }
 
     def worker(opt_idx: int, locked_type: str, locked_title: str):

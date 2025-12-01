@@ -14,9 +14,11 @@ import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.utils.EmailUtils
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,11 +64,13 @@ class MailDetailViewModel(
     private val appContext: Context,
     private val emailDao: EmailDao,
     private val inboxRepository: InboxRepository,
-    private val messageId: String
+    private val messageId: String,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MailDetailUiState())
     val uiState: StateFlow<MailDetailUiState> = _uiState.asStateFlow()
+    private var markReadInProgress = false
 
     init {
         loadMail()
@@ -86,6 +90,7 @@ class MailDetailViewModel(
                             isLoading = false
                         )
                     }
+                    markEmailAsReadIfNeeded(email)
                 } else {
                     Log.e("MailDetailViewModel", "Email not found in DB cache")
                     _uiState.update { it.copy(error = "메일을 찾을 수 없습니다.", isLoading = true) }
@@ -101,7 +106,7 @@ class MailDetailViewModel(
 
     private suspend fun fetchMailDetailFromServer() {
         try {
-            val response = withContext(Dispatchers.IO) {
+            val response = withContext(ioDispatcher) {
                 inboxRepository.getMail(messageId)
             }
             if (!response.isSuccessful) {
@@ -129,6 +134,8 @@ class MailDetailViewModel(
                     error = null
                 )
             }
+
+            markEmailAsReadIfNeeded(updatedMail)
         } catch (e: Exception) {
             Log.e("MailDetailViewModel", "Exception fetching mail detail", e)
             handleMailDetailError(e.message ?: "메일을 불러오는 중 오류가 발생했습니다.")
@@ -159,8 +166,32 @@ class MailDetailViewModel(
             labelIds = labelIds,
             body = body,
             attachments = attachments,
-            cachedAt = existing?.cachedAt ?: System.currentTimeMillis()
+            cachedAt = existing?.cachedAt ?: System.currentTimeMillis(),
+            dateTimestamp = existing?.dateTimestamp ?: EmailUtils.parseDateToTimestamp(dateRaw)
         )
+    }
+
+    private fun markEmailAsReadIfNeeded(email: EmailItem) {
+        if (!email.isUnread || markReadInProgress) {
+            return
+        }
+
+        markReadInProgress = true
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    inboxRepository.updateReadStatus(email.id, isUnread = false)
+                }
+                _uiState.update { state ->
+                    val currentMail = state.mail ?: return@update state
+                    state.copy(mail = currentMail.copy(isUnread = false))
+                }
+            } catch (e: Exception) {
+                Log.e("MailDetailViewModel", "Failed to mark email as read", e)
+            } finally {
+                markReadInProgress = false
+            }
+        }
     }
 
     fun downloadAttachment(attachment: Attachment) {

@@ -7,10 +7,13 @@ from typing import Any
 
 import pandas as pd
 from django.db.models import Prefetch
+from django.db.models.functions import Length
 from langchain_community.document_loaders import CSVLoader, Docx2txtLoader, PDFPlumberLoader, TextLoader
 
 from apps.ai.models import ContactAnalysisResult, GroupAnalysisResult
 from apps.contact.models import Contact, PromptOption
+from apps.mail.models import AttachmentAnalysis, SentMail
+from apps.user.models import UserProfile
 
 
 def sse_event(name, payload, *, eid=None, retry_ms=None):
@@ -32,7 +35,9 @@ def collect_prompt_context(
     user,
     to_emails: list[str],
     include_analysis: bool = True,
-    recipient_label_fmt: str = "Recipient {i}",
+    include_fewshots: bool = False,
+    fewshot_k: int = 3,
+    min_body_len: int = 0,
 ) -> dict[str, Any]:
     """
     유저 + 수신자 이메일 리스트를 기반으로 프롬프트 컨텍스트 수집.
@@ -87,6 +92,16 @@ def collect_prompt_context(
     def get_group_opts(g):
         return list(g.options.all()) if g else []
 
+    language = None
+    profile = None
+    user_profile = UserProfile.objects.filter(user=user).first()
+    if user_profile:
+        language = _clean(user_profile.language_preference)
+        profile = {
+            "display_name": _clean(user_profile.display_name),
+            "info": _clean(user_profile.info),
+        }
+
     base = {
         "recipients": recipients,
         "group_name": None,
@@ -95,8 +110,10 @@ def collect_prompt_context(
         "personal_prompt": None,
         "sender_role": None,
         "recipient_role": None,
-        "language": None,
+        "language": language,
+        "fewshots": [],
         "analysis": None,
+        "profile": profile,
     }
 
     if not contacts:
@@ -116,9 +133,11 @@ def collect_prompt_context(
             "personal_prompt": _clean(getattr(ctx, "personal_prompt", None)),
             "sender_role": _clean(getattr(ctx, "sender_role", None)),
             "recipient_role": _clean(getattr(ctx, "recipient_role", None)),
-            "language": _clean(getattr(ctx, "language_preference", None)),
+            "language": _clean(getattr(ctx, "language_preference", None)) or base["language"],
         }
 
+        if include_fewshots:
+            out["fewshots"] = _fetch_fewshot_bodies_for_single(user, c, fewshot_k, min_body_len)
         if include_analysis:
             out["analysis"] = _fetch_analysis_for_single(user, c)
         return out
@@ -132,6 +151,8 @@ def collect_prompt_context(
             "group_description": _clean(g.description),
             "prompt_options": serialize_opts(get_group_opts(g)),
         }
+        if include_fewshots:
+            out["fewshots"] = _fetch_fewshot_bodies_for_group(user, g, fewshot_k, min_body_len)
         if include_analysis:
             out["analysis"] = _fetch_analysis_for_group(user, g)
         return out
@@ -152,6 +173,24 @@ def collect_prompt_context(
         "group_description": None,
         "prompt_options": serialize_opts(opts) if opts else [],
     }
+
+
+def _fetch_fewshot_bodies_for_single(user, contact, k: int, min_body_len: int) -> list[str]:
+    qs = SentMail.objects.filter(user=user, contact=contact).exclude(body__isnull=True).exclude(body__exact="").order_by("-sent_at")
+    if min_body_len > 0:
+        qs = qs.annotate(body_len=Length("body")).filter(body_len__gte=min_body_len)
+    bodies = list(qs.values_list("body", flat=True)[:k])
+
+    if not bodies and getattr(contact, "group_id", None):
+        bodies = _fetch_fewshot_bodies_for_group(user, contact.group, k, min_body_len)
+    return bodies
+
+
+def _fetch_fewshot_bodies_for_group(user, group, k: int, min_body_len: int) -> list[str]:
+    qs = SentMail.objects.filter(user=user, contact__group=group).exclude(body__isnull=True).exclude(body__exact="").order_by("-sent_at")
+    if min_body_len > 0:
+        qs = qs.annotate(body_len=Length("body")).filter(body_len__gte=min_body_len)
+    return list(qs.values_list("body", flat=True)[:k])
 
 
 def _fetch_analysis_for_single(user, contact) -> dict | None:
@@ -187,7 +226,7 @@ def _fetch_analysis_for_group(user, group) -> dict | None:
 DEFAULT_LANGUAGE = "user's original language"
 
 
-def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
+def build_prompt_inputs(ctx: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
     def _clean(s: Any) -> str | None:
         if not isinstance(s, str):
             return None
@@ -204,7 +243,7 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
 
     prompt_text = "\n".join(prompt_lines).strip() or None
 
-    return {
+    base = {
         "recipients": ctx.get("recipients"),
         "group_name": _clean(ctx.get("group_name")),
         "group_description": _clean(ctx.get("group_description")),
@@ -213,7 +252,14 @@ def build_prompt_inputs(ctx: dict[str, Any]) -> dict[str, Any]:
         "recipient_role": _clean(ctx.get("recipient_role")),
         "language": language,
         "analysis": ctx.get("analysis"),
+        "fewshots": ctx.get("fewshots"),
+        "profile": ctx.get("profile"),
     }
+
+    if extra:
+        base.update(extra)
+
+    return base
 
 
 def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
@@ -290,3 +336,30 @@ def extract_text_from_bytes(data: bytes, mime_type: str, filename: str) -> str:
 
 def hash_bytes(data: bytes) -> str:
     return hashlib.sha1(data).hexdigest()
+
+
+def build_attachment_context_from_qs(qs) -> list[dict]:
+    items = []
+    for obj in qs:
+        items.append(
+            {
+                "filename": obj.filename,
+                "mime_type": obj.mime_type,
+                "summary": obj.summary,
+                "insights": obj.insights,
+                "mail_guide": obj.mail_guide,
+            }
+        )
+    return items
+
+
+def get_attachments_for_message(user, message_id: str) -> list[dict]:
+    qs = AttachmentAnalysis.objects.filter(user=user, message_id=message_id).order_by("-created_at")
+    return build_attachment_context_from_qs(qs)
+
+
+def get_attachments_for_content_keys(user, content_keys: list[str]) -> list[dict]:
+    if not content_keys:
+        return []
+    qs = AttachmentAnalysis.objects.filter(user=user, content_key__in=content_keys).order_by("-created_at")
+    return build_attachment_context_from_qs(qs)

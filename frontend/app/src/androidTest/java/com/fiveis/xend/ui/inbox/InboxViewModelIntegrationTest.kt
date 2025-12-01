@@ -33,6 +33,7 @@ class InboxViewModelIntegrationTest {
     private lateinit var contactRepository: ContactBookRepository
     private lateinit var viewModel: InboxViewModel
     private lateinit var mockApiService: MailApiService
+    private lateinit var prefs: android.content.SharedPreferences
 
     @Before
     fun setup() {
@@ -45,11 +46,12 @@ class InboxViewModelIntegrationTest {
         emailDao = database.emailDao()
 
         mockApiService = mockk(relaxed = true)
+        prefs = mockk(relaxed = true)
         repository = InboxRepository(mockApiService, emailDao)
         contactRepository = mockk()
         coEvery { contactRepository.observeGroups() } returns MutableStateFlow(emptyList())
         coEvery { contactRepository.observeContacts() } returns MutableStateFlow(emptyList())
-        viewModel = InboxViewModel(repository, contactRepository)
+        viewModel = InboxViewModel(repository, contactRepository, prefs)
     }
 
     @After

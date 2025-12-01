@@ -12,8 +12,14 @@ State = dict[str, Any]
 def build_context_node(state: State) -> State:
     user = state["user"]
     to_emails = state["to_emails"]
+    attachments = state.get("attachments")
     ctx = collect_prompt_context(user, to_emails)
-    raw_inputs = build_prompt_inputs(ctx)
+    raw_inputs = build_prompt_inputs(
+        ctx,
+        extra={
+            "attachments": attachments or [],
+        },
+    )
     state["raw_inputs"] = raw_inputs
     return state
 
@@ -58,7 +64,9 @@ def body_prep_node(state: State) -> State:
         "sender_role": raw_inputs.get("sender_role"),
         "recipient_role": raw_inputs.get("recipient_role"),
         "analysis": raw_inputs.get("analysis", None),
+        "fewshots": raw_inputs.get("fewshots"),
         "plan_text": plan_text,
+        "profile": raw_inputs.get("profile"),
     }
     state["body_inputs"] = locked_inputs
     return state

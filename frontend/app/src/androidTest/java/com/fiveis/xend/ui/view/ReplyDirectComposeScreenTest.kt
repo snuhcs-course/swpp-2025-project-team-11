@@ -78,8 +78,15 @@ class ReplyDirectComposeScreenTest {
             )
         }
 
+        // Wait for the UI to settle
+        composeTestRule.waitForIdle()
+
         // Then
         composeTestRule.onNodeWithContentDescription("전송").performClick()
+
+        // Wait for callback to be invoked
+        composeTestRule.waitForIdle()
+
         assert(sendCalled)
     }
 
@@ -98,7 +105,7 @@ class ReplyDirectComposeScreenTest {
         }
 
         // Then
-        composeTestRule.onNodeWithText("받는 사람: ").assertIsDisplayed()
+        composeTestRule.onNodeWithText("받는 사람").assertIsDisplayed()
         composeTestRule.onNodeWithText("John Doe").assertIsDisplayed()
     }
 
@@ -116,8 +123,12 @@ class ReplyDirectComposeScreenTest {
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
+        // Wait for UI to settle
+        composeTestRule.waitForIdle()
+        Thread.sleep(200)
+
+        // Then - Check for group name
+        composeTestRule.onNodeWithText("Group1").assertIsDisplayed()
     }
 
     @Test
@@ -224,12 +235,14 @@ class ReplyDirectComposeScreenTest {
                 subject = "Test",
                 groups = emptyList(),
                 onBack = {},
-                onSend = {}
+                onSend = {},
+                canUndo = true,
+                isStreaming = false
             )
         }
 
         // Then
-        composeTestRule.onNodeWithText("실행취소").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("실행취소").assertIsDisplayed()
     }
 
     @Test
@@ -507,9 +520,9 @@ class ReplyDirectComposeScreenTest {
             )
         }
 
-        // Then
+        // Then - Check that all group names are displayed
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Group1, Group2, Group3").assertIsDisplayed()
     }
 
     @Test
@@ -563,6 +576,251 @@ class ReplyDirectComposeScreenTest {
         }
 
         // Then - Should not crash
+        Thread.sleep(200)
+    }
+
+    @Test
+    fun replyDirectComposeScreen_shows_ai_complete_button() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("AI 완성").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_ai_complete_click_triggers_callback() {
+        var aiCompleteClicked = false
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                onAiComplete = { aiCompleteClicked = true }
+            )
+        }
+
+        composeTestRule.onNodeWithText("AI 완성").performClick()
+        assert(aiCompleteClicked)
+    }
+
+    @Test
+    fun replyDirectComposeScreen_stop_button_visible_when_streaming() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                isStreaming = true
+            )
+        }
+
+        composeTestRule.onNodeWithText("중지").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_stop_click_triggers_callback() {
+        var stopClicked = false
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                isStreaming = true,
+                onStopStreaming = { stopClicked = true }
+            )
+        }
+
+        composeTestRule.onNodeWithText("중지").performClick()
+        assert(stopClicked)
+    }
+
+    @Test
+    fun replyDirectComposeScreen_undo_button_visible_when_can_undo() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                canUndo = true,
+                isStreaming = false
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("실행취소").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_undo_click_triggers_callback() {
+        var undoClicked = false
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                canUndo = true,
+                onUndo = { undoClicked = true }
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("실행취소").performClick()
+        assert(undoClicked)
+    }
+
+    @Test
+    fun replyDirectComposeScreen_redo_button_visible_when_can_redo() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                canRedo = true,
+                isStreaming = false
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("다시 실행").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_redo_click_triggers_callback() {
+        var redoClicked = false
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                canRedo = true,
+                onRedo = { redoClicked = true }
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("다시 실행").performClick()
+        assert(redoClicked)
+    }
+
+    @Test
+    fun replyDirectComposeScreen_add_contact_button_visible_when_flag_true() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                showAddContactButton = true,
+                onAddContactClick = {} // Must provide callback for button to show
+            )
+        }
+
+        composeTestRule.waitForIdle()
+        Thread.sleep(200)
+        composeTestRule.onNodeWithText("연락처 추가").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_add_contact_click_triggers_callback() {
+        var addContactClicked = false
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                showAddContactButton = true,
+                onAddContactClick = { addContactClicked = true }
+            )
+        }
+
+        composeTestRule.onNodeWithText("연락처 추가").performClick()
+        assert(addContactClicked)
+    }
+
+    @Test
+    fun replyDirectComposeScreen_streaming_indicator_shown() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                isStreaming = true
+            )
+        }
+
+        composeTestRule.onNodeWithText("AI 플래너가 메일 구조를 설계 중입니다").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_sender_section_displays() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                senderEmail = "Sender Name <sender@test.com>",
+                date = "2024.12.19",
+                originalBody = "Original message"
+            )
+        }
+
+        composeTestRule.onNodeWithText("Sender Name").assertIsDisplayed()
+    }
+
+    @Test
+    fun replyDirectComposeScreen_sender_section_click_expands() {
+        composeTestRule.setContent {
+            ReplyDirectComposeScreen(
+                recipientEmail = "test@test.com",
+                recipientName = "Test User",
+                subject = "Test Subject",
+                groups = emptyList(),
+                onBack = {},
+                onSend = {},
+                senderEmail = "Sender <sender@test.com>",
+                date = "2024.12.19",
+                originalBody = "Body"
+            )
+        }
+
+        composeTestRule.onNodeWithText("Sender").performClick()
+        composeTestRule.waitForIdle()
         Thread.sleep(200)
     }
 }

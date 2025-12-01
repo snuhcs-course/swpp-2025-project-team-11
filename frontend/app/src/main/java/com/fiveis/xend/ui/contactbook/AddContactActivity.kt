@@ -2,7 +2,6 @@ package com.fiveis.xend.ui.contactbook
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -45,6 +44,11 @@ class AddContactActivity : ComponentActivity() {
                 )
                 val addUiState by addViewModel.uiState.collectAsState()
 
+                // 이전 성공 상태 초기화 (ViewModel이 재사용될 경우 대비)
+                LaunchedEffect(Unit) {
+                    addViewModel.dismissSuccessBanner()
+                }
+
                 // 그룹 목록이 필요하면 ContactBookViewModel 활용
                 val bookViewModel: ContactBookViewModel = viewModel(
                     factory = ContactBookViewModel.Factory(application)
@@ -58,6 +62,7 @@ class AddContactActivity : ComponentActivity() {
                 var recipientRole by rememberSaveable { mutableStateOf<String?>(null) }
                 var personalPrompt by rememberSaveable { mutableStateOf<String?>(null) }
                 var selectedGroup by rememberSaveable { mutableStateOf<Group?>(null) }
+                var languagePreference by rememberSaveable { mutableStateOf("") }
 
                 AddContactScreen(
                     groups = bookUiState.groups,
@@ -66,6 +71,7 @@ class AddContactActivity : ComponentActivity() {
                     onSenderRoleChange = { senderRole = it },
                     onRecipientRoleChange = { recipientRole = it },
                     onPersonalPromptChange = { personalPrompt = it },
+                    onLanguagePreferenceChange = { languagePreference = it },
                     onGroupChange = { selectedGroup = it },
                     onBack = {
                         finish()
@@ -75,15 +81,12 @@ class AddContactActivity : ComponentActivity() {
                         addViewModel.addContact(
                             name = name,
                             email = email,
-                            senderRole = senderRole,
-                            recipientRole = recipientRole ?: "",
-                            personalPrompt = personalPrompt,
-                            group = selectedGroup
+                            senderRole = senderRole?.takeIf { it.isNotBlank() },
+                            recipientRole = recipientRole?.takeIf { it.isNotBlank() },
+                            personalPrompt = personalPrompt?.takeIf { it.isNotBlank() },
+                            group = selectedGroup,
+                            languagePreference = languagePreference.takeIf { it.isNotBlank() }
                         )
-                    },
-                    onGmailContactsSync = {
-                        // TODO
-                        Toast.makeText(this, "Gmail 동기화 준비중...", Toast.LENGTH_SHORT).show()
                     },
                     onAddGroupClick = {
                         startActivity(Intent(this, AddGroupActivity::class.java))
@@ -94,16 +97,14 @@ class AddContactActivity : ComponentActivity() {
                             startActivity(Intent(this, InboxActivity::class.java))
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
-                    }
+                    },
+                    errorMessage = addUiState.error,
+                    onDismissError = { addViewModel.clearError() }
                 )
 
-                // 결과 피드백
-                LaunchedEffect(addUiState.error, addUiState.lastSuccessMsg) {
-                    addUiState.error?.let {
-                        Toast.makeText(this@AddContactActivity, it, Toast.LENGTH_SHORT).show()
-                    }
-                    addUiState.lastSuccessMsg?.let {
-                        Toast.makeText(this@AddContactActivity, it, Toast.LENGTH_SHORT).show()
+                // 에러 및 성공 피드백
+                LaunchedEffect(addUiState.showSuccessBanner) {
+                    if (addUiState.showSuccessBanner) {
                         setResult(RESULT_OK)
                         finish()
                         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)

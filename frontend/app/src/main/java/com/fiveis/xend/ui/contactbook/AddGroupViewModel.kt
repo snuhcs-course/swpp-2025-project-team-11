@@ -17,7 +17,8 @@ data class AddGroupUiState(
     val formatPromptOptions: List<PromptOption> = emptyList(),
     val isFetchingOptions: Boolean = false,
     val isSubmitting: Boolean = false,
-    val lastSuccessMsg: String? = null,
+    val showSuccessBanner: Boolean = false,
+    val successMessage: String? = null,
     val error: String? = null
 )
 
@@ -50,7 +51,7 @@ class AddGroupViewModel(
     fun addGroup(
         name: String,
         description: String,
-        emoji: String? = null,
+        emoji: String = "",
         options: List<PromptOption>,
         members: List<com.fiveis.xend.data.model.Contact> = emptyList()
     ) {
@@ -59,7 +60,7 @@ class AddGroupViewModel(
             return
         }
 
-        _uiState.update { it.copy(isSubmitting = true, error = null, lastSuccessMsg = null) }
+        _uiState.update { it.copy(isSubmitting = true, error = null, showSuccessBanner = false, successMessage = null) }
 
         viewModelScope.launch {
             try {
@@ -81,7 +82,8 @@ class AddGroupViewModel(
                 _uiState.update {
                     it.copy(
                         isSubmitting = false,
-                        lastSuccessMsg = "추가 성공(그룹 ID: ${res.id}, 멤버 ${members.size}명)",
+                        showSuccessBanner = true,
+                        successMessage = "그룹이 추가되었습니다",
                         error = null
                     )
                 }
@@ -95,6 +97,10 @@ class AddGroupViewModel(
                 }
             }
         }
+    }
+
+    fun dismissSuccessBanner() {
+        _uiState.update { it.copy(showSuccessBanner = false, successMessage = null) }
     }
 
     fun addPromptOption(

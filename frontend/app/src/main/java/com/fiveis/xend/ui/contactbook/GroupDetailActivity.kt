@@ -85,7 +85,7 @@ class GroupDetailActivity : ComponentActivity() {
                     },
                     onRemoveMember = { member -> vm.removeMemberFromGroup(member.id) },
                     onAddMembers = { ids -> vm.addMembersToGroup(ids) },
-                    onRenameGroup = { newName, newDesc -> vm.renameGroup(newName, newDesc) },
+                    onRenameGroup = { newName, newDesc, emoji -> vm.renameGroup(newName, newDesc, emoji) },
                     onClearRenameError = { vm.clearRenameError() },
                     onRefreshPromptOptions = { vm.refreshPromptOptions() },
                     onSavePromptOptions = { ids -> vm.updateGroupPromptOptions(ids) },

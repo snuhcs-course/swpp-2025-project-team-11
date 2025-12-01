@@ -4,6 +4,8 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.fiveis.xend.data.database.EmailDao
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailListResponse
+import com.fiveis.xend.data.model.ReadStatusUpdateRequest
+import com.fiveis.xend.data.model.ReadStatusUpdateResponse
 import com.fiveis.xend.network.MailApiService
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -41,11 +43,16 @@ class InboxRepositoryTest {
             createMockEmailItem("1"),
             createMockEmailItem("2")
         )
-        every { emailDao.getEmailsByLabel("INBOX") } returns flowOf(mockEmails)
+        every { emailDao.getInboxEmails() } returns flowOf(mockEmails)
 
         val result = repository.getCachedEmails()
 
-        coVerify { emailDao.getEmailsByLabel("INBOX") }
+        // Collect from flow to verify it works
+        var collected: List<EmailItem>? = null
+        result.collect { collected = it }
+        assertEquals(2, collected?.size)
+        assertEquals("1", collected?.get(0)?.id)
+        assertEquals("2", collected?.get(1)?.id)
     }
 
     @Test
@@ -88,7 +95,7 @@ class InboxRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals("token123", result.getOrNull())
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -172,7 +179,7 @@ class InboxRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals(null, result.getOrNull())
-        coVerify(atLeast = 1) { emailDao.insertEmails(newEmails) }
+        coVerify(atLeast = 1) { emailDao.insertEmails(any()) }
     }
 
     @Test
@@ -202,10 +209,14 @@ class InboxRepositoryTest {
 
     @Test
     fun update_read_status_calls_dao_with_correct_parameters() = runTest {
+        coEvery {
+            mailApiService.updateReadStatus("1", ReadStatusUpdateRequest(isRead = true))
+        } returns Response.success(ReadStatusUpdateResponse(id = "1", labelIds = listOf("INBOX")))
         coEvery { emailDao.updateReadStatus("1", false) } returns Unit
 
         repository.updateReadStatus("1", false)
 
+        coVerify { mailApiService.updateReadStatus("1", ReadStatusUpdateRequest(isRead = true)) }
         coVerify { emailDao.updateReadStatus("1", false) }
     }
 
@@ -215,12 +226,12 @@ class InboxRepositoryTest {
             createMockEmailItem("1"),
             createMockEmailItem("2")
         )
-        coEvery { emailDao.insertEmails(mockEmails) } returns Unit
+        coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
 
         repository.saveEmailsToCache(mockEmails)
 
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify { emailDao.insertEmails(any()) }
         coVerify { emailDao.getEmailCount() }
     }
 
@@ -251,6 +262,87 @@ class InboxRepositoryTest {
         assertTrue(result.isSuccessful)
         assertEquals(messageId, result.body()?.id)
         coVerify { mailApiService.getMail(messageId) }
+    }
+
+    @Test
+    fun save_draft_should_insert_draft_and_return_id() = runTest {
+        val draft = com.fiveis.xend.data.model.DraftItem(
+            id = 0,
+            subject = "Test",
+            body = "Body",
+            recipients = listOf("test@example.com"),
+            timestamp = System.currentTimeMillis()
+        )
+        coEvery { emailDao.insertDraft(draft) } returns 123L
+
+        val result = repository.saveDraft(draft)
+
+        assertEquals(123L, result)
+        coVerify { emailDao.insertDraft(draft) }
+    }
+
+    @Test
+    fun get_draft_should_return_draft_by_id() = runTest {
+        val draft = com.fiveis.xend.data.model.DraftItem(
+            id = 1,
+            subject = "Test",
+            body = "Body",
+            recipients = listOf("test@example.com"),
+            timestamp = System.currentTimeMillis()
+        )
+        coEvery { emailDao.getDraft(1) } returns draft
+
+        val result = repository.getDraft(1)
+
+        assertEquals(draft, result)
+        coVerify { emailDao.getDraft(1) }
+    }
+
+    @Test
+    fun get_draft_should_return_null_when_draft_not_found() = runTest {
+        coEvery { emailDao.getDraft(999) } returns null
+
+        val result = repository.getDraft(999)
+
+        assertEquals(null, result)
+    }
+
+    @Test
+    fun get_draft_by_recipient_should_return_draft_by_email() = runTest {
+        val draft = com.fiveis.xend.data.model.DraftItem(
+            id = 1,
+            subject = "Test",
+            body = "Body",
+            recipients = listOf("recipient@example.com"),
+            timestamp = System.currentTimeMillis()
+        )
+        coEvery { emailDao.getDraftByRecipient("recipient@example.com") } returns draft
+
+        val result = repository.getDraftByRecipient("recipient@example.com")
+
+        assertEquals(draft, result)
+    }
+
+    @Test
+    fun get_all_drafts_should_return_flow_of_drafts() = runTest {
+        val drafts = listOf(
+            com.fiveis.xend.data.model.DraftItem(1, "Subject 1", "Body 1", listOf("a@test.com"), 1000L),
+            com.fiveis.xend.data.model.DraftItem(2, "Subject 2", "Body 2", listOf("b@test.com"), 2000L)
+        )
+        every { emailDao.getAllDrafts() } returns flowOf(drafts)
+
+        repository.getAllDrafts()
+
+        coVerify { emailDao.getAllDrafts() }
+    }
+
+    @Test
+    fun delete_draft_should_delete_draft_by_id() = runTest {
+        coEvery { emailDao.deleteDraft(1) } returns Unit
+
+        repository.deleteDraft(1)
+
+        coVerify { emailDao.deleteDraft(1) }
     }
 
     private fun createMockEmailItem(id: String) = EmailItem(

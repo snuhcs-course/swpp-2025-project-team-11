@@ -42,7 +42,7 @@ class MailReplySseClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.SECONDS)
         .connectTimeout(15, TimeUnit.SECONDS)
-        .addInterceptor(loggingInterceptor)
+//        .addInterceptor(loggingInterceptor)
         .addInterceptor { chain ->
             val accessToken = tokenManager.getAccessToken()
             val request = if (accessToken != null) {
@@ -63,6 +63,7 @@ class MailReplySseClient(
         subject: String,
         body: String,
         toEmail: String,
+        messageId: String? = null,
         onReady: () -> Unit = {},
         onOptions: (List<ReplyOptionInfo>) -> Unit,
         onOptionDelta: (optionId: Int, seq: Int, text: String) -> Unit,
@@ -77,6 +78,9 @@ class MailReplySseClient(
             put("subject", subject)
             put("body", body)
             put("to_email", toEmail)
+            if (!messageId.isNullOrBlank()) {
+                put("message_id", messageId)
+            }
         }
 
         val json = payload.toString()

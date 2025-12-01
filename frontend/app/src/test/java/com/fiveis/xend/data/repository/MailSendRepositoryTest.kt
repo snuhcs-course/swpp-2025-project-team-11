@@ -3,12 +3,10 @@ package com.fiveis.xend.data.repository
 import android.content.Context
 import com.fiveis.xend.data.model.SendResponse
 import com.fiveis.xend.network.MailApiService
-import com.fiveis.xend.network.RetrofitClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
 import io.mockk.slot
 import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
@@ -31,12 +29,12 @@ class MailSendRepositoryTest {
     @Before
     fun setup() {
         context = mockk(relaxed = true)
+        // Mock applicationContext to return itself
+        every { context.applicationContext } returns context
+
         mailApiService = mockk()
 
-        mockkObject(RetrofitClient)
-        every { RetrofitClient.getMailApiService(context) } returns mailApiService
-
-        repository = MailSendRepository(context)
+        repository = MailSendRepository(context, mailApiService)
     }
 
     @After

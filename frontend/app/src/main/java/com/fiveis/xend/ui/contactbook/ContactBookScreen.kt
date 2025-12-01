@@ -82,6 +82,7 @@ fun ContactBookScreen(
     uiState: ContactBookUiState,
     onRefresh: () -> Unit = {},
     onTabSelected: (ContactBookTab) -> Unit,
+    onDismissSuccessBanner: () -> Unit = {},
     onGroupClick: (Group) -> Unit = {},
     onContactClick: (Contact) -> Unit = {},
     onBottomNavChange: (String) -> Unit = {},
@@ -202,6 +203,16 @@ fun ContactBookScreen(
                             }
                         }
                     )
+
+                    // Success Banner
+                    if (uiState.showSuccessBanner && uiState.successMessage != null) {
+                        com.fiveis.xend.ui.compose.Banner(
+                            message = uiState.successMessage,
+                            type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
+                            onDismiss = onDismissSuccessBanner,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
 
                     // 탭
                     Row(
@@ -471,27 +482,33 @@ fun GroupCard(group: Group, onClick: (Group) -> Unit, onEdit: (Group) -> Unit = 
                         .background(groupColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (group.emoji != null) {
+                    if (!group.emoji.isNullOrEmpty()) {
                         Text(
-                            text = group.emoji,
+                            text = group.emoji ?: "",
                             fontSize = 20.sp
                         )
                     }
                 }
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(group.name, fontWeight = FontWeight.Bold, color = groupColor, fontSize = 18.sp)
                     Text(
                         group.description ?: "",
-                        modifier = Modifier.width(240.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         color = Color.DarkGray,
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                Text("${group.members.size}명", color = groupColor, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "${group.members.size}명",
+                    color = groupColor,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
+                )
                 Spacer(Modifier.width(12.dp))
             }
 

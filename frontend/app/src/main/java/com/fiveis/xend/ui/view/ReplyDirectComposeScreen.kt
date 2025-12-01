@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -45,8 +46,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -76,9 +75,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.fiveis.xend.ui.compose.RealtimeConnectionStatus
 import com.fiveis.xend.ui.compose.TemplateTIcon
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
 import com.fiveis.xend.ui.compose.common.BodyHeader
+import com.fiveis.xend.ui.compose.common.RealtimeStatusLabel
 import com.fiveis.xend.ui.compose.common.XendRichEditorState
 import com.fiveis.xend.ui.compose.common.rememberXendRichEditorState
 import com.fiveis.xend.ui.theme.Blue60
@@ -113,6 +114,8 @@ fun ReplyDirectComposeScreen(
     isStreaming: Boolean = false,
     suggestionText: String = "",
     aiRealtime: Boolean = true,
+    realtimeStatus: RealtimeConnectionStatus = RealtimeConnectionStatus.IDLE,
+    realtimeErrorMessage: String? = null,
     onUndo: () -> Unit = {},
     onRedo: () -> Unit = {},
     onAiComplete: () -> Unit = {},
@@ -230,6 +233,13 @@ fun ReplyDirectComposeScreen(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .padding(bottom = 8.dp)
+                                .then(
+                                    if (it.onActionClick != null && it.actionText == null) {
+                                        Modifier.clickable { it.onActionClick.invoke() }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                         )
                     }
                 }
@@ -309,6 +319,13 @@ fun ReplyDirectComposeScreen(
                 }
             )
 
+            RealtimeStatusLabel(
+                status = realtimeStatus,
+                errorMessage = realtimeErrorMessage,
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
+            )
+
             Spacer(modifier = Modifier.height(120.dp))
         }
     }
@@ -325,18 +342,15 @@ private fun DirectComposeToolbarIconButton(
     content: @Composable () -> Unit
 ) {
     Surface(
+        onClick = onClick,
+        enabled = enabled,
         modifier = modifier.size(40.dp),
         shape = RoundedCornerShape(12.dp),
         color = if (enabled) containerColor else containerColor.copy(alpha = 0.5f),
+        contentColor = contentTint,
         border = border
     ) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            colors = IconButtonDefaults.iconButtonColors(
-                contentColor = contentTint
-            )
-        ) {
+        Box(contentAlignment = Alignment.Center) {
             content()
         }
     }
@@ -390,28 +404,61 @@ private fun DirectComposeActionRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedButton(
-                onClick = onAiComplete,
-                modifier = Modifier.size(width = 96.dp, height = 35.dp),
-                enabled = !isStreaming,
-                contentPadding = PaddingValues(horizontal = 15.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Blue60),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Blue60,
-                    disabledContentColor = Blue60.copy(alpha = 0.4f)
-                )
-            ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+            if (isStreaming) {
                 Text(
-                    "AI 완성",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    text = "AI 플래너가 메일 구조를 설계 중입니다",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue60
+                )
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "AI 중지",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "중지",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFEF4444)
+                        )
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onAiComplete,
+                    enabled = true,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Blue60),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Blue60
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = "AI 완성",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "AI 완성",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
             }
         }
     }
@@ -564,39 +611,34 @@ private fun SubjectControlRow(
             }
 
             if (isStreaming) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "AI 플래너가 메일 구조를 설계 중입니다",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue60
+                )
+                OutlinedButton(
+                    onClick = onStopStreaming,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onStopStreaming,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Stop,
-                            contentDescription = "AI 중지",
-                            tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "중지",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFFEF4444)
-                            )
-                        )
-                    }
-                    Text(
-                        text = "AI 플래너가 메일 구조를 설계 중입니다",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "AI 중지",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(16.dp)
                     )
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = Blue60
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "중지",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFEF4444)
+                        )
                     )
                 }
             } else {
@@ -809,7 +851,8 @@ private fun ReplyDirectComposeScreenPreview() {
             onSend = { _ -> },
             senderEmail = "김대표 <ceo@company.com>",
             date = "Q4 실적 보고서 검토 요청 · 협업미팅 2개",
-            originalBody = "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 우수한 성과라고 판단됩니다."
+            originalBody = "안녕하세요, 대표님.<br><br>Q4 실적 보고서를 검토했습니다.<br><br>전반적으로 매출 증가율이 목표치를 상회하는 우수한 성과라고 판단됩니다.",
+            realtimeStatus = RealtimeConnectionStatus.CONNECTED
         )
     }
 }
@@ -1050,7 +1093,13 @@ private fun extractEmailAddress(formattedEmail: String): String {
 private fun extractName(formattedString: String): String {
     val nameRegex = "(.+?)\\s*<".toRegex() // Matches everything before <
     val matchResult = nameRegex.find(formattedString)
-    return matchResult?.groupValues?.get(1)?.trim() ?: formattedString.substringBefore("<").trim().ifEmpty {
-        formattedString
+    val extracted = matchResult?.groupValues?.get(1)?.trim() ?: formattedString.substringBefore("<").trim()
+
+    // If extracted name is empty, it means we have format like "<email@example.com>"
+    // In that case, extract and return the email address
+    return if (extracted.isEmpty()) {
+        extractEmailAddress(formattedString)
+    } else {
+        extracted
     }
 }

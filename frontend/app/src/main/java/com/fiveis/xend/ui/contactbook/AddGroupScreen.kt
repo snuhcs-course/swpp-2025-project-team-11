@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -54,13 +52,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.ui.theme.BackgroundLight
-import com.fiveis.xend.ui.theme.Blue80
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray400
 import com.fiveis.xend.ui.theme.Purple60
@@ -76,7 +76,7 @@ fun AddGroupScreen(
     onAdd: () -> Unit,
     onGroupNameChange: (String) -> Unit,
     onGroupDescriptionChange: (String) -> Unit,
-    onGroupEmojiChange: (String?) -> Unit = {},
+    onGroupEmojiChange: (String) -> Unit = {},
     onPromptOptionsChange: (PromptingUiState) -> Unit,
     onAddPromptOption: AddPromptOptionHandler = { _, _, _, _, _ -> },
     onUpdatePromptOption: UpdatePromptOptionHandler = { _, _, _, _, _ -> },
@@ -88,7 +88,7 @@ fun AddGroupScreen(
 ) {
     var groupName by rememberSaveable { mutableStateOf("") }
     var groupDescription by rememberSaveable { mutableStateOf("") }
-    var groupEmoji by rememberSaveable { mutableStateOf<String?>(null) }
+    var groupEmoji by rememberSaveable { mutableStateOf("") }
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     // 등록된 연락처 "+N명 더보기" 토글 상태
     var isMembersExpanded by rememberSaveable { mutableStateOf(false) }
@@ -123,18 +123,8 @@ fun AddGroupScreen(
                     ) { Text("저장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
             )
-        },
+        }
 //        bottomBar = { BottomNavBar(selected = "contacts", onSelect = onBottomNavChange) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAdd,
-                containerColor = Blue80,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "그룹 추가")
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -158,7 +148,8 @@ fun AddGroupScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp),
+                                .height(48.dp)
+                                .testTag("groupNameInput"),
                             placeholder = {
                                 Text(
                                     text = "이름을 입력하세요",
@@ -181,13 +172,19 @@ fun AddGroupScreen(
                             onClick = { showEmojiPicker = true },
                             modifier = Modifier.size(48.dp),
                             shape = RoundedCornerShape(12.dp),
-                            color = if (groupEmoji != null) Purple60.copy(alpha = 0.1f) else Color.White,
-                            border = BorderStroke(1.dp, if (groupEmoji != null) Purple60 else BorderGray)
+                            color = if (groupEmoji.isNotEmpty()) {
+                                Purple60.copy(
+                                    alpha = 0.1f
+                                )
+                            } else {
+                                Gray400.copy(alpha = 0.1f)
+                            },
+                            border = BorderStroke(1.dp, if (groupEmoji.isNotEmpty()) Purple60 else BorderGray)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                if (groupEmoji != null) {
+                                if (groupEmoji.isNotEmpty()) {
                                     Text(
-                                        text = groupEmoji!!,
+                                        text = groupEmoji,
                                         fontSize = 24.sp
                                     )
                                 } else {
@@ -322,11 +319,11 @@ fun AddGroupScreen(
     // 이모티콘 선택 다이얼로그
     if (showEmojiPicker) {
         EmojiPickerDialog(
-            currentEmoji = groupEmoji,
+            currentEmoji = groupEmoji.ifEmpty { null },
             onDismiss = { showEmojiPicker = false },
             onEmojiSelected = { emoji ->
-                groupEmoji = emoji
-                onGroupEmojiChange(emoji)
+                groupEmoji = emoji ?: ""
+                onGroupEmojiChange(groupEmoji)
                 showEmojiPicker = false
             }
         )
@@ -438,6 +435,7 @@ fun ContactSelectDialog(
     onDismiss: () -> Unit,
     onConfirm: (List<Contact>) -> Unit
 ) {
+    val sortedContacts = remember(contacts) { contacts.sortedBy { it.name } }
     // ID만 저장해서 Set 비교 문제 해결
     var tempSelectedIds by remember { mutableStateOf(selectedContacts.map { it.id }.toSet()) }
 
@@ -491,7 +489,7 @@ fun ContactSelectDialog(
                             .fillMaxWidth()
                             .height(300.dp)
                     ) {
-                        itemsIndexed(contacts) { _, contact ->
+                        itemsIndexed(sortedContacts) { _, contact ->
                             val isSelected = tempSelectedIds.contains(contact.id)
                             Surface(
                                 modifier = Modifier
@@ -506,7 +504,7 @@ fun ContactSelectDialog(
                                 color = if (isSelected) {
                                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                                 } else {
-                                    Color.Transparent
+                                    Color.White
                                 },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -843,9 +841,9 @@ fun EmojiPickerDialog(currentEmoji: String?, onDismiss: () -> Unit, onEmojiSelec
         "🔲"
     )
 
-    androidx.compose.ui.window.Dialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(
+        properties = DialogProperties(
             usePlatformDefaultWidth = false
         )
     ) {
@@ -867,7 +865,7 @@ fun EmojiPickerDialog(currentEmoji: String?, onDismiss: () -> Unit, onEmojiSelec
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "이모티콘 선택",
+                        "심볼 이모지 선택",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )

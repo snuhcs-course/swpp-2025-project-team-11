@@ -329,4 +329,490 @@ class ReplyComposeViewModelTest {
         assertFalse(viewModel.uiState.value.isStreaming)
         assertFalse(viewModel.uiState.value.isLoading)
     }
+
+    @Test
+    fun multipleOptionsAreHandledCorrectly() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        val options = listOf(
+            ReplyOptionInfo(1, "formal", "Formal Reply"),
+            ReplyOptionInfo(2, "casual", "Casual Reply"),
+            ReplyOptionInfo(3, "professional", "Professional Reply")
+        )
+        onOptionsSlot.captured.invoke(options)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(3, viewModel.uiState.value.options.size)
+        assertEquals("Formal Reply", viewModel.uiState.value.options[0].title)
+        assertEquals("Casual Reply", viewModel.uiState.value.options[1].title)
+        assertEquals("Professional Reply", viewModel.uiState.value.options[2].title)
+    }
+
+    @Test
+    fun emptyOptionsListHandledCorrectly() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(emptyList())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.options.isEmpty())
+    }
+
+    @Test
+    fun deltasForDifferentOptionsHandledSeparately() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(
+            listOf(
+                ReplyOptionInfo(1, "formal", "Formal"),
+                ReplyOptionInfo(2, "casual", "Casual")
+            )
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        onOptionDeltaSlot.captured.invoke(1, 0, "Hello ")
+        onOptionDeltaSlot.captured.invoke(2, 0, "Hi ")
+        onOptionDeltaSlot.captured.invoke(1, 1, "Sir")
+        onOptionDeltaSlot.captured.invoke(2, 1, "there")
+
+        val state = viewModel.uiState.value
+        assertEquals("Hello Sir", state.options[0].body)
+        assertEquals("Hi there", state.options[1].body)
+    }
+
+    @Test
+    fun rapidDeltaUpdatesAreHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        for (i in 0 until 100) {
+            onOptionDeltaSlot.captured.invoke(1, i, "A")
+        }
+
+        val state = viewModel.uiState.value
+        assertEquals("A".repeat(100), state.options[0].body)
+    }
+
+    @Test
+    fun stopStreamingWhenViewModelDestroyed() {
+        every { api.stop() } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+        viewModel.stopStreaming()
+
+        verify { api.stop() }
+    }
+
+    @Test
+    fun largeTextDeltaIsHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val largeText = "Lorem ipsum ".repeat(1000)
+        onOptionDeltaSlot.captured.invoke(1, 0, largeText)
+
+        assertEquals(largeText, viewModel.uiState.value.options[0].body)
+    }
+
+    @Test
+    fun unicodeTextInDeltaIsHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        onOptionDeltaSlot.captured.invoke(1, 0, "안녕하세요 ")
+        onOptionDeltaSlot.captured.invoke(1, 1, "😀 ")
+        onOptionDeltaSlot.captured.invoke(1, 2, "こんにちは")
+
+        assertEquals("안녕하세요 😀 こんにちは", viewModel.uiState.value.options[0].body)
+    }
+
+    @Test
+    fun specialCharactersInDeltaAreHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        onOptionDeltaSlot.captured.invoke(1, 0, "<html>&nbsp;</html>")
+
+        assertEquals("<html>&nbsp;</html>", viewModel.uiState.value.options[0].body)
+    }
+
+    @Test
+    fun emptyStringDeltaIsHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        onOptionDeltaSlot.captured.invoke(1, 0, "")
+
+        assertEquals("", viewModel.uiState.value.options[0].body)
+    }
+
+    @Test
+    fun newlineCharactersInDeltaAreHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDeltaSlot = slot<(Int, Int, String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = capture(onOptionDeltaSlot),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        onOptionDeltaSlot.captured.invoke(1, 0, "Line1\nLine2\nLine3")
+
+        assertEquals("Line1\nLine2\nLine3", viewModel.uiState.value.options[0].body)
+    }
+
+    @Test
+    fun optionWithZeroTotalSeqIsHandled() = runTest {
+        val onOptionsSlot = slot<(List<ReplyOptionInfo>) -> Unit>()
+        val onOptionDoneSlot = slot<(Int, Int) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = capture(onOptionsSlot),
+                onOptionDelta = any(),
+                onOptionDone = capture(onOptionDoneSlot),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onOptionsSlot.captured.invoke(listOf(ReplyOptionInfo(1, "formal", "Formal")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        onOptionDoneSlot.captured.invoke(1, 0)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.options[0].isComplete)
+        assertEquals(0, viewModel.uiState.value.options[0].totalSeq)
+    }
+
+    @Test
+    fun errorMessageWithSpecialCharactersIsHandled() = runTest {
+        val onErrorSlot = slot<(String) -> Unit>()
+
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = capture(onErrorSlot)
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "test@example.com")
+
+        onErrorSlot.captured.invoke("Error: <network> failure & timeout")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Error: <network> failure & timeout", viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun multipleStartCallsResetState() {
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject1", "Body1", "test1@example.com")
+        viewModel.startReplyOptions("Subject2", "Body2", "test2@example.com")
+
+        assertTrue(viewModel.uiState.value.isLoading)
+        assertTrue(viewModel.uiState.value.isStreaming)
+    }
+
+    @Test
+    fun longSubjectIsHandled() {
+        val longSubject = "Subject ".repeat(1000)
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions(longSubject, "Body", "test@example.com")
+
+        verify {
+            api.start(
+                subject = longSubject,
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        }
+    }
+
+    @Test
+    fun longBodyIsHandled() {
+        val longBody = "Body content ".repeat(1000)
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", longBody, "test@example.com")
+
+        verify {
+            api.start(
+                subject = any(),
+                body = longBody,
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        }
+    }
+
+    @Test
+    fun emailWithSpecialCharactersIsHandled() {
+        every {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = any(),
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        } just runs
+
+        viewModel.startReplyOptions("Subject", "Body", "user+tag@example.com")
+
+        verify {
+            api.start(
+                subject = any(),
+                body = any(),
+                toEmail = "user+tag@example.com",
+                onReady = any(),
+                onOptions = any(),
+                onOptionDelta = any(),
+                onOptionDone = any(),
+                onOptionError = any(),
+                onDone = any(),
+                onError = any()
+            )
+        }
+    }
 }

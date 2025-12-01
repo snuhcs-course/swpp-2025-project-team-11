@@ -46,6 +46,11 @@ class AddGroupActivity : ComponentActivity() {
                 )
                 val addUiState by addViewModel.uiState.collectAsState()
 
+                // 이전 성공 상태 초기화 (ViewModel이 재사용될 경우 대비)
+                LaunchedEffect(Unit) {
+                    addViewModel.dismissSuccessBanner()
+                }
+
                 val bookViewModel: ContactBookViewModel = viewModel(
                     factory = ContactBookViewModel.Factory(application)
                 )
@@ -59,7 +64,7 @@ class AddGroupActivity : ComponentActivity() {
                 // AddGroupScreen 입력값들 보관
                 var name by rememberSaveable { mutableStateOf("") }
                 var description by rememberSaveable { mutableStateOf("") }
-                var emoji by rememberSaveable { mutableStateOf<String?>(null) }
+                var emoji by rememberSaveable { mutableStateOf("") }
                 var options by rememberSaveable { mutableStateOf(emptyList<PromptOption>()) }
                 var members by remember { mutableStateOf(emptyList<com.fiveis.xend.data.model.Contact>()) }
                 var showContactSelectDialog by remember { mutableStateOf(false) }
@@ -175,7 +180,7 @@ class AddGroupActivity : ComponentActivity() {
                 }
 
                 // 결과 피드백
-                LaunchedEffect(addUiState.error, addUiState.lastSuccessMsg) {
+                LaunchedEffect(addUiState.error, addUiState.showSuccessBanner) {
                     addUiState.error?.let {
                         Toast.makeText(
                             this@AddGroupActivity,
@@ -183,12 +188,8 @@ class AddGroupActivity : ComponentActivity() {
                             Toast.LENGTH_LONG
                         ).show()
                     }
-                    addUiState.lastSuccessMsg?.let {
-                        Toast.makeText(
-                            this@AddGroupActivity,
-                            it,
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    if (addUiState.showSuccessBanner) {
+                        // 성공 시 바로 종료
                         setResult(RESULT_OK)
                         finish()
                         overridePendingTransition(

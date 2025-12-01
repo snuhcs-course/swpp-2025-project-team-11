@@ -42,7 +42,7 @@ class ReplyComposeViewModel(
     /**
      * 답장 옵션 추천 시작
      */
-    fun startReplyOptions(subject: String, body: String, toEmail: String) {
+    fun startReplyOptions(subject: String, body: String, toEmail: String, messageId: String? = null) {
         Log.d("ReplyComposeVM", "startReplyOptions 호출")
         _uiState.value = ReplyComposeUiState(isLoading = true, isStreaming = true)
 
@@ -50,6 +50,7 @@ class ReplyComposeViewModel(
             subject = subject,
             body = body,
             toEmail = toEmail,
+            messageId = messageId,
             onReady = {
                 Log.d("ReplyComposeVM", "onReady 호출")
                 viewModelScope.launch(Dispatchers.Main) {

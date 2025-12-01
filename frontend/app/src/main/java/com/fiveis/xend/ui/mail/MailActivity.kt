@@ -49,6 +49,8 @@ class MailActivity : ComponentActivity() {
         ) { result ->
             if (result.resultCode == MailComposeActivity.RESULT_DRAFT_SAVED) {
                 inboxViewModel.showDraftSavedBanner()
+            } else if (result.resultCode == MailComposeActivity.RESULT_MAIL_SENT) {
+                inboxViewModel.showMailSentBanner()
             }
         }
 
@@ -99,7 +101,10 @@ class MailActivity : ComponentActivity() {
                     onBottomNavChange = {
                         when (it) {
                             "contacts" -> {
-                                startActivity(Intent(this, ContactBookActivity::class.java))
+                                val intent = Intent(this, ContactBookActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                                }
+                                startActivity(intent)
                                 overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
                             }
                         }
@@ -108,7 +113,10 @@ class MailActivity : ComponentActivity() {
                         inboxViewModel.dismissSuccessBanner()
                     },
                     showDraftSavedBanner = inboxViewModel.uiState.value.showDraftSavedBanner,
-                    onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner
+                    onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner,
+                    showMailSentBanner = inboxUiState.showMailSentBanner,
+                    onDismissMailSentBanner = inboxViewModel::dismissMailSentBanner,
+                    onInboxDeleteEmail = inboxViewModel::deleteEmail
                 )
 
                 if (inboxUiState.showAddContactDialog) {
@@ -118,14 +126,15 @@ class MailActivity : ComponentActivity() {
                             senderEmail = EmailUtils.extractEmailAddress(email.fromEmail),
                             groups = inboxUiState.groups,
                             onDismiss = { inboxViewModel.dismissAddContactDialog() },
-                            onConfirm = { name, emailAddr, senderRole, recipientRole, personalPrompt, groupId ->
+                            onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                                 inboxViewModel.addContact(
                                     name = name,
-                                    email = emailAddr,
+                                    email = email,
                                     senderRole = senderRole,
                                     recipientRole = recipientRole,
                                     personalPrompt = personalPrompt,
-                                    groupId = groupId
+                                    groupId = groupId,
+                                    languagePreference = language
                                 )
                             }
                         )
@@ -144,7 +153,8 @@ class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Fa
             val database = AppDatabase.getDatabase(context)
             val repository = InboxRepository(mailApiService, database.emailDao())
             val contactRepository = ContactBookRepository(context)
-            return InboxViewModel(repository, contactRepository) as T
+            val prefs = context.getSharedPreferences("xend_pagination", Context.MODE_PRIVATE)
+            return InboxViewModel(repository, contactRepository, prefs) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -157,7 +167,8 @@ class SentViewModelFactory(private val context: Context) : ViewModelProvider.Fac
             val mailApiService = RetrofitClient.getMailApiService(context)
             val database = AppDatabase.getDatabase(context)
             val repository = SentRepository(mailApiService, database.emailDao())
-            return SentViewModel(repository) as T
+            val prefs = context.getSharedPreferences("xend_pagination", Context.MODE_PRIVATE)
+            return SentViewModel(repository, prefs) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -70,4 +70,11 @@ class RetrofitClientTest {
         assertNotNull(wsClient)
         assertNotNull(regularClient)
     }
+
+    @Test
+    fun `getClient should use custom DNS`() {
+        val client = RetrofitClient.getClient(mockContext)
+        assertNotNull(client)
+        assertNotNull(client.dns)
+    }
 }

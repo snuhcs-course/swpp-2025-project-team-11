@@ -83,7 +83,7 @@ class AddGroupViewModelTest {
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("", "Description", emptyList())
+        viewModel.addGroup("", "Description", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
@@ -97,24 +97,25 @@ class AddGroupViewModelTest {
         val mockResponse = GroupResponse(
             id = 1L,
             name = "VIP",
-            description = "Important people"
+            description = "Important people",
+            emoji = null
         )
 
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.getAllPromptOptions() } returns Pair(toneOptions, emptyList())
         coEvery {
-            repository.addGroup("VIP", "Important people", toneOptions)
+            repository.addGroup("VIP", "Important people", "", toneOptions)
         } returns mockResponse
 
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("VIP", "Important people", toneOptions)
+        viewModel.addGroup("VIP", "Important people", "", toneOptions)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -125,13 +126,13 @@ class AddGroupViewModelTest {
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.getAllPromptOptions() } returns Pair(toneOptions, emptyList())
         coEvery {
-            repository.addGroup(any(), any(), any())
+            repository.addGroup(any(), any(), any(), any())
         } throws Exception("Network error")
 
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("VIP", "Description", toneOptions)
+        viewModel.addGroup("VIP", "Description", "", toneOptions)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
@@ -224,7 +225,7 @@ class AddGroupViewModelTest {
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.refreshPromptOptions() } returns Unit
         coEvery {
-            repository.addGroup("VIP", "Important people", toneOptions)
+            repository.addGroup("VIP", "Important people", "", toneOptions)
         } returns mockResponse
         coEvery {
             repository.updateContactGroup(any(), any())
@@ -233,12 +234,12 @@ class AddGroupViewModelTest {
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("VIP", "Important people", toneOptions, members)
+        viewModel.addGroup("VIP", "Important people", "", toneOptions, members)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("멤버 2명") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
         coVerify(exactly = 2) { repository.updateContactGroup(any(), 1L) }
     }
 
@@ -251,7 +252,7 @@ class AddGroupViewModelTest {
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("   ", "Description", emptyList())
+        viewModel.addGroup("   ", "Description", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
@@ -321,7 +322,7 @@ class AddGroupViewModelTest {
     @Test
     fun add_group_member_update_failure_sets_error() = runTest {
         val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
-        val mockResponse = GroupResponse(id = 1L, name = "VIP", description = "Important people")
+        val mockResponse = GroupResponse(id = 1L, name = "VIP", description = "Important people", emoji = null)
         val members = listOf(
             com.fiveis.xend.data.model.Contact(id = 1L, name = "Member1", email = "member1@test.com")
         )
@@ -329,7 +330,7 @@ class AddGroupViewModelTest {
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.refreshPromptOptions() } returns Unit
         coEvery {
-            repository.addGroup("VIP", "Important people", toneOptions)
+            repository.addGroup("VIP", "Important people", "", toneOptions)
         } returns mockResponse
         coEvery {
             repository.updateContactGroup(1L, 1L)
@@ -338,7 +339,7 @@ class AddGroupViewModelTest {
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("VIP", "Important people", toneOptions, members)
+        viewModel.addGroup("VIP", "Important people", "", toneOptions, members)
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
@@ -349,22 +350,22 @@ class AddGroupViewModelTest {
     @Test
     fun add_group_with_special_characters_in_name_succeeds() = runTest {
         val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
-        val mockResponse = GroupResponse(id = 1L, name = "Group!@#$%", description = "Description")
+        val mockResponse = GroupResponse(id = 1L, name = "Group!@#$%", description = "Description", emoji = null)
 
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.refreshPromptOptions() } returns Unit
         coEvery {
-            repository.addGroup("Group!@#$%", "Description", emptyList())
+            repository.addGroup("Group!@#$%", "Description", "", emptyList())
         } returns mockResponse
 
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("Group!@#$%", "Description", emptyList())
+        viewModel.addGroup("Group!@#$%", "Description", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
@@ -372,79 +373,216 @@ class AddGroupViewModelTest {
     fun add_group_with_long_description_succeeds() = runTest {
         val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
         val longDescription = "Very long description ".repeat(50)
-        val mockResponse = GroupResponse(id = 1L, name = "Test Group", description = longDescription)
+        val mockResponse = GroupResponse(id = 1L, name = "Test Group", description = longDescription, emoji = null)
 
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.refreshPromptOptions() } returns Unit
         coEvery {
-            repository.addGroup("Test Group", longDescription, emptyList())
+            repository.addGroup("Test Group", longDescription, "", emptyList())
         } returns mockResponse
 
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("Test Group", longDescription, emptyList())
+        viewModel.addGroup("Test Group", longDescription, "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
     @Test
     fun add_group_with_empty_description_succeeds() = runTest {
         val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
-        val mockResponse = GroupResponse(id = 1L, name = "Test Group", description = "")
+        val mockResponse = GroupResponse(id = 1L, name = "Test Group", description = "", emoji = null)
 
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.refreshPromptOptions() } returns Unit
         coEvery {
-            repository.addGroup("Test Group", "", emptyList())
+            repository.addGroup("Test Group", "", "", emptyList())
         } returns mockResponse
 
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
-        viewModel.addGroup("Test Group", "", emptyList())
+        viewModel.addGroup("Test Group", "", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
+        assertNotNull(viewModel.uiState.value.successMessage)
         assertEquals(null, viewModel.uiState.value.error)
     }
 
     @Test
     fun add_group_multiple_times_updates_state_correctly() = runTest {
         val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
-        val mockResponse1 = GroupResponse(id = 1L, name = "Group1", description = "Desc1")
-        val mockResponse2 = GroupResponse(id = 2L, name = "Group2", description = "Desc2")
+        val mockResponse1 = GroupResponse(id = 1L, name = "Group1", description = "Desc1", emoji = null)
+        val mockResponse2 = GroupResponse(id = 2L, name = "Group2", description = "Desc2", emoji = null)
 
         every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
         coEvery { repository.refreshPromptOptions() } returns Unit
         coEvery {
-            repository.addGroup("Group1", "Desc1", emptyList())
+            repository.addGroup("Group1", "Desc1", "", emptyList())
         } returns mockResponse1
         coEvery {
-            repository.addGroup("Group2", "Desc2", emptyList())
+            repository.addGroup("Group2", "Desc2", "", emptyList())
         } returns mockResponse2
 
         viewModel = AddGroupViewModel(application, repository)
         advanceUntilIdle()
 
         // First add
-        viewModel.addGroup("Group1", "Desc1", emptyList())
+        viewModel.addGroup("Group1", "Desc1", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("1") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
 
         // Second add
-        viewModel.addGroup("Group2", "Desc2", emptyList())
+        viewModel.addGroup("Group2", "Desc2", "", emptyList())
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isSubmitting)
-        assertNotNull(viewModel.uiState.value.lastSuccessMsg)
-        assertTrue(viewModel.uiState.value.lastSuccessMsg?.contains("2") == true)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertTrue(viewModel.uiState.value.successMessage == "그룹이 추가되었습니다")
+    }
+
+    @Test
+    fun update_prompt_option_success_calls_callback() = runTest {
+        val initialOption = PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal")
+        val updatedOption = PromptOption(id = 1L, key = "tone", name = "Very Formal", prompt = "Be very formal")
+
+        every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(listOf(initialOption))
+        coEvery { repository.refreshPromptOptions() } returns Unit
+        coEvery { repository.updatePromptOption(1L, "Very Formal", "Be very formal") } returns updatedOption
+
+        viewModel = AddGroupViewModel(application, repository)
+        advanceUntilIdle()
+
+        var successCalled = false
+        var errorCalled = false
+        viewModel.updatePromptOption(
+            1L,
+            "Very Formal",
+            "Be very formal",
+            onSuccess = { successCalled = true },
+            onError = { errorCalled = true }
+        )
+        advanceUntilIdle()
+
+        assertTrue(successCalled)
+        assertFalse(errorCalled)
+        coVerify { repository.updatePromptOption(1L, "Very Formal", "Be very formal") }
+    }
+
+    @Test
+    fun update_prompt_option_failure_calls_error_callback() = runTest {
+        every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshPromptOptions() } returns Unit
+        coEvery { repository.updatePromptOption(any(), any(), any()) } throws Exception("Update failed")
+
+        viewModel = AddGroupViewModel(application, repository)
+        advanceUntilIdle()
+
+        var successCalled = false
+        var errorMessage = ""
+        viewModel.updatePromptOption(
+            1L,
+            "Test",
+            "Test prompt",
+            onSuccess = { successCalled = true },
+            onError = { errorMessage = it }
+        )
+        advanceUntilIdle()
+
+        assertFalse(successCalled)
+        assertTrue(errorMessage.isNotEmpty())
+        assertNotNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun delete_prompt_option_success_calls_callback() = runTest {
+        every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshPromptOptions() } returns Unit
+        coEvery { repository.deletePromptOption(1L) } returns Unit
+
+        viewModel = AddGroupViewModel(application, repository)
+        advanceUntilIdle()
+
+        var successCalled = false
+        var errorCalled = false
+        viewModel.deletePromptOption(
+            1L,
+            onSuccess = { successCalled = true },
+            onError = { errorCalled = true }
+        )
+        advanceUntilIdle()
+
+        assertTrue(successCalled)
+        assertFalse(errorCalled)
+        coVerify { repository.deletePromptOption(1L) }
+    }
+
+    @Test
+    fun delete_prompt_option_failure_calls_error_callback() = runTest {
+        every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(emptyList())
+        coEvery { repository.refreshPromptOptions() } returns Unit
+        coEvery { repository.deletePromptOption(any()) } throws Exception("Delete failed")
+
+        viewModel = AddGroupViewModel(application, repository)
+        advanceUntilIdle()
+
+        var successCalled = false
+        var errorMessage = ""
+        viewModel.deletePromptOption(
+            1L,
+            onSuccess = { successCalled = true },
+            onError = { errorMessage = it }
+        )
+        advanceUntilIdle()
+
+        assertFalse(successCalled)
+        assertTrue(errorMessage.isNotEmpty())
+        assertNotNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun factory_creates_view_model_successfully() {
+        val factory = AddGroupViewModel.Factory(application)
+        val createdViewModel = factory.create(AddGroupViewModel::class.java)
+
+        assertNotNull(createdViewModel)
+        assertTrue(createdViewModel is AddGroupViewModel)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun factory_throws_exception_for_wrong_class() {
+        val factory = AddGroupViewModel.Factory(application)
+        factory.create(ContactBookViewModel::class.java)
+    }
+
+    @Test
+    fun add_group_with_emoji_succeeds() = runTest {
+        val toneOptions = listOf(PromptOption(id = 1L, key = "tone", name = "Formal", prompt = "Be formal"))
+        val mockResponse = GroupResponse(id = 1L, name = "VIP", description = "Important", emoji = "🔥")
+
+        every { repository.observePromptOptions() } returns kotlinx.coroutines.flow.flowOf(toneOptions)
+        coEvery { repository.refreshPromptOptions() } returns Unit
+        coEvery {
+            repository.addGroup("VIP", "Important", "🔥", emptyList())
+        } returns mockResponse
+
+        viewModel = AddGroupViewModel(application, repository)
+        advanceUntilIdle()
+
+        viewModel.addGroup("VIP", "Important", "🔥", emptyList())
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isSubmitting)
+        assertNotNull(viewModel.uiState.value.successMessage)
+        assertEquals(null, viewModel.uiState.value.error)
+        coVerify { repository.addGroup("VIP", "Important", "🔥", emptyList()) }
     }
 }

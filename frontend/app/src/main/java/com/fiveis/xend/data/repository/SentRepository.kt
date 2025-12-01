@@ -7,8 +7,11 @@ import com.fiveis.xend.data.model.AttachmentAnalysisResponse
 import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.model.MailListResponse
+import com.fiveis.xend.data.model.ReadStatusUpdateRequest
 import com.fiveis.xend.network.MailApiService
+import com.fiveis.xend.utils.EmailUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import okhttp3.ResponseBody
 import retrofit2.Response
 
@@ -16,8 +19,43 @@ class SentRepository(
     private val mailApiService: MailApiService,
     private val emailDao: EmailDao
 ) {
+    /**
+     * Add dateTimestamp to emails for proper chronological sorting
+     */
+    private fun List<EmailItem>.withParsedTimestamps(): List<EmailItem> {
+        return map { email ->
+            val timestamp = EmailUtils.parseDateToTimestamp(email.dateRaw)
+            val displayDate = EmailUtils.formatDisplayDate(timestamp, email.date)
+            val displaySenderName = EmailUtils.extractSenderName(email.fromEmail)
+            email.copy(
+                dateTimestamp = timestamp,
+                displayDate = displayDate,
+                displaySenderName = displaySenderName
+            )
+        }
+    }
+
+    private fun EmailItem.ensureDisplayFields(): EmailItem {
+        val needsDate = displayDate.isBlank()
+        val needsName = displaySenderName.isBlank()
+        if (!needsDate && !needsName) return this
+        val resolvedDate = if (needsDate) {
+            EmailUtils.formatDisplayDate(dateTimestamp, date)
+        } else {
+            displayDate
+        }
+        val resolvedName = if (needsName) {
+            EmailUtils.extractSenderName(fromEmail)
+        } else {
+            displaySenderName
+        }
+        return copy(displayDate = resolvedDate, displaySenderName = resolvedName)
+    }
+
     fun getCachedEmails(): Flow<List<EmailItem>> {
-        return emailDao.getEmailsByLabel("SENT").also {
+        return emailDao.getEmailsByLabel("SENT").map { emails ->
+            emails.map { it.ensureDisplayFields() }
+        }.also {
             Log.d("SentRepository", "getCachedEmails Flow created for SENT")
         }
     }
@@ -57,7 +95,7 @@ class SentRepository(
                         return Result.success(null)
                     }
 
-                    emailDao.insertEmails(messages)
+                    emailDao.insertEmails(messages.withParsedTimestamps())
                     val count = emailDao.getEmailCount()
                     Log.d("SentRepository", "Successfully inserted ${messages.size} emails into DB")
                     Log.d("SentRepository", "Total emails in DB: $count")
@@ -94,11 +132,11 @@ class SentRepository(
                 Log.d("SentRepository", "Received ${newEmails.size} new emails (total: $totalFetched)")
 
                 if (newEmails.isNotEmpty()) {
-                    emailDao.insertEmails(newEmails)
+                    emailDao.insertEmails(newEmails.withParsedTimestamps())
                 }
 
                 val previousToken = pageToken
-                val nextToken = mailListResponse.nextPageToken?.takeIf { it.isNotBlank() }
+                val nextToken = mailListResponse.nextPageToken
                 if (nextToken != null && nextToken == previousToken) {
                     Log.d("SentRepository", "Received identical nextPageToken; stopping pagination to avoid loop")
                     break
@@ -148,12 +186,31 @@ class SentRepository(
     }
 
     suspend fun updateReadStatus(emailId: String, isUnread: Boolean) {
-        emailDao.updateReadStatus(emailId, isUnread)
+        try {
+            val response = mailApiService.updateReadStatus(
+                messageId = emailId,
+                request = ReadStatusUpdateRequest(isRead = !isUnread)
+            )
+
+            if (!response.isSuccessful) {
+                val errorBody = response.errorBody()?.string()
+                Log.e(
+                    "SentRepository",
+                    "Failed to sync read status (code=${response.code()} body=$errorBody)"
+                )
+                throw Exception("Failed to update read status: ${response.code()}")
+            }
+
+            emailDao.updateReadStatus(emailId, isUnread)
+        } catch (e: Exception) {
+            Log.e("SentRepository", "Error updating read status for $emailId", e)
+            throw e
+        }
     }
 
     suspend fun saveEmailsToCache(emails: List<EmailItem>) {
         Log.d("SentRepository", "saveEmailsToCache: saving ${emails.size} emails")
-        emailDao.insertEmails(emails)
+        emailDao.insertEmails(emails.withParsedTimestamps())
         val count = emailDao.getEmailCount()
         Log.d("SentRepository", "saveEmailsToCache: total emails in DB = $count")
     }

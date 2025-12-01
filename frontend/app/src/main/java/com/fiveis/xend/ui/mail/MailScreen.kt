@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,14 +44,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +66,7 @@ import com.fiveis.xend.ui.inbox.InboxUiState
 import com.fiveis.xend.ui.sent.SentUiState
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
+import kotlin.math.absoluteValue
 
 enum class MailTab {
     INBOX,
@@ -84,12 +90,33 @@ fun MailScreen(
     onDismissSuccessBanner: () -> Unit = {},
     showDraftSavedBanner: Boolean,
     onDismissDraftSavedBanner: () -> Unit,
+    showMailSentBanner: Boolean = false,
+    onDismissMailSentBanner: () -> Unit = {},
+    onInboxDeleteEmail: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableStateOf(MailTab.INBOX) }
+    var selectedTab by rememberSaveable { mutableStateOf(MailTab.INBOX) }
     var showBottomBar by remember { mutableStateOf(true) }
-    var previousIndex by remember { mutableStateOf(0) }
-    var previousScrollOffset by remember { mutableStateOf(0) }
+    val previousIndex = remember { mutableIntStateOf(0) }
+    val previousScrollOffset = remember { mutableIntStateOf(0) }
+    val scrollDeltaAccumulator = remember { mutableFloatStateOf(0f) }
+    val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
+
+    // 각 탭의 스크롤 위치 저장 (Activity 재시작 시에도 복원)
+    val inboxScrollIndex = rememberSaveable { mutableStateOf(0) }
+    val inboxScrollOffset = rememberSaveable { mutableStateOf(0) }
+    val sentScrollIndex = rememberSaveable { mutableStateOf(0) }
+    val sentScrollOffset = rememberSaveable { mutableStateOf(0) }
+
+    // 각 탭의 스크롤 상태를 독립적으로 유지
+    val inboxListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = inboxScrollIndex.value,
+        initialFirstVisibleItemScrollOffset = inboxScrollOffset.value
+    )
+    val sentListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = sentScrollIndex.value,
+        initialFirstVisibleItemScrollOffset = sentScrollOffset.value
+    )
 
     Scaffold(
         bottomBar = {
@@ -203,6 +230,33 @@ fun MailScreen(
                     }
                 }
 
+                // Mail Sent Banner
+                AnimatedVisibility(
+                    visible = showMailSentBanner,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Banner(
+                            message = "메일이 전송되었습니다",
+                            type = BannerType.SUCCESS,
+                            onDismiss = onDismissMailSentBanner,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+
                 when (selectedTab) {
                     MailTab.INBOX -> com.fiveis.xend.ui.inbox.EmailListContent(
                         emails = inboxUiState.emails,
@@ -214,24 +268,38 @@ fun MailScreen(
                         isLoadingMore = inboxUiState.isLoading,
                         error = inboxUiState.error,
                         onScrollChange = { currentIndex, currentOffset ->
+                            inboxScrollIndex.value = currentIndex
+                            inboxScrollOffset.value = currentOffset
                             if (currentIndex == 0 && currentOffset == 0) {
                                 showBottomBar = true
+                                scrollDeltaAccumulator.floatValue = 0f
                             } else {
-                                val isScrollingDown = if (currentIndex != previousIndex) {
-                                    currentIndex > previousIndex
+                                val offsetDelta = (currentOffset - previousScrollOffset.intValue)
+                                    .absoluteValue.toFloat()
+                                scrollDeltaAccumulator.floatValue += offsetDelta
+                                val isScrollingDown = if (currentIndex != previousIndex.intValue) {
+                                    currentIndex > previousIndex.intValue
                                 } else {
-                                    currentOffset > previousScrollOffset
+                                    currentOffset > previousScrollOffset.intValue
                                 }
-                                showBottomBar = !isScrollingDown
+
+                                if (scrollDeltaAccumulator.floatValue > scrollThresholdPx) {
+                                    showBottomBar = !isScrollingDown
+                                    scrollDeltaAccumulator.floatValue = 0f
+                                }
                             }
-                            previousIndex = currentIndex
-                            previousScrollOffset = currentOffset
+                            previousIndex.intValue = currentIndex
+                            previousScrollOffset.intValue = currentOffset
                         },
                         onScrollStopped = {
                             showBottomBar = true
+                            scrollDeltaAccumulator.floatValue = 0f
                         },
                         contactEmails = inboxUiState.contactEmails,
-                        contactsByEmail = inboxUiState.contactsByEmail
+                        contactsByEmail = inboxUiState.contactsByEmail,
+                        listState = inboxListState,
+                        onDeleteEmail = onInboxDeleteEmail,
+                        deletingEmailId = inboxUiState.deletingEmailId
                     )
                     MailTab.SENT -> com.fiveis.xend.ui.sent.EmailListContent(
                         emails = sentUiState.emails,
@@ -242,22 +310,34 @@ fun MailScreen(
                         isLoadingMore = sentUiState.isLoading,
                         error = sentUiState.error,
                         onScrollChange = { currentIndex, currentOffset ->
+                            sentScrollIndex.value = currentIndex
+                            sentScrollOffset.value = currentOffset
                             if (currentIndex == 0 && currentOffset == 0) {
                                 showBottomBar = true
+                                scrollDeltaAccumulator.floatValue = 0f
                             } else {
-                                val isScrollingDown = if (currentIndex != previousIndex) {
-                                    currentIndex > previousIndex
+                                val offsetDelta = (currentOffset - previousScrollOffset.intValue)
+                                    .absoluteValue.toFloat()
+                                scrollDeltaAccumulator.floatValue += offsetDelta
+                                val isScrollingDown = if (currentIndex != previousIndex.intValue) {
+                                    currentIndex > previousIndex.intValue
                                 } else {
-                                    currentOffset > previousScrollOffset
+                                    currentOffset > previousScrollOffset.intValue
                                 }
-                                showBottomBar = !isScrollingDown
+                                if (scrollDeltaAccumulator.floatValue > scrollThresholdPx) {
+                                    showBottomBar = !isScrollingDown
+                                    scrollDeltaAccumulator.floatValue = 0f
+                                }
                             }
-                            previousIndex = currentIndex
-                            previousScrollOffset = currentOffset
+                            previousIndex.intValue = currentIndex
+                            previousScrollOffset.intValue = currentOffset
                         },
                         onScrollStopped = {
                             showBottomBar = true
-                        }
+                            scrollDeltaAccumulator.floatValue = 0f
+                        },
+                        contactsByEmail = inboxUiState.contactsByEmail,
+                        listState = sentListState
                     )
                 }
             }

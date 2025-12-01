@@ -116,8 +116,8 @@ fun AIEnhancedRichTextEditor(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
+            .padding(horizontal = 20.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, ComposeOutline),
         color = ComposeSurface
     ) {

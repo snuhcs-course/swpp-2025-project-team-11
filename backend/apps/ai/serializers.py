@@ -13,12 +13,18 @@ class MailGenerateRequest(serializers.Serializer):
         allow_empty=False,
         required=True,
     )
+    attachment_content_keys = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+    )
 
 
 class ReplyGenerateRequest(serializers.Serializer):
     subject = serializers.CharField(allow_blank=True, required=True)
     body = serializers.CharField(allow_blank=True, required=True)
     to_email = serializers.EmailField(required=True, allow_blank=False)
+    message_id = serializers.CharField(required=False, allow_blank=True)
 
 
 class PromptPreviewRequestSerializer(serializers.Serializer):
@@ -53,3 +59,29 @@ class AttachmentAnalysisResponseSerializer(serializers.Serializer):
     summary = serializers.CharField(help_text="첨부파일 요약")
     insights = serializers.CharField(help_text="핵심 인사이트")
     mail_guide = serializers.CharField(help_text="이메일 작성 가이드")
+    content_key = serializers.CharField(required=False, allow_null=True)
+
+
+class _MailGenResultSerializer(serializers.Serializer):
+    subject = serializers.CharField(help_text="생성된 이메일 제목")
+    body = serializers.CharField(help_text="생성된 이메일 본문")
+
+
+class MailGenerateAnalysisResponseSerializer(serializers.Serializer):
+    analysis = serializers.JSONField(
+        allow_null=True,
+        help_text="collect_prompt_context에서 생성된 분석 결과 (없으면 null)",
+    )
+    fewshots = serializers.JSONField(
+        allow_null=True,
+        help_text="collect_prompt_context에서 수집한 few-shot 예시들 (없으면 null)",
+    )
+    without_analysis = _MailGenResultSerializer(
+        help_text="analysis / fewshots 둘 다 사용하지 않고 생성한 베이스라인 결과",
+    )
+    with_analysis = _MailGenResultSerializer(
+        help_text="analysis만 사용(fewshots 제거)하여 생성한 결과",
+    )
+    with_fewshots = _MailGenResultSerializer(
+        help_text="fewshots만 사용(analysis 제거)하여 생성한 결과",
+    )

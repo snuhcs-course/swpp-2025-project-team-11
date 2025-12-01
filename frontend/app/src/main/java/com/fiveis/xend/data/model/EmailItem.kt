@@ -49,5 +49,18 @@ data class EmailItem(
     @SerializedName("attachments")
     val attachments: List<Attachment> = emptyList(),
 
-    val cachedAt: Long = System.currentTimeMillis()
+    val cachedAt: Long = System.currentTimeMillis(),
+
+    /**
+     * Epoch timestamp in milliseconds for proper chronological sorting.
+     * Parsed from dateRaw during insertion.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val dateTimestamp: Long = 0L,
+
+    @ColumnInfo(defaultValue = "")
+    val displayDate: String = "",
+
+    @ColumnInfo(defaultValue = "")
+    val displaySenderName: String = ""
 )

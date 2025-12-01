@@ -64,6 +64,7 @@ class ContactBookActivity : ComponentActivity() {
                 ) { result ->
                     if (result.resultCode == RESULT_OK) {
                         viewModel.onTabSelected(ContactBookTab.Contacts)
+                        viewModel.showContactAddedBanner()
                     }
                 }
                 val addGroupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -71,6 +72,7 @@ class ContactBookActivity : ComponentActivity() {
                 ) { result ->
                     if (result.resultCode == RESULT_OK) {
                         viewModel.onTabSelected(ContactBookTab.Groups)
+                        viewModel.showGroupAddedBanner()
                     }
                 }
 
@@ -78,6 +80,7 @@ class ContactBookActivity : ComponentActivity() {
                     uiState = uiState,
                     onRefresh = { viewModel.refreshAll() },
                     onTabSelected = viewModel::onTabSelected,
+                    onDismissSuccessBanner = { viewModel.dismissSuccessBanner() },
                     onGroupClick = { group ->
                         startActivity(
                             Intent(this, GroupDetailActivity::class.java)
@@ -94,7 +97,10 @@ class ContactBookActivity : ComponentActivity() {
                     },
                     onBottomNavChange = {
                         if (it == "mail") {
-                            startActivity(Intent(this, MailActivity::class.java))
+                            val intent = Intent(this, MailActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                            }
+                            startActivity(intent)
                             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
                         }
                     },

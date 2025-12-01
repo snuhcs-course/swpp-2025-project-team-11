@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
@@ -247,7 +246,8 @@ private fun ReplyComposeContent(
 ) {
     android.util.Log.d("ReplyComposeContent", "렌더링: isLoading=$isLoadingOptions, options=${replyOptions.size}")
     val scrollState = rememberScrollState()
-    var isMailContentExpanded by remember { mutableStateOf(true) }
+    var isMailContentExpanded by remember { mutableStateOf(false) }
+    var selectedOption by remember { mutableStateOf<ReplyOptionState?>(null) }
 
     Column(
         modifier = modifier
@@ -289,14 +289,18 @@ private fun ReplyComposeContent(
                 replyOptions = replyOptions,
                 isLoading = isLoadingOptions,
                 isStreaming = isStreamingOptions,
-                onUseOption = onUseOption
+                onGenerateMore = onGenerateMore,
+                onCurrentOptionChange = { selectedOption = it }
             )
         }
 
         // 하단 버튼들
         BottomActionButtons(
             onDirectCompose = onDirectCompose,
-            onGenerateMore = onGenerateMore
+            onUseSelectedOption = {
+                selectedOption?.let { option -> onUseOption(option) }
+            },
+            isUseOptionEnabled = selectedOption != null
         )
     }
 }
@@ -480,7 +484,8 @@ private fun ReplyOptionsSection(
     replyOptions: List<ReplyOptionState>,
     isLoading: Boolean,
     isStreaming: Boolean,
-    onUseOption: (ReplyOptionState) -> Unit
+    onGenerateMore: () -> Unit,
+    onCurrentOptionChange: (ReplyOptionState?) -> Unit
 ) {
     // 상태 로깅
     android.util.Log.d(
@@ -600,17 +605,13 @@ private fun ReplyOptionsSection(
             android.util.Log.d("ReplyOptionsSection", "HorizontalPager page=$page 렌더링 중")
             ReplyContentCard(
                 replyOption = replyOptions[page],
-                onNext = {
-                    // 다음 옵션으로 이동
-                    val nextPage = (page + 1) % replyOptions.size
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(nextPage)
-                    }
-                },
-                onUse = {
-                    onUseOption(replyOptions[page])
-                }
+                onGenerateMore = onGenerateMore
             )
+        }
+
+        androidx.compose.runtime.LaunchedEffect(pagerState.currentPage, replyOptions) {
+            val current = replyOptions.getOrNull(pagerState.currentPage)
+            onCurrentOptionChange(current)
         }
     }
 }
@@ -641,7 +642,7 @@ private fun OptionTab(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ReplyContentCard(replyOption: ReplyOptionState, onNext: () -> Unit, onUse: () -> Unit) {
+private fun ReplyContentCard(replyOption: ReplyOptionState, onGenerateMore: () -> Unit) {
     android.util.Log.d(
         "ReplyContentCard",
         "id=${replyOption.id}, type=${replyOption.type}, " +
@@ -657,19 +658,53 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onNext: () -> Unit, 
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
-            // 추천 뱃지
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Green60,
-                modifier = Modifier.padding(bottom = 12.dp)
+            // 상단: 추천 뱃지 + 새로 생성 버튼
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "추천",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+                // 추천 뱃지
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Green60
+                ) {
+                    Text(
+                        text = "추천",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                // 새로 생성 버튼
+                Button(
+                    onClick = onGenerateMore,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Green60,
+                        contentColor = Color.White
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 12.dp,
+                        vertical = 6.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "새로 생성",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             // 옵션 타입 (예: 상세 보고형, 간결형)
@@ -681,75 +716,36 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onNext: () -> Unit, 
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // 본문 미리보기 섹션
-            Text(
-                text = replyOption.body,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = TextPrimary,
+            // 본문 미리보기 섹션 (더 큰 높이 + 스크롤 가능 + 하얀색 배경)
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            // 하단 버튼들
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .height(280.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = Color.White
             ) {
-                // 다음 옵션 버튼
-                OutlinedButton(
-                    onClick = onNext,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = MailDetailBodyBg,
-                        contentColor = Gray600
-                    ),
-                    border = BorderStroke(1.dp, Gray200)
-                ) {
-                    Text(
-                        text = "다음 옵션",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                // 이 옵션 사용 버튼
-                Button(
-                    onClick = onUse,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Green60,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "이 옵션 사용",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                val bodyScrollState = rememberScrollState()
+                Text(
+                    text = replyOption.body,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = TextPrimary,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(bodyScrollState)
+                        .padding(12.dp)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun BottomActionButtons(onDirectCompose: () -> Unit, onGenerateMore: () -> Unit) {
+private fun BottomActionButtons(
+    onDirectCompose: () -> Unit,
+    onUseSelectedOption: (() -> Unit)?,
+    isUseOptionEnabled: Boolean
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -780,25 +776,26 @@ private fun BottomActionButtons(onDirectCompose: () -> Unit, onGenerateMore: () 
             )
         }
 
-        // 추가 생성 버튼
+        // 이 옵션 사용 버튼
         Button(
-            onClick = onGenerateMore,
+            onClick = { if (isUseOptionEnabled) onUseSelectedOption?.invoke() },
+            enabled = isUseOptionEnabled,
             modifier = Modifier.weight(1f).height(48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Purple60,
+                containerColor = if (isUseOptionEnabled) Purple60 else Gray200,
                 contentColor = Color.White
             ),
-            border = BorderStroke(1.dp, Purple60)
+            border = BorderStroke(1.dp, if (isUseOptionEnabled) Purple60 else Gray200)
         ) {
             Icon(
-                imageVector = Icons.Default.AutoAwesome,
+                imageVector = Icons.Default.Check,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "새로 생성",
+                text = "이 옵션 사용",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium
             )

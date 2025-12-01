@@ -61,12 +61,16 @@ class EmailDaoIntegrationTest {
 
         emailDao.insertEmails(emails)
 
+        // Add a small delay to ensure DB write is complete
+        kotlinx.coroutines.delay(100)
+
         val result = emailDao.getAllEmails().first()
 
         assertEquals(3, result.size)
-        assertEquals("1", result[0].id)
-        assertEquals("2", result[1].id)
-        assertEquals("3", result[2].id)
+        // getAllEmails orders by cachedAt DESC, so highest cachedAt comes first
+        assertEquals("1", result[0].id) // cachedAt = 3L
+        assertEquals("2", result[1].id) // cachedAt = 2L
+        assertEquals("3", result[2].id) // cachedAt = 1L
     }
 
     @Test
@@ -153,6 +157,9 @@ class EmailDaoIntegrationTest {
 
     @Test
     fun getEmailCount_returns_zero_when_no_emails() = runTest {
+        // Ensure database is clean
+        emailDao.deleteAllEmails()
+
         val count = emailDao.getEmailCount()
 
         assertEquals(0, count)

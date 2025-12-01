@@ -1,5 +1,6 @@
 package com.fiveis.xend.ui.inbox
 
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,7 +33,12 @@ data class InboxUiState(
     // 이메일 주소를 key로 하는 연락처 맵 (이름 표시용)
     val contactsByEmail: Map<String, String> = emptyMap(),
     // 임시 저장 성공 배너 표시 여부
-    val showDraftSavedBanner: Boolean = false
+    val showDraftSavedBanner: Boolean = false,
+    // 메일 전송 성공 배너 표시 여부
+    val showMailSentBanner: Boolean = false,
+    // 메일 삭제 관련
+    val deletingEmailId: String? = null,
+    val deleteError: String? = null
 )
 
 /**
@@ -40,19 +46,73 @@ data class InboxUiState(
  */
 class InboxViewModel(
     private val repository: InboxRepository,
-    private val contactRepository: ContactBookRepository
+    private val contactRepository: ContactBookRepository,
+    private val prefs: SharedPreferences
 ) : ViewModel() {
+
+    companion object {
+        private const val PREF_INBOX_NEXT_PAGE_TOKEN = "inbox_next_page_token"
+    }
 
     private val _uiState = MutableStateFlow(InboxUiState())
     val uiState: StateFlow<InboxUiState> = _uiState.asStateFlow()
 
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
+        // SharedPreferences에서 저장된 토큰 복원
+        restorePageToken()
         loadCachedEmails()
         loadGroups()
         observeContacts()
+        refreshContactsFromServer()
         // 백그라운드에서 사일런트 동기화 (UI 로딩 표시 없이)
         silentRefreshEmails()
+    }
+
+    /**
+     * SharedPreferences에서 저장된 페이지 토큰 복원
+     */
+    private fun restorePageToken() {
+        val savedToken = prefs.getString(PREF_INBOX_NEXT_PAGE_TOKEN, null)
+        Log.d("InboxViewModel", "Restored page token from prefs: $savedToken")
+        if (savedToken != null) {
+            _uiState.update { it.copy(loadMoreNextPageToken = savedToken) }
+        }
+    }
+
+    private fun refreshContactsFromServer() {
+        viewModelScope.launch {
+            try {
+                contactRepository.refreshGroups()
+                contactRepository.refreshContacts()
+            } catch (e: Exception) {
+                Log.e("InboxViewModel", "Failed to refresh contacts when Inbox starts", e)
+            }
+        }
+    }
+
+    /**
+     * 페이지 토큰을 SharedPreferences에 저장
+     */
+    private fun savePageToken(token: String?) {
+        Log.d("InboxViewModel", "Saving page token to prefs: $token")
+        prefs.edit().apply {
+            if (token != null) {
+                putString(PREF_INBOX_NEXT_PAGE_TOKEN, token)
+            } else {
+                remove(PREF_INBOX_NEXT_PAGE_TOKEN)
+            }
+            apply()
+        }
+    }
+
+    /**
+     * 토큰 에러 시 초기화 (만료된 토큰 등)
+     */
+    private fun clearPageToken() {
+        Log.d("InboxViewModel", "Clearing page token due to error")
+        savePageToken(null)
+        _uiState.update { it.copy(loadMoreNextPageToken = null) }
     }
 
     private fun loadGroups() {
@@ -84,7 +144,17 @@ class InboxViewModel(
         viewModelScope.launch {
             repository.getCachedEmails().collect { cachedEmails ->
                 Log.d("InboxViewModel", "Received ${cachedEmails.size} cached emails from DB")
-                _uiState.update { it.copy(emails = cachedEmails) }
+                _uiState.update { currentState ->
+                    val deletingId = currentState.deletingEmailId
+                    val shouldClearDeletingId = deletingId?.let { id ->
+                        cachedEmails.none { it.id == id }
+                    } ?: false
+
+                    currentState.copy(
+                        emails = cachedEmails,
+                        deletingEmailId = if (shouldClearDeletingId) null else deletingId
+                    )
+                }
             }
         }
     }
@@ -126,17 +196,19 @@ class InboxViewModel(
                     Log.d("InboxViewModel", "refreshEmails succeeded, nextPageToken: $nextToken")
 
                     _uiState.update { currentState ->
-                        // DB가 비어있을 때만 loadMoreNextPageToken 설정
-                        // (DB에 메일이 있으면 refresh 토큰은 이미 저장된 메일을 가리키므로 버림)
-                        val newLoadMoreToken = if (currentState.emails.isEmpty()) {
-                            Log.d("InboxViewModel", "DB empty - setting loadMoreNextPageToken: $nextToken")
+                        // 저장된 토큰이 없고, 새 토큰이 있을 때만 설정
+                        // (이미 토큰이 있으면 유지 - loadMore로 받은 토큰이 더 정확함)
+                        val newLoadMoreToken = if (currentState.loadMoreNextPageToken == null && nextToken != null) {
+                            Log.d("InboxViewModel", "No existing token - setting loadMoreNextPageToken: $nextToken")
+                            // 새 토큰을 SharedPreferences에 저장
+                            savePageToken(nextToken)
                             nextToken
                         } else {
                             Log.d(
                                 "InboxViewModel",
-                                "DB has ${currentState.emails.size} emails - keeping existing loadMoreNextPageToken: " +
-                                    "${currentState.loadMoreNextPageToken}"
+                                "Keeping existing loadMoreNextPageToken: ${currentState.loadMoreNextPageToken}"
                             )
+                            // 기존 토큰 유지 (이미 SharedPreferences에 저장되어 있음)
                             currentState.loadMoreNextPageToken
                         }
 
@@ -205,6 +277,8 @@ class InboxViewModel(
 
                     val newLoadMoreToken = response.body()?.nextPageToken
                     Log.d("InboxViewModel", "Updated loadMoreNextPageToken: $newLoadMoreToken")
+                    // 새 토큰을 SharedPreferences에 저장
+                    savePageToken(newLoadMoreToken)
                     _uiState.update {
                         it.copy(
                             loadMoreNextPageToken = newLoadMoreToken,
@@ -213,7 +287,13 @@ class InboxViewModel(
                         )
                     }
                 } else {
-                    Log.e("InboxViewModel", "loadMoreEmails failed with code: ${response.code()}")
+                    val errorCode = response.code()
+                    Log.e("InboxViewModel", "loadMoreEmails failed with code: $errorCode")
+                    // 400, 401, 404 등의 에러는 토큰 문제일 가능성이 높으므로 초기화
+                    if (errorCode in listOf(400, 401, 404)) {
+                        Log.w("InboxViewModel", "Clearing invalid page token due to error code: $errorCode")
+                        clearPageToken()
+                    }
                     _uiState.update { it.copy(error = "Failed to load more emails", isLoading = false) }
                 }
             } catch (e: Exception) {
@@ -282,6 +362,20 @@ class InboxViewModel(
     }
 
     /**
+     * 메일 전송 성공 배너 표시
+     */
+    fun showMailSentBanner() {
+        _uiState.update { it.copy(showMailSentBanner = true) }
+    }
+
+    /**
+     * 메일 전송 성공 배너 닫기
+     */
+    fun dismissMailSentBanner() {
+        _uiState.update { it.copy(showMailSentBanner = false) }
+    }
+
+    /**
      * 연락처 추가
      */
     fun addContact(
@@ -290,9 +384,18 @@ class InboxViewModel(
         senderRole: String?,
         recipientRole: String,
         personalPrompt: String?,
-        groupId: Long?
+        groupId: Long?,
+        languagePreference: String? = null
     ) {
         viewModelScope.launch {
+            // 닫기/초기화: 버튼 누르자마자 다이얼로그가 닫혀야 하므로 먼저 상태를 정리한다.
+            _uiState.update {
+                it.copy(
+                    showAddContactDialog = false,
+                    selectedEmailForContact = null,
+                    addContactError = null
+                )
+            }
             try {
                 Log.d("InboxViewModel", "Adding contact: name=$name, email=$email")
                 contactRepository.addContact(
@@ -301,7 +404,8 @@ class InboxViewModel(
                     groupId = groupId,
                     senderRole = senderRole,
                     recipientRole = recipientRole,
-                    personalPrompt = personalPrompt
+                    personalPrompt = personalPrompt,
+                    languagePreference = languagePreference
                 )
                 Log.d("InboxViewModel", "Contact added successfully")
                 _uiState.update {
@@ -322,5 +426,35 @@ class InboxViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * 이메일 삭제 (휴지통으로 이동)
+     */
+    fun deleteEmail(emailId: String, permanent: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(deletingEmailId = emailId, deleteError = null) }
+            try {
+                Log.d("InboxViewModel", "Deleting email: $emailId (permanent=$permanent)")
+                repository.deleteEmail(emailId, permanent)
+                Log.d("InboxViewModel", "Email deleted successfully: $emailId")
+                _uiState.update { it.copy(deletingEmailId = null, deleteError = null) }
+            } catch (e: Exception) {
+                Log.e("InboxViewModel", "Failed to delete email: $emailId", e)
+                _uiState.update {
+                    it.copy(
+                        deletingEmailId = null,
+                        deleteError = e.message ?: "메일 삭제 실패"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 삭제 에러 메시지 초기화
+     */
+    fun clearDeleteError() {
+        _uiState.update { it.copy(deleteError = null) }
     }
 }

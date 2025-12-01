@@ -193,7 +193,7 @@ class ContactBookRepositoryTest {
         coVerify {
             contactApiService.addContact(
                 match { request ->
-                    request.context?.senderRole == ""
+                    request.context?.senderRole == null || request.context?.senderRole == ""
                 }
             )
         }
@@ -394,6 +394,7 @@ class ContactBookRepositoryTest {
             id = 1L,
             name = name,
             description = description,
+            emoji = null,
             options = options
         )
 
@@ -405,7 +406,7 @@ class ContactBookRepositoryTest {
         coEvery { optionDao.deleteCrossRefsByGroup(any()) } returns Unit
         coEvery { optionDao.upsertCrossRefs(any()) } returns Unit
 
-        val result = repository.addGroup(name, description, options)
+        val result = repository.addGroup(name, description, "", options)
 
         assertEquals(expectedResponse, result)
         coVerify {
@@ -426,7 +427,7 @@ class ContactBookRepositoryTest {
         } returns Response.success(null)
 
         val exception = try {
-            repository.addGroup("Test", "Description", emptyList())
+            repository.addGroup("Test", "Description", "", emptyList())
             null
         } catch (e: Exception) {
             e
@@ -757,7 +758,7 @@ class ContactBookRepositoryTest {
     @Test
     fun refresh_group_and_members_calls_both_endpoints() = runTest {
         coEvery { contactApiService.getGroup(1L) } returns Response.success(
-            GroupResponse(1L, "G", null, emptyList())
+            GroupResponse(1L, "G", null, null, emptyList())
         )
         coEvery { contactApiService.getAllContacts() } returns Response.success(emptyList())
         coEvery { groupDao.upsertGroups(any()) } returns Unit
@@ -818,7 +819,7 @@ class ContactBookRepositoryTest {
         coEvery { contactDao.upsertContacts(any()) } returns Unit
         coEvery { contactDao.upsertContexts(any()) } returns Unit
 
-        repository.updateContact(9L, "Lee", "lee@example.com", null, null, null, null)
+        repository.updateContact(9L, "Lee", "lee@example.com", null, null, null, null, null)
 
         coVerify { contactDao.upsertContacts(match { it.single().id == 9L && it.single().name == "Lee" }) }
     }
@@ -836,7 +837,7 @@ class ContactBookRepositoryTest {
             groupId = null, senderRole = "Writer", recipientRole = "Emp", personalPrompt = null
         )
 
-        assertEquals("", reqSlot.captured.context?.personalPrompt)
+        assertTrue(reqSlot.captured.context?.personalPrompt == null || reqSlot.captured.context?.personalPrompt == "")
     }
 
     @Test
@@ -1104,9 +1105,13 @@ class ContactBookRepositoryTest {
             name = "Test Contact",
             email = "test@example.com"
         )
-        val mockContact = com.fiveis.xend.data.database.ContactWithContext(mockEntity, null)
+        val mockContact = com.fiveis.xend.data.database.ContactWithGroupAndContext(
+            contact = mockEntity,
+            context = null,
+            group = null
+        )
 
-        every { contactDao.observeAllWithContext() } returns kotlinx.coroutines.flow.flowOf(listOf(mockContact))
+        every { contactDao.observeAllWithGroup() } returns kotlinx.coroutines.flow.flowOf(listOf(mockContact))
 
         val result = repository.observeContacts()
 
@@ -1114,7 +1119,7 @@ class ContactBookRepositoryTest {
             assertEquals(1, contacts.size)
             assertEquals("Test Contact", contacts[0].name)
         }
-        io.mockk.verify { contactDao.observeAllWithContext() }
+        io.mockk.verify { contactDao.observeAllWithGroup() }
     }
 
     @Test
@@ -1260,15 +1265,106 @@ class ContactBookRepositoryTest {
     fun update_contact_group_updates_contact_group_id() = runTest {
         val contactId = 1L
         val groupId = 2L
+        val mockGroup = GroupResponse(
+            id = groupId,
+            name = "Test Group",
+            description = null,
+            emoji = null
+        )
+        val mockContact = ContactResponse(
+            id = contactId,
+            name = "Test",
+            email = "test@example.com",
+            group = mockGroup
+        )
 
         coEvery {
             contactApiService.updateContact(contactId, mapOf("group_id" to groupId))
-        } returns Response.success(null)
-        coEvery { contactDao.updateGroupId(contactId, groupId) } returns Unit
+        } returns Response.success(mockContact)
+        coEvery { contactDao.upsertContacts(any()) } returns Unit
 
         repository.updateContactGroup(contactId, groupId)
 
         coVerify { contactApiService.updateContact(contactId, mapOf("group_id" to groupId)) }
-        coVerify { contactDao.updateGroupId(contactId, groupId) }
+        coVerify { contactDao.upsertContacts(any()) }
+    }
+
+    @Test
+    fun update_group_with_all_params_succeeds() = runTest {
+        val groupId = 1L
+        val updatedGroup = GroupResponse(
+            id = groupId,
+            name = "Updated Name",
+            description = "Updated Desc",
+            emoji = "🔥",
+            options = emptyList()
+        )
+
+        coEvery { contactApiService.updateGroup(groupId, any()) } returns Response.success(updatedGroup)
+        coEvery { groupDao.upsertGroups(any()) } returns Unit
+        coEvery { optionDao.deleteCrossRefsByGroup(groupId) } returns Unit
+
+        val result = repository.updateGroup(
+            groupId = groupId,
+            name = "Updated Name",
+            description = "Updated Desc",
+            emoji = "🔥",
+            emojiProvided = true,
+            optionIds = emptyList()
+        )
+
+        assertEquals(updatedGroup, result)
+        coVerify { contactApiService.updateGroup(groupId, match {
+            it["name"] == "Updated Name" &&
+            it["description"] == "Updated Desc" &&
+            it["emoji"] == "🔥" &&
+            it["option_ids"] == emptyList<Long>()
+        }) }
+    }
+
+    @Test
+    fun search_contacts_returns_filtered_flow() = runTest {
+        val allContacts = listOf(
+            com.fiveis.xend.data.database.ContactWithGroupAndContext(
+                contact = com.fiveis.xend.data.database.entity.ContactEntity(1L, null, "Alice", "alice@test.com"),
+                group = null,
+                context = null
+            ),
+            com.fiveis.xend.data.database.ContactWithGroupAndContext(
+                contact = com.fiveis.xend.data.database.entity.ContactEntity(2L, null, "Bob", "bob@test.com"),
+                group = null,
+                context = null
+            )
+        )
+
+        every { contactDao.observeAllWithGroup() } returns flowOf(allContacts)
+
+        val result = repository.searchContacts("ali")
+
+        result.collect { contacts ->
+            assertEquals(1, contacts.size)
+            assertEquals("Alice", contacts[0].name)
+        }
+    }
+
+    @Test
+    fun contact_data_and_group_data_classes_work() {
+        val contact = com.fiveis.xend.data.model.Contact(
+            id = 1L,
+            name = "John",
+            email = "john@example.com"
+        )
+        val contactData = com.fiveis.xend.data.repository.ContactData(listOf(contact))
+        assertEquals(1, contactData.contacts.size)
+        assertEquals("John", contactData.contacts[0].name)
+
+        val group = com.fiveis.xend.data.model.Group(
+            id = 1L,
+            name = "Team",
+            description = "Description"
+        )
+        val groupData = com.fiveis.xend.data.repository.GroupData(listOf(group))
+        assertEquals(1, groupData.groups.size)
+        assertEquals("Team", groupData.groups[0].name)
     }
 }

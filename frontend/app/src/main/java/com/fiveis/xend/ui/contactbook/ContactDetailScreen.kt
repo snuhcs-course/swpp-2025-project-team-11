@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,6 +73,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.PromptOption
+import com.fiveis.xend.ui.profile.LanguageDialog
+import com.fiveis.xend.ui.profile.languageDisplayText
 import com.fiveis.xend.ui.theme.BackgroundLight
 import com.fiveis.xend.ui.theme.BorderGray
 import com.fiveis.xend.ui.theme.Gray200
@@ -92,7 +95,7 @@ fun ContactDetailScreen(
     onRefresh: () -> Unit,
     onOpenGroup: (Long) -> Unit,
     onComposeMail: (Contact) -> Unit,
-    onUpdateContact: (String, String, String?, String?, String?, Long?) -> Unit,
+    onUpdateContact: (String, String, String?, String?, String?, Long?, String?) -> Unit,
     onClearEditError: () -> Unit
 ) {
     val contact = uiState.contact
@@ -109,6 +112,7 @@ fun ContactDetailScreen(
     var editRecipientManual by rememberSaveable { mutableStateOf("") }
     var editPersonalPromptField by rememberSaveable { mutableStateOf("") }
     var editSelectedGroupId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editLanguagePreference by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(uiState.isUpdating, uiState.updateError, showEditDialog) {
         if (!showEditDialog) return@LaunchedEffect
@@ -199,11 +203,26 @@ fun ContactDetailScreen(
                             )
                         }
                         Spacer(Modifier.size(12.dp))
-                        Column(Modifier.wrapContentWidth()) {
-                            Text(contact.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            if (contact.email.isNotBlank()) Text(contact.email, color = Color.Gray)
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                contact.name,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (contact.email.isNotBlank()) {
+                                Text(
+                                    contact.email,
+                                    color = Color.Gray,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
-                        Spacer(Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp))
                         IconButton(
                             onClick = {
                                 editNameField = contact.name
@@ -238,6 +257,7 @@ fun ContactDetailScreen(
                                 }
                                 editPersonalPromptField = contact.context?.personalPrompt.orEmpty()
                                 editSelectedGroupId = contact.group?.id
+                                editLanguagePreference = contact.context?.languagePreference.orEmpty()
                                 editSubmitted = false
                                 onClearEditError()
                                 showEditDialog = true
@@ -281,8 +301,13 @@ fun ContactDetailScreen(
                                     modifier = Modifier
                                         .size(42.dp)
                                         .clip(CircleShape)
-                                        .background(groupColor)
-                                )
+                                        .background(groupColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    group.emoji?.let {
+                                        Text(text = it, fontSize = 20.sp)
+                                    }
+                                }
                                 Spacer(Modifier.size(16.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(
@@ -315,6 +340,46 @@ fun ContactDetailScreen(
                             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("소속된 그룹이 없습니다.", color = Color.Gray, fontWeight = FontWeight.SemiBold)
                             }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    HorizontalDivider()
+
+                    contact.context?.languagePreference
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { language ->
+                            Column {
+                                Text(
+                                    text = "메일 작성 언어",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = languageDisplayText(language),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+
+                    if (contact.context?.languagePreference.isNullOrBlank()) {
+                        Column {
+                            Text(
+                                text = "메일 작성 언어",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "프로필 기본값",
+                                fontSize = 16.sp,
+                                color = TextPrimary
+                            )
                         }
                     }
                 }
@@ -358,6 +423,7 @@ fun ContactDetailScreen(
     if (showEditDialog) {
         val trimmedName = editNameField.trim()
         val trimmedEmail = editEmailField.trim()
+        val currentLanguagePreference = editLanguagePreference.trim()
         val finalSenderRole = when (editSenderMode) {
             RoleInputMode.PRESET -> editSenderPreset?.trim()
             RoleInputMode.MANUAL -> editSenderManual.trim()
@@ -387,6 +453,7 @@ fun ContactDetailScreen(
             errorMessage = uiState.updateError,
             isProcessing = uiState.isUpdating,
             isConfirmEnabled = isConfirmEnabled,
+            languagePreference = editLanguagePreference,
             onNameChange = {
                 editNameField = it
                 if (uiState.updateError != null) onClearEditError()
@@ -417,6 +484,7 @@ fun ContactDetailScreen(
             onRecipientManualChange = { editRecipientManual = it },
             onPersonalPromptChange = { editPersonalPromptField = it },
             onGroupSelected = { editSelectedGroupId = it },
+            onLanguagePreferenceChange = { editLanguagePreference = it },
             onDismiss = {
                 if (!uiState.isUpdating) {
                     showEditDialog = false
@@ -432,7 +500,8 @@ fun ContactDetailScreen(
                     finalSenderRole,
                     finalRecipientRole,
                     editPersonalPromptField.trim(),
-                    editSelectedGroupId
+                    editSelectedGroupId,
+                    currentLanguagePreference
                 )
             }
         )
@@ -556,6 +625,7 @@ private fun EditContactDialog(
     personalPrompt: String,
     selectedGroupName: String,
     groups: List<Group>,
+    languagePreference: String,
     errorMessage: String?,
     isProcessing: Boolean,
     isConfirmEnabled: Boolean,
@@ -569,6 +639,7 @@ private fun EditContactDialog(
     onRecipientManualChange: (String) -> Unit,
     onPersonalPromptChange: (String) -> Unit,
     onGroupSelected: (Long?) -> Unit,
+    onLanguagePreferenceChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -579,6 +650,7 @@ private fun EditContactDialog(
     var isSenderExpanded by remember { mutableStateOf(false) }
     var isRecipientExpanded by remember { mutableStateOf(false) }
     var isGroupExpanded by remember { mutableStateOf(false) }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -587,13 +659,15 @@ private fun EditContactDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.90f)
-                .widthIn(max = 720.dp),
+                .widthIn(max = 720.dp)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(
                 modifier = Modifier
                     .background(Color.White)
                     .padding(20.dp)
+                    .fillMaxHeight()
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -624,6 +698,7 @@ private fun EditContactDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f, fill = true)
                         .verticalScroll(scrollState)
                 ) {
                     Text("이름", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
@@ -684,128 +759,142 @@ private fun EditContactDialog(
 
                     Spacer(Modifier.height(16.dp))
 
-                    Text("관계", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        ExposedDropdownMenuBox(
-                            expanded = isSenderExpanded,
-                            onExpandedChange = { if (!isProcessing) isSenderExpanded = !isSenderExpanded },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = when (senderMode) {
-                                    RoleInputMode.PRESET -> senderPreset ?: "나"
-                                    RoleInputMode.MANUAL -> directInputLabel
-                                },
-                                onValueChange = {},
-                                readOnly = true,
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Group,
-                                        contentDescription = null,
-                                        tint = ToolbarIconTint,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSenderExpanded)
-                                },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .height(48.dp),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !isProcessing,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = BackgroundLight,
-                                    unfocusedContainerColor = BackgroundLight,
-                                    unfocusedBorderColor = Gray200,
-                                    focusedBorderColor = Purple60,
-                                    focusedTextColor = Slate900,
-                                    unfocusedTextColor = Gray600
-                                )
-                            )
-                            ExposedDropdownMenu(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("관계 - 나", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(8.dp))
+                            ExposedDropdownMenuBox(
                                 expanded = isSenderExpanded,
-                                onDismissRequest = { isSenderExpanded = false }
+                                onExpandedChange = { if (!isProcessing) isSenderExpanded = !isSenderExpanded },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                senderRoleOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, fontSize = 13.sp) },
-                                        onClick = {
-                                            isSenderExpanded = false
-                                            if (option == directInputLabel) {
-                                                onSenderModeChange(RoleInputMode.MANUAL)
-                                                onSenderPresetChange(null)
-                                            } else {
-                                                onSenderModeChange(RoleInputMode.PRESET)
-                                                onSenderPresetChange(option)
-                                            }
-                                        }
+                                OutlinedTextField(
+                                    value = when (senderMode) {
+                                        RoleInputMode.PRESET -> senderPreset ?: "나"
+                                        RoleInputMode.MANUAL -> directInputLabel
+                                    },
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    singleLine = true,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Group,
+                                            contentDescription = null,
+                                            tint = ToolbarIconTint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSenderExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .menuAnchor()
+                                        .height(48.dp),
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontSize = 10.sp,
+                                        baselineShift = BaselineShift(0.4f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isProcessing,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = BackgroundLight,
+                                        unfocusedContainerColor = BackgroundLight,
+                                        unfocusedBorderColor = Gray200,
+                                        focusedBorderColor = Purple60,
+                                        focusedTextColor = Slate900,
+                                        unfocusedTextColor = Gray600
                                     )
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = isSenderExpanded,
+                                    onDismissRequest = { isSenderExpanded = false }
+                                ) {
+                                    senderRoleOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option, fontSize = 10.sp) },
+                                            onClick = {
+                                                isSenderExpanded = false
+                                                if (option == directInputLabel) {
+                                                    onSenderModeChange(RoleInputMode.MANUAL)
+                                                    onSenderPresetChange(null)
+                                                } else {
+                                                    onSenderModeChange(RoleInputMode.PRESET)
+                                                    onSenderPresetChange(option)
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(Modifier.width(8.dp))
-
-                        ExposedDropdownMenuBox(
-                            expanded = isRecipientExpanded,
-                            onExpandedChange = { if (!isProcessing) isRecipientExpanded = !isRecipientExpanded },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = when (recipientMode) {
-                                    RoleInputMode.PRESET -> recipientPreset ?: "상대방"
-                                    RoleInputMode.MANUAL -> directInputLabel
-                                },
-                                onValueChange = {},
-                                readOnly = true,
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Group,
-                                        contentDescription = null,
-                                        tint = ToolbarIconTint,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientExpanded)
-                                },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .height(48.dp),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !isProcessing,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = BackgroundLight,
-                                    unfocusedContainerColor = BackgroundLight,
-                                    unfocusedBorderColor = Gray200,
-                                    focusedBorderColor = Purple60,
-                                    focusedTextColor = Slate900,
-                                    unfocusedTextColor = Gray600
-                                )
-                            )
-                            ExposedDropdownMenu(
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("관계 - 상대방", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(8.dp))
+                            ExposedDropdownMenuBox(
                                 expanded = isRecipientExpanded,
-                                onDismissRequest = { isRecipientExpanded = false }
+                                onExpandedChange = { if (!isProcessing) isRecipientExpanded = !isRecipientExpanded },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                recipientRoleOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, fontSize = 13.sp) },
-                                        onClick = {
-                                            isRecipientExpanded = false
-                                            if (option == directInputLabel) {
-                                                onRecipientModeChange(RoleInputMode.MANUAL)
-                                                onRecipientPresetChange(null)
-                                            } else {
-                                                onRecipientModeChange(RoleInputMode.PRESET)
-                                                onRecipientPresetChange(option)
-                                            }
-                                        }
+                                OutlinedTextField(
+                                    value = when (recipientMode) {
+                                        RoleInputMode.PRESET -> recipientPreset ?: "상대방"
+                                        RoleInputMode.MANUAL -> directInputLabel
+                                    },
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    singleLine = true,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Group,
+                                            contentDescription = null,
+                                            tint = ToolbarIconTint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRecipientExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .menuAnchor()
+                                        .height(48.dp),
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontSize = 10.sp,
+                                        baselineShift = BaselineShift(0.4f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isProcessing,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = BackgroundLight,
+                                        unfocusedContainerColor = BackgroundLight,
+                                        unfocusedBorderColor = Gray200,
+                                        focusedBorderColor = Purple60,
+                                        focusedTextColor = Slate900,
+                                        unfocusedTextColor = Gray600
                                     )
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = isRecipientExpanded,
+                                    onDismissRequest = { isRecipientExpanded = false }
+                                ) {
+                                    recipientRoleOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option, fontSize = 10.sp) },
+                                            onClick = {
+                                                isRecipientExpanded = false
+                                                if (option == directInputLabel) {
+                                                    onRecipientModeChange(RoleInputMode.MANUAL)
+                                                    onRecipientPresetChange(null)
+                                                } else {
+                                                    onRecipientModeChange(RoleInputMode.PRESET)
+                                                    onRecipientPresetChange(option)
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -915,6 +1004,7 @@ private fun EditContactDialog(
                             value = selectedGroupName,
                             onValueChange = {},
                             readOnly = true,
+                            singleLine = true,
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.FolderOpen,
@@ -930,7 +1020,10 @@ private fun EditContactDialog(
                                 .fillMaxWidth()
                                 .menuAnchor()
                                 .height(48.dp),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                            textStyle = LocalTextStyle.current.copy(
+                                fontSize = 13.sp,
+                                baselineShift = BaselineShift(0.4f)
+                            ),
                             shape = RoundedCornerShape(12.dp),
                             enabled = !isProcessing,
                             colors = OutlinedTextFieldDefaults.colors(
@@ -977,6 +1070,44 @@ private fun EditContactDialog(
                                 )
                             }
                         }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Text("메일 작성 언어", color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isProcessing) { if (!isProcessing) showLanguageDialog = true }
+                    ) {
+                        OutlinedTextField(
+                            value = languageDisplayText(languagePreference),
+                            onValueChange = {},
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            placeholder = {
+                                Text(
+                                    text = "프로필 기본값",
+                                    style = LocalTextStyle.current.copy(fontSize = 12.sp),
+                                    color = Gray400
+                                )
+                            },
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            singleLine = true,
+                            readOnly = true,
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = TextPrimary,
+                                disabledBorderColor = BorderGray,
+                                focusedBorderColor = Purple60,
+                                unfocusedBorderColor = BorderGray,
+                                disabledContainerColor = Color.White,
+                                focusedContainerColor = Color.White
+                            )
+                        )
                     }
 
                     if (!errorMessage.isNullOrBlank()) {
@@ -1028,5 +1159,13 @@ private fun EditContactDialog(
                 }
             }
         }
+    }
+
+    if (showLanguageDialog) {
+        LanguageDialog(
+            selectedLanguage = if (languagePreference == "KOR") "Korean" else languagePreference,
+            onLanguageSelected = { selected -> onLanguagePreferenceChange(selected) },
+            onDismiss = { showLanguageDialog = false }
+        )
     }
 }
