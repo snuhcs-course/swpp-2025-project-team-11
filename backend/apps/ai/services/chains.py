@@ -24,8 +24,6 @@ from apps.ai.services.prompts import (
     REPLY_USER,
     SUBJECT_SYSTEM,
     SUBJECT_USER,
-    SUGGEST_SYSTEM,
-    SUGGEST_USER,
     VALIDATOR_SYSTEM,
     VALIDATOR_USER,
 )
@@ -136,15 +134,3 @@ _attachment_prompt = ChatPromptTemplate.from_messages(
 )
 
 attachment_analysis_chain = _attachment_prompt | _base_model.with_structured_output(AttachmentAnalysisResult)
-
-_suggest_prompt = ChatPromptTemplate.from_messages(
-    [("system", SUGGEST_SYSTEM), ("user", SUGGEST_USER)],
-    template_format="jinja2",
-)
-
-_suggest_model = ChatOpenAI(
-    model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-    temperature=float(os.getenv("AI_TEMPERATURE", "0.6")),
-)
-
-suggest_chain = _suggest_prompt | _suggest_model | StrOutputParser()
