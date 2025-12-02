@@ -31,6 +31,7 @@ class SentRepositoryTest {
     fun setup() {
         mailApiService = mockk()
         emailDao = mockk(relaxed = true)
+        coEvery { emailDao.getEmailsByIds(any()) } returns emptyList()
         repository = SentRepository(mailApiService, emailDao)
     }
 

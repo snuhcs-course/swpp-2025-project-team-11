@@ -11,6 +11,7 @@ import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.data.model.ReadStatusUpdateRequest
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.utils.EmailUtils
+import com.fiveis.xend.utils.mergeSourceLabels
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okhttp3.ResponseBody
@@ -97,7 +98,8 @@ class InboxRepository(
                         return Result.success(null)
                     }
 
-                    emailDao.insertEmails(messages.withParsedTimestamps())
+                    val processed = messages.withParsedTimestamps().withSourceLabel()
+                    emailDao.insertEmails(processed)
                     val count = emailDao.getEmailCount()
                     Log.d("InboxRepository", "Successfully inserted ${messages.size} emails into DB")
                     Log.d("InboxRepository", "Total emails in DB: $count")
@@ -134,7 +136,8 @@ class InboxRepository(
                 Log.d("InboxRepository", "Received ${newEmails.size} new emails (total: $totalFetched)")
 
                 if (newEmails.isNotEmpty()) {
-                    emailDao.insertEmails(newEmails.withParsedTimestamps())
+                    val processed = newEmails.withParsedTimestamps().withSourceLabel()
+                    emailDao.insertEmails(processed)
                 }
 
                 val previousToken = pageToken
@@ -240,7 +243,8 @@ class InboxRepository(
 
     suspend fun saveEmailsToCache(emails: List<EmailItem>) {
         Log.d("InboxRepository", "saveEmailsToCache: saving ${emails.size} emails")
-        emailDao.insertEmails(emails.withParsedTimestamps())
+        val processed = emails.withParsedTimestamps().withSourceLabel()
+        emailDao.insertEmails(processed)
         val count = emailDao.getEmailCount()
         Log.d("InboxRepository", "saveEmailsToCache: total emails in DB = $count")
     }
@@ -264,5 +268,14 @@ class InboxRepository(
 
     suspend fun deleteDraft(id: Long) {
         emailDao.deleteDraft(id)
+    }
+
+    private suspend fun List<EmailItem>.withSourceLabel(): List<EmailItem> {
+        if (isEmpty()) return this
+        val existing = emailDao.getEmailsByIds(map { it.id }).associateBy { it.id }
+        return map { email ->
+            val merged = mergeSourceLabels(existing[email.id]?.sourceLabel, "INBOX")
+            email.copy(sourceLabel = merged)
+        }
     }
 }

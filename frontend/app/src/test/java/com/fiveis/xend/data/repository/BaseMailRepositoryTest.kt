@@ -32,6 +32,7 @@ class BaseMailRepositoryTest {
     fun setup() {
         mailApiService = mockk(relaxed = true)
         emailDao = mockk(relaxed = true)
+        coEvery { emailDao.getEmailsByIds(any()) } returns emptyList()
         repository = TestMailRepository(mailApiService, emailDao, "INBOX", "TestRepo")
     }
 

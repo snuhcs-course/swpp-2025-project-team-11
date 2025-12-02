@@ -10,6 +10,7 @@ import com.fiveis.xend.data.model.MailListResponse
 import com.fiveis.xend.data.model.ReadStatusUpdateRequest
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.utils.EmailUtils
+import com.fiveis.xend.utils.mergeSourceLabels
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okhttp3.ResponseBody
@@ -96,7 +97,8 @@ class SentRepository(
                         return Result.success(null)
                     }
 
-                    emailDao.insertEmails(messages.withParsedTimestamps())
+                    val processed = messages.withParsedTimestamps().withSourceLabel()
+                    emailDao.insertEmails(processed)
                     val count = emailDao.getEmailCount()
                     Log.d("SentRepository", "Successfully inserted ${messages.size} emails into DB")
                     Log.d("SentRepository", "Total emails in DB: $count")
@@ -133,7 +135,8 @@ class SentRepository(
                 Log.d("SentRepository", "Received ${newEmails.size} new emails (total: $totalFetched)")
 
                 if (newEmails.isNotEmpty()) {
-                    emailDao.insertEmails(newEmails.withParsedTimestamps())
+                    val processed = newEmails.withParsedTimestamps().withSourceLabel()
+                    emailDao.insertEmails(processed)
                 }
 
                 val previousToken = pageToken
@@ -211,8 +214,18 @@ class SentRepository(
 
     suspend fun saveEmailsToCache(emails: List<EmailItem>) {
         Log.d("SentRepository", "saveEmailsToCache: saving ${emails.size} emails")
-        emailDao.insertEmails(emails.withParsedTimestamps())
+        val processed = emails.withParsedTimestamps().withSourceLabel()
+        emailDao.insertEmails(processed)
         val count = emailDao.getEmailCount()
         Log.d("SentRepository", "saveEmailsToCache: total emails in DB = $count")
+    }
+
+    private suspend fun List<EmailItem>.withSourceLabel(): List<EmailItem> {
+        if (isEmpty()) return this
+        val existing = emailDao.getEmailsByIds(map { it.id }).associateBy { it.id }
+        return map { email ->
+            val merged = mergeSourceLabels(existing[email.id]?.sourceLabel, "SENT")
+            email.copy(sourceLabel = merged)
+        }
     }
 }
