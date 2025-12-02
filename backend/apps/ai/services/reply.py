@@ -4,7 +4,7 @@ import threading
 import time
 from collections.abc import Generator
 
-from apps.ai.services.chains import plan_chain, reply_body_chain
+from apps.ai.services.chains import reply_body_chain, reply_plan_chain
 from apps.ai.services.pii_masker import PiiMasker, make_req_id, unmask_stream
 from apps.ai.services.utils import build_prompt_inputs, collect_prompt_context, sse_event
 from apps.core.utils.async_stream import as_async_stream
@@ -52,8 +52,9 @@ def stream_reply_options_llm(
         "attachments": masked_inputs.get("attachments", []),
     }
     try:
-        plan = plan_chain.invoke(plan_inputs)
-    except Exception:
+        plan = reply_plan_chain.invoke(plan_inputs)
+    except Exception as e:
+        print(e)
         plan = type(
             "FallbackPlan",
             (object,),
