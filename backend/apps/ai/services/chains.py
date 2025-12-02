@@ -4,7 +4,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from apps.ai.services.models import AttachmentAnalysisResult, SpeechAnalysis, ValidationResult
+from apps.ai.services.models import AttachmentAnalysisResult, ReplyPlan, SpeechAnalysis, ValidationResult
 from apps.ai.services.prompts import (
     ANALYSIS_SYSTEM,
     ANALYSIS_USER,
@@ -18,10 +18,14 @@ from apps.ai.services.prompts import (
     PLAN_USER,
     PROMPT_PREVIEW_SYSTEM,
     PROMPT_PREVIEW_USER,
+    REPLY_PLAN_SYSTEM,
+    REPLY_PLAN_USER,
     REPLY_SYSTEM,
     REPLY_USER,
     SUBJECT_SYSTEM,
     SUBJECT_USER,
+    SUGGEST_SYSTEM,
+    SUGGEST_USER,
     VALIDATOR_SYSTEM,
     VALIDATOR_USER,
 )
@@ -52,6 +56,12 @@ _plan_prompt = ChatPromptTemplate.from_messages(
     template_format="jinja2",
 )
 plan_chain = _plan_prompt | _base_model | StrOutputParser()
+
+_reply_plan_prompt = ChatPromptTemplate.from_messages(
+    [("system", REPLY_PLAN_SYSTEM), ("user", REPLY_PLAN_USER)],
+    template_format="jinja2",
+)
+reply_plan_chain = _reply_plan_prompt | _base_model.with_structured_output(ReplyPlan)
 
 _reply_body_prompt = ChatPromptTemplate.from_messages(
     [("system", REPLY_SYSTEM), ("user", REPLY_USER)],
@@ -126,3 +136,15 @@ _attachment_prompt = ChatPromptTemplate.from_messages(
 )
 
 attachment_analysis_chain = _attachment_prompt | _base_model.with_structured_output(AttachmentAnalysisResult)
+
+_suggest_prompt = ChatPromptTemplate.from_messages(
+    [("system", SUGGEST_SYSTEM), ("user", SUGGEST_USER)],
+    template_format="jinja2",
+)
+
+_suggest_model = ChatOpenAI(
+    model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+    temperature=float(os.getenv("AI_TEMPERATURE", "0.6")),
+)
+
+suggest_chain = _suggest_prompt | _suggest_model | StrOutputParser()
