@@ -31,7 +31,8 @@ class InboxRepository(
             email.copy(
                 dateTimestamp = timestamp,
                 displayDate = displayDate,
-                displaySenderName = displaySenderName
+                displaySenderName = displaySenderName,
+                sourceLabel = "INBOX"
             )
         }
     }
@@ -73,7 +74,7 @@ class InboxRepository(
     suspend fun refreshEmails(labels: String? = "INBOX", maxResults: Int? = 20): Result<String?> {
         return try {
             // 가장 최신 메일의 날짜 가져오기
-            val latestDate = emailDao.getLatestEmailDate()
+            val latestDate = emailDao.getLatestEmailDate("INBOX")
 
             if (latestDate == null) {
                 // DB가 비어있으면 첫 페이지만 가져오기

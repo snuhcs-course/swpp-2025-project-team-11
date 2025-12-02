@@ -166,6 +166,7 @@ class MailDetailViewModel(
             labelIds = labelIds,
             body = body,
             attachments = attachments,
+            sourceLabel = existing?.sourceLabel ?: inferSourceLabel(labelIds),
             cachedAt = existing?.cachedAt ?: System.currentTimeMillis(),
             dateTimestamp = existing?.dateTimestamp ?: EmailUtils.parseDateToTimestamp(dateRaw)
         )
@@ -266,6 +267,17 @@ class MailDetailViewModel(
                     )
                 }
             }
+        }
+    }
+
+    private fun inferSourceLabel(labelIds: List<String>): String {
+        val hasInbox = labelIds.any { it.equals("INBOX", ignoreCase = true) }
+        val hasSent = labelIds.any { it.equals("SENT", ignoreCase = true) }
+
+        return when {
+            hasInbox -> "INBOX"
+            hasSent -> "SENT"
+            else -> labelIds.firstOrNull() ?: ""
         }
     }
 

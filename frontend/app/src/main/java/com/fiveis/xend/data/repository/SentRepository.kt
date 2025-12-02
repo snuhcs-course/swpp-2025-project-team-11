@@ -30,7 +30,8 @@ class SentRepository(
             email.copy(
                 dateTimestamp = timestamp,
                 displayDate = displayDate,
-                displaySenderName = displaySenderName
+                displaySenderName = displaySenderName,
+                sourceLabel = "SENT"
             )
         }
     }
@@ -72,7 +73,7 @@ class SentRepository(
     suspend fun refreshEmails(labels: String? = "SENT", maxResults: Int? = 20): Result<String?> {
         return try {
             // 가장 최신 메일의 날짜 가져오기
-            val latestDate = emailDao.getLatestEmailDate()
+            val latestDate = emailDao.getLatestEmailDate("SENT")
 
             if (latestDate == null) {
                 // DB가 비어있으면 첫 페이지만 가져오기

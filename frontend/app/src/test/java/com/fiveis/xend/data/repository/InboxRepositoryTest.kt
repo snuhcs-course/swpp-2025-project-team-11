@@ -86,7 +86,7 @@ class InboxRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns null
         coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
         coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
@@ -108,7 +108,7 @@ class InboxRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns null
         coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
 
         val result = repository.refreshEmails("INBOX", 20)
@@ -125,7 +125,7 @@ class InboxRepositoryTest {
             "Server error".toResponseBody()
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns null
         coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
 
         val result = repository.refreshEmails("INBOX", 20)
@@ -137,7 +137,7 @@ class InboxRepositoryTest {
     fun refresh_emails_returns_failure_when_response_body_is_null() = runTest {
         val mockResponse = Response.success<MailListResponse>(null)
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns null
         coEvery { mailApiService.getEmails("INBOX", 20, null, null) } returns mockResponse
 
         val result = repository.refreshEmails("INBOX", 20)
@@ -169,7 +169,7 @@ class InboxRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns latestDate
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns latestDate
         coEvery { mailApiService.getEmails("INBOX", 20, null, latestDate) } returns firstResponse
         coEvery { mailApiService.getEmails("INBOX", 20, "token1", latestDate) } returns secondResponse
         coEvery { emailDao.insertEmails(any()) } returns Unit
@@ -195,7 +195,7 @@ class InboxRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns latestDate
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns latestDate
         coEvery { mailApiService.getEmails("INBOX", 20, null, latestDate) } returns response
         coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 1

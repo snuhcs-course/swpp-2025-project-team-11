@@ -104,7 +104,7 @@ class SentRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns null
         coEvery { mailApiService.getEmails("SENT", 20, null, null) } returns Response.success(
             MailListResponse(mockEmails, "nextToken", 0)
         )
@@ -120,7 +120,7 @@ class SentRepositoryTest {
 
     @Test
     fun refresh_emails_with_empty_db_returns_null_when_no_messages() = runTest {
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns null
         coEvery { mailApiService.getEmails("SENT", 20, null, null) } returns Response.success(
             MailListResponse(emptyList(), null, 0)
         )
@@ -134,7 +134,7 @@ class SentRepositoryTest {
 
     @Test
     fun refresh_emails_returns_failure_when_response_body_is_null() = runTest {
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns null
         coEvery { mailApiService.getEmails("SENT", 20, null, null) } returns Response.success(null)
 
         val result = repository.refreshEmails()
@@ -169,7 +169,7 @@ class SentRepositoryTest {
             labelIds = listOf("SENT")
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns "2025-01-01"
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns "2025-01-01"
         coEvery {
             mailApiService.getEmails("SENT", 20, null, "2025-01-01")
         } returns Response.success(MailListResponse(listOf(newEmail1), "token1", 0))
@@ -201,7 +201,7 @@ class SentRepositoryTest {
             labelIds = listOf("SENT")
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns "2025-01-01"
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns "2025-01-01"
         coEvery {
             mailApiService.getEmails("SENT", 20, null, "2025-01-01")
         } returns Response.success(MailListResponse(listOf(newEmail), null, 0))
@@ -218,7 +218,7 @@ class SentRepositoryTest {
 
     @Test
     fun refresh_emails_returns_failure_on_api_error() = runTest {
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns null
         coEvery {
             mailApiService.getEmails("SENT", 20, null, null)
         } returns Response.error(500, "Server error".toResponseBody())
@@ -231,7 +231,7 @@ class SentRepositoryTest {
 
     @Test
     fun refresh_emails_with_existing_emails_returns_failure_on_api_error() = runTest {
-        coEvery { emailDao.getLatestEmailDate() } returns "2025-01-01"
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns "2025-01-01"
         coEvery {
             mailApiService.getEmails("SENT", 20, null, "2025-01-01")
         } returns Response.error(404, "Not found".toResponseBody())
@@ -244,7 +244,7 @@ class SentRepositoryTest {
 
     @Test
     fun refresh_emails_with_exception_returns_failure() = runTest {
-        coEvery { emailDao.getLatestEmailDate() } throws RuntimeException("Database error")
+        coEvery { emailDao.getLatestEmailDate("SENT") } throws RuntimeException("Database error")
 
         val result = repository.refreshEmails()
 
@@ -357,7 +357,7 @@ class SentRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns null
         coEvery { mailApiService.getEmails("CUSTOM_LABEL", 50, null, null) } returns Response.success(
             MailListResponse(mockEmails, null, 0)
         )
@@ -413,7 +413,7 @@ class SentRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns "2025-01-01"
+        coEvery { emailDao.getLatestEmailDate("SENT") } returns "2025-01-01"
         coEvery {
             mailApiService.getEmails("SENT", 20, null, "2025-01-01")
         } returns Response.success(MailListResponse(batch1, "token1", 0))
