@@ -772,8 +772,15 @@ private fun RecipientSection(
                                     "newContact.isEmpty=${newContact.text.isEmpty()}"
                             )
 
-                            // Only collapse if we were previously focused
-                            if (!focused && isInputFocused && newContact.text.isEmpty() &&
+                            // Auto-add contact when losing focus if there's text
+                            if (!focused && isInputFocused && newContact.text.isNotEmpty()) {
+                                Log.d(
+                                    "RecipientSection",
+                                    "onFocusChanged: Auto-adding contact on focus loss"
+                                )
+                                addContact()
+                                forceExpanded = false
+                            } else if (!focused && isInputFocused && newContact.text.isEmpty() &&
                                 contacts.isNotEmpty() && !isExpanding
                             ) {
                                 Log.d(
