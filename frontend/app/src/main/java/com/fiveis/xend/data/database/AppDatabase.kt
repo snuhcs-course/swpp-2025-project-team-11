@@ -24,6 +24,7 @@ import com.fiveis.xend.data.model.EmailItem
  * v5 -> v6: emails 테이블에 dateTimestamp 필드 추가 (정렬용 epoch timestamp)
  * v6 -> v7: emails 테이블에 displayDate/displaySenderName 필드 추가 (UI 최적화)
  * v7 -> v8: profile 테이블 추가 (프로필 캐시)
+ * v8 -> v9: emails 테이블에 sourceLabel 필드 추가 (캐시 출처 구분)
  */
 @Database(
     entities = [
@@ -36,7 +37,7 @@ import com.fiveis.xend.data.model.EmailItem
         GroupPromptOptionCrossRef::class,
         ProfileEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -236,6 +237,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from v8 to v9:
+         * - Add sourceLabel column to emails table to track mailbox origin
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE emails ADD COLUMN sourceLabel TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    """
+                    UPDATE emails SET sourceLabel = 
+                    CASE
+                        WHEN labelIds LIKE '%INBOX%' THEN 'INBOX'
+                        WHEN labelIds LIKE '%SENT%' THEN 'SENT'
+                        ELSE ''
+                    END
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 val newInstance = Room.databaseBuilder(
@@ -250,7 +273,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
-                        MIGRATION_7_8
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .fallbackToDestructiveMigration() // Add this line
                     .build()

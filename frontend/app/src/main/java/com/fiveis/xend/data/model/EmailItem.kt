@@ -49,6 +49,9 @@ data class EmailItem(
     @SerializedName("attachments")
     val attachments: List<Attachment> = emptyList(),
 
+    @ColumnInfo(defaultValue = "")
+    val sourceLabel: String = "",
+
     val cachedAt: Long = System.currentTimeMillis(),
 
     /**

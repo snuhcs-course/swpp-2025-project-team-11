@@ -15,6 +15,8 @@ import com.fiveis.xend.data.model.EmailItem
 import com.fiveis.xend.data.model.MailDetailResponse
 import com.fiveis.xend.data.repository.InboxRepository
 import com.fiveis.xend.utils.EmailUtils
+import com.fiveis.xend.utils.mailboxLabelsFromIds
+import com.fiveis.xend.utils.mergeSourceLabels
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
@@ -153,6 +155,12 @@ class MailDetailViewModel(
     }
 
     private fun MailDetailResponse.toEmailItem(existing: EmailItem?): EmailItem {
+        val labelsFromServer = mailboxLabelsFromIds(labelIds)
+        val mergedSourceLabel = mergeSourceLabels(
+            existing?.sourceLabel,
+            *labelsFromServer.toTypedArray()
+        )
+
         return EmailItem(
             id = id,
             threadId = threadId,
@@ -166,6 +174,7 @@ class MailDetailViewModel(
             labelIds = labelIds,
             body = body,
             attachments = attachments,
+            sourceLabel = mergedSourceLabel,
             cachedAt = existing?.cachedAt ?: System.currentTimeMillis(),
             dateTimestamp = existing?.dateTimestamp ?: EmailUtils.parseDateToTimestamp(dateRaw)
         )

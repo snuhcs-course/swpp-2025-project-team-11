@@ -13,15 +13,15 @@ interface EmailDao {
     @Query("SELECT * FROM emails ORDER BY cachedAt DESC")
     fun getAllEmails(): Flow<List<EmailItem>>
 
-    @Query("SELECT * FROM emails WHERE labelIds LIKE '%' || :label || '%' ORDER BY dateTimestamp DESC")
+    @Query(
+        "SELECT * FROM emails WHERE sourceLabel LIKE '%' || :label || '%' ORDER BY dateTimestamp DESC"
+    )
     fun getEmailsByLabel(label: String): Flow<List<EmailItem>>
 
     /**
      * Get INBOX emails excluding SENT (to avoid showing self-sent emails in inbox)
      */
-    @Query(
-        "SELECT * FROM emails WHERE labelIds LIKE '%INBOX%' AND labelIds NOT LIKE '%SENT%' ORDER BY dateTimestamp DESC"
-    )
+    @Query("SELECT * FROM emails WHERE sourceLabel LIKE '%INBOX%' ORDER BY dateTimestamp DESC")
     fun getInboxEmails(): Flow<List<EmailItem>>
 
     @Query("SELECT * FROM emails WHERE id = :emailId")
@@ -53,8 +53,13 @@ interface EmailDao {
      * 1. Backend sending consistent ISO 8601 format, or
      * 2. Adding a separate timestamp field for sorting
      */
-    @Query("SELECT date FROM emails ORDER BY cachedAt DESC LIMIT 1")
-    suspend fun getLatestEmailDate(): String?
+    @Query(
+        "SELECT date FROM emails WHERE sourceLabel LIKE '%' || :label || '%' ORDER BY cachedAt DESC LIMIT 1"
+    )
+    suspend fun getLatestEmailDate(label: String): String?
+
+    @Query("SELECT * FROM emails WHERE id IN (:ids)")
+    suspend fun getEmailsByIds(ids: List<String>): List<EmailItem>
 
     @Query(
         """
