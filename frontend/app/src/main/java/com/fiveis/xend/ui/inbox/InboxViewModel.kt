@@ -36,6 +36,8 @@ data class InboxUiState(
     val showDraftSavedBanner: Boolean = false,
     // 메일 전송 성공 배너 표시 여부
     val showMailSentBanner: Boolean = false,
+    // 새 메일 배너 표시 여부
+    val showNewEmailBanner: Boolean = false,
     // 메일 삭제 관련
     val deletingEmailId: String? = null,
     val deleteError: String? = null
@@ -56,6 +58,9 @@ class InboxViewModel(
 
     private val _uiState = MutableStateFlow(InboxUiState())
     val uiState: StateFlow<InboxUiState> = _uiState.asStateFlow()
+
+    private var previousFirstEmailId: String? = null
+    private var isFirstEmailLoad = true
 
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
@@ -144,6 +149,29 @@ class InboxViewModel(
         viewModelScope.launch {
             repository.getCachedEmails().collect { cachedEmails ->
                 Log.d("InboxViewModel", "Received ${cachedEmails.size} cached emails from DB")
+
+                val currentFirstEmailId = cachedEmails.firstOrNull()?.id
+                val shouldShowBanner =
+                    !isFirstEmailLoad &&
+                        previousFirstEmailId != null &&
+                        currentFirstEmailId != null &&
+                        currentFirstEmailId != previousFirstEmailId
+
+                if (shouldShowBanner) {
+                    Log.d(
+                        "InboxViewModel",
+                        "New emails detected! First email ID changed from $previousFirstEmailId to $currentFirstEmailId"
+                    )
+                }
+
+                if (currentFirstEmailId != null) {
+                    previousFirstEmailId = currentFirstEmailId
+                }
+
+                if (isFirstEmailLoad && cachedEmails.isNotEmpty()) {
+                    isFirstEmailLoad = false
+                }
+
                 _uiState.update { currentState ->
                     val deletingId = currentState.deletingEmailId
                     val shouldClearDeletingId = deletingId?.let { id ->
@@ -152,7 +180,8 @@ class InboxViewModel(
 
                     currentState.copy(
                         emails = cachedEmails,
-                        deletingEmailId = if (shouldClearDeletingId) null else deletingId
+                        deletingEmailId = if (shouldClearDeletingId) null else deletingId,
+                        showNewEmailBanner = if (shouldShowBanner) true else currentState.showNewEmailBanner
                     )
                 }
             }
@@ -373,6 +402,13 @@ class InboxViewModel(
      */
     fun dismissMailSentBanner() {
         _uiState.update { it.copy(showMailSentBanner = false) }
+    }
+
+    /**
+     * 새 메일 배너 닫기
+     */
+    fun dismissNewEmailBanner() {
+        _uiState.update { it.copy(showNewEmailBanner = false) }
     }
 
     /**

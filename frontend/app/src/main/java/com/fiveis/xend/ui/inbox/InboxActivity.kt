@@ -86,6 +86,9 @@ class InboxActivity : ComponentActivity() {
                     },
                     onDismissSuccessBanner = {
                         viewModel.dismissSuccessBanner()
+                    },
+                    onDismissNewEmailBanner = {
+                        viewModel.dismissNewEmailBanner()
                     }
                 )
 

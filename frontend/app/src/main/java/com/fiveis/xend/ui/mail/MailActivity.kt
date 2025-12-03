@@ -118,7 +118,9 @@ class MailActivity : ComponentActivity() {
                     onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner,
                     showMailSentBanner = inboxUiState.showMailSentBanner,
                     onDismissMailSentBanner = inboxViewModel::dismissMailSentBanner,
-                    onInboxDeleteEmail = inboxViewModel::deleteEmail
+                    onInboxDeleteEmail = inboxViewModel::deleteEmail,
+                    showNewEmailBanner = inboxUiState.showNewEmailBanner,
+                    onDismissNewEmailBanner = inboxViewModel::dismissNewEmailBanner
                 )
 
                 if (inboxUiState.showAddContactDialog) {
