@@ -43,6 +43,10 @@ class MailComposeViewModel(
     private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
     private var pendingSuggestionText: String? = null
+    private var pendingSuggestionSubject: String? = null
+    private var skipNextDebouncedSend: Boolean = false
+    private var latestText: String = ""
+    private var latestSubject: String = ""
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -183,6 +187,10 @@ class MailComposeViewModel(
                             "gpu.done" -> {
                                 suggestionBuffer.clear()
                             }
+                            "noop" -> {
+                                suggestionBuffer.clear()
+                                _ui.update { it.copy(suggestionText = "") }
+                            }
                         }
                     } catch (e: Exception) {
                         _ui.update {
@@ -224,6 +232,11 @@ class MailComposeViewModel(
         }
     }
 
+    fun skipNextTextChangeSend() {
+        skipNextDebouncedSend = true
+        debounceJob?.cancel()
+    }
+
     private fun disconnectWebSocket() {
         wsClient?.disconnect()
         suggestionBuffer.clear()
@@ -256,8 +269,18 @@ class MailComposeViewModel(
         }
     }
 
-    fun onTextChanged(currentText: String) {
+    fun onTextChanged(currentText: String, subject: String) {
         if (!_ui.value.isRealtimeEnabled) return
+
+        val sanitizedText = stripSuggestionFromText(currentText)
+
+        latestText = sanitizedText
+        latestSubject = subject
+
+        if (skipNextDebouncedSend) {
+            skipNextDebouncedSend = false
+            return
+        }
 
         val normalized = currentText.trim()
         if (normalized.length <= 20) {
@@ -271,10 +294,14 @@ class MailComposeViewModel(
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
         debounceJob = viewModelScope.launch {
-            delay(500)
+            delay(700)
+            if (sanitizedText != latestText || subject != latestSubject) {
+                return@launch
+            }
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
-                text = currentText,
+                text = sanitizedText,
+                subject = subject,
                 maxTokens = 50
             )
         }
@@ -315,7 +342,7 @@ class MailComposeViewModel(
     /**
      * Request new suggestion immediately (for tab completion)
      */
-    fun requestImmediateSuggestion(currentText: String, force: Boolean = false) {
+    fun requestImmediateSuggestion(currentText: String, subject: String, force: Boolean = false) {
         if (!_ui.value.isRealtimeEnabled && !force) return
 
         val normalized = currentText.trim()
@@ -331,7 +358,8 @@ class MailComposeViewModel(
         _ui.update { it.copy(suggestionText = "") }
 
         viewModelScope.launch(Dispatchers.Main) {
-            pendingSuggestionText = currentText
+            pendingSuggestionText = stripSuggestionFromText(currentText)
+            pendingSuggestionSubject = subject
         }
 
         wsClient?.let { client ->
@@ -348,11 +376,14 @@ class MailComposeViewModel(
     private fun sendPendingSuggestion() {
         viewModelScope.launch(Dispatchers.Main) {
             val text = pendingSuggestionText ?: return@launch
+            val subject = pendingSuggestionSubject ?: ""
             pendingSuggestionText = null
+            pendingSuggestionSubject = null
             delay(100) // Short delay to let the UI update
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
                 text = text,
+                subject = subject,
                 maxTokens = 50
             )
         }
@@ -369,6 +400,26 @@ class MailComposeViewModel(
                 sendPendingSuggestion()
             }
         }
+    }
+
+    private fun stripSuggestionFromText(text: String): String {
+        // Remove the transient gray suggestion span if it's still present in the HTML
+        var cleaned = text.replace(
+            Regex(
+                """<span[^>]*id=["']ai-suggestion["'][^>]*>.*?</span>""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            ),
+            ""
+        )
+
+        // If a suggestion is showing, strip it when it dangles at the end of the text
+        val suggestion = _ui.value.suggestionText.trim()
+        if (suggestion.isNotEmpty()) {
+            val pattern = Regex("\\s*${Regex.escape(suggestion)}\\s*$")
+            cleaned = cleaned.replace(pattern, "")
+        }
+
+        return cleaned.trimEnd()
     }
 
     private fun parseOutputFromMarkdown(rawText: String): String {
