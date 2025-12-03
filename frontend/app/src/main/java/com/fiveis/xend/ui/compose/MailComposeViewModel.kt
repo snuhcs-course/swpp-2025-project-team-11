@@ -259,6 +259,14 @@ class MailComposeViewModel(
     fun onTextChanged(currentText: String) {
         if (!_ui.value.isRealtimeEnabled) return
 
+        val normalized = currentText.trim()
+        if (normalized.length <= 20) {
+            debounceJob?.cancel()
+            suggestionBuffer.clear()
+            _ui.update { it.copy(suggestionText = "") }
+            return
+        }
+
         debounceJob?.cancel()
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
@@ -309,6 +317,14 @@ class MailComposeViewModel(
      */
     fun requestImmediateSuggestion(currentText: String, force: Boolean = false) {
         if (!_ui.value.isRealtimeEnabled && !force) return
+
+        val normalized = currentText.trim()
+        if (normalized.length <= 20 && !force) {
+            debounceJob?.cancel()
+            suggestionBuffer.clear()
+            _ui.update { it.copy(suggestionText = "") }
+            return
+        }
 
         debounceJob?.cancel()
         suggestionBuffer.clear()
