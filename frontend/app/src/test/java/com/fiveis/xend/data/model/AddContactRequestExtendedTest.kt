@@ -147,7 +147,7 @@ class AddContactRequestExtendedTest {
             context = AddContactRequestContext()
         )
 
-        assertEquals("KOR", request.context?.languagePreference)
+        assertEquals("", request.context?.languagePreference)
     }
 
     @Test
@@ -173,7 +173,7 @@ class AddContactRequestExtendedTest {
         assertEquals("", context.recipientRole)
         assertEquals("", context.relationshipDetails)
         assertEquals("", context.personalPrompt)
-        assertEquals("KOR", context.languagePreference)
+        assertEquals("", context.languagePreference)
     }
 
     @Test
