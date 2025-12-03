@@ -153,7 +153,7 @@ class MailComposeIntegrationTest {
         viewModel.enableRealtimeMode(true)
         Thread.sleep(100)
 
-        viewModel.onTextChanged("Test message")
+        viewModel.onTextChanged("Test message", "Test subject")
         Thread.sleep(100)
 
         verify { wsClient.connect(any(), any(), any(), any()) }
@@ -163,10 +163,10 @@ class MailComposeIntegrationTest {
     fun viewModel_ignores_text_changed_with_realtime_disabled() {
         viewModel = MailComposeViewModel(sseClient, wsClient)
 
-        viewModel.onTextChanged("Test message")
+        viewModel.onTextChanged("Test message", "Test subject")
         Thread.sleep(600)  // Wait for debounce timeout
 
-        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any()) }
+        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any(), any()) }
     }
 
     @Test(timeout = 5000)
