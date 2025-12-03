@@ -8,6 +8,7 @@ from .views import (
     MailGenerateStreamTestView,
     MailGenerateStreamView,
     MailGenerateWithPlanStreamView,
+    MailSuggestView,
     ReplyOptionsStreamView,
 )
 
@@ -28,4 +29,5 @@ urlpatterns = [
         name="mail-attachment-analyze-upload",
     ),
     path("mail/generate/test/", MailGenerateAnalysisTestView.as_view(), name="mail-generate-test"),
+    path("mail/suggest/", MailSuggestView.as_view(), name="mail-suggest"),
 ]

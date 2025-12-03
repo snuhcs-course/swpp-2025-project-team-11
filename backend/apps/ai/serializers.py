@@ -85,3 +85,52 @@ class MailGenerateAnalysisResponseSerializer(serializers.Serializer):
     with_fewshots = _MailGenResultSerializer(
         help_text="fewshots만 사용(analysis 제거)하여 생성한 결과",
     )
+
+
+class MailSuggestRequest(serializers.Serializer):
+    subject = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
+    body = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
+
+    to_emails = serializers.ListField(
+        child=serializers.EmailField(),
+        allow_empty=False,
+        required=True,
+    )
+
+    target = serializers.ChoiceField(
+        choices=["subject", "body"],
+        required=False,
+    )
+
+    # 본문 중간 자동완성용
+    cursor = serializers.IntegerField(required=False, min_value=0, help_text="body에서 커서 위치 (0-based index). 없으면 끝에 이어쓰기.")
+
+    def validate(self, attrs):
+        subject = attrs.get("subject") or ""
+        body = attrs.get("body") or ""
+        cursor = attrs.get("cursor")
+
+        if not subject and not body:
+            raise serializers.ValidationError("subject 또는 body 중 하나는 반드시 입력해야 합니다.")
+
+        if cursor is not None and attrs["target"] == "body":
+            if not body:
+                raise serializers.ValidationError("cursor를 쓰려면 body가 필요합니다.")
+            if cursor > len(body):
+                raise serializers.ValidationError("cursor는 body 길이 이하여야 합니다.")
+        return attrs
+
+
+class MailSuggestResponseSerializer(serializers.Serializer):
+    target = serializers.ChoiceField(choices=["subject", "body"])
+    suggestion = serializers.CharField(help_text="이어쓰기/자동완성 제안 텍스트")
