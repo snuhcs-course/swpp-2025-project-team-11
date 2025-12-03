@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                     factory = object : ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return LoginViewModel(tokenManager) as T
+                            return LoginViewModel(applicationContext, tokenManager) as T
                         }
                     }
                 )
@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
                 object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
                     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return LoginViewModel(tokenManager) as T
+                        return LoginViewModel(this@MainActivity.applicationContext, tokenManager) as T
                     }
                 }
             )[LoginViewModel::class.java]

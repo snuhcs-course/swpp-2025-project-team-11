@@ -300,7 +300,7 @@ private fun ReplyComposeContent(
             onUseSelectedOption = {
                 selectedOption?.let { option -> onUseOption(option) }
             },
-            isUseOptionEnabled = selectedOption != null
+            isUseOptionEnabled = selectedOption != null && !isStreamingOptions
         )
     }
 }
@@ -605,6 +605,7 @@ private fun ReplyOptionsSection(
             android.util.Log.d("ReplyOptionsSection", "HorizontalPager page=$page 렌더링 중")
             ReplyContentCard(
                 replyOption = replyOptions[page],
+                isStreaming = isStreaming,
                 onGenerateMore = onGenerateMore
             )
         }
@@ -642,7 +643,7 @@ private fun OptionTab(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ReplyContentCard(replyOption: ReplyOptionState, onGenerateMore: () -> Unit) {
+private fun ReplyContentCard(replyOption: ReplyOptionState, isStreaming: Boolean, onGenerateMore: () -> Unit) {
     android.util.Log.d(
         "ReplyContentCard",
         "id=${replyOption.id}, type=${replyOption.type}, " +
@@ -683,10 +684,13 @@ private fun ReplyContentCard(replyOption: ReplyOptionState, onGenerateMore: () -
                 // 새로 생성 버튼
                 Button(
                     onClick = onGenerateMore,
+                    enabled = !isStreaming,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Green60,
-                        contentColor = Color.White
+                        contentColor = Color.White,
+                        disabledContainerColor = Gray200,
+                        disabledContentColor = Gray500
                     ),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 12.dp,

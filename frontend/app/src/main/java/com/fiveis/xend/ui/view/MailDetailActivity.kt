@@ -57,6 +57,7 @@ class MailDetailActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val appContext = applicationContext
+        val isSentMail = intent.getBooleanExtra("is_sent_mail", false)
         setContent {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
@@ -78,6 +79,7 @@ class MailDetailActivity : ComponentActivity() {
                     uiState = uiState,
                     knownContactsByEmail = knownContacts,
                     onBack = { finish() },
+                    showReplyButton = !isSentMail,
                     onReply = {
                         uiState.mail?.let { mail ->
                             val intent = Intent(this@MailDetailActivity, ReplyComposeActivity::class.java).apply {
