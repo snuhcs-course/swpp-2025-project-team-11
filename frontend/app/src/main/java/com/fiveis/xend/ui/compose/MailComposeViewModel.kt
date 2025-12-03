@@ -47,6 +47,9 @@ class MailComposeViewModel(
     private var skipNextDebouncedSend: Boolean = false
     private var latestText: String = ""
     private var latestSubject: String = ""
+    private var lastRealtimeRequestText: String? = null
+    private var lastRealtimeRequestSubject: String? = null
+    private var lastRetryAttemptedForText: String? = null
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -257,6 +260,7 @@ class MailComposeViewModel(
                 realtimeErrorMessage = friendlyMessage
             )
         }
+        scheduleRealtimeRetry()
     }
 
     private fun mapRealtimeError(rawMessage: String): String? {
@@ -298,6 +302,9 @@ class MailComposeViewModel(
             if (sanitizedText != latestText || subject != latestSubject) {
                 return@launch
             }
+            lastRealtimeRequestText = sanitizedText
+            lastRealtimeRequestSubject = subject
+            lastRetryAttemptedForText = null
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
                 text = sanitizedText,
@@ -360,6 +367,9 @@ class MailComposeViewModel(
         viewModelScope.launch(Dispatchers.Main) {
             pendingSuggestionText = stripSuggestionFromText(currentText)
             pendingSuggestionSubject = subject
+            lastRealtimeRequestText = pendingSuggestionText
+            lastRealtimeRequestSubject = subject
+            lastRetryAttemptedForText = null
         }
 
         wsClient?.let { client ->
@@ -380,6 +390,9 @@ class MailComposeViewModel(
             pendingSuggestionText = null
             pendingSuggestionSubject = null
             delay(100) // Short delay to let the UI update
+            lastRealtimeRequestText = text
+            lastRealtimeRequestSubject = subject
+            lastRetryAttemptedForText = null
             wsClient?.sendMessage(
                 systemPrompt = "메일 초안 작성",
                 text = text,
@@ -457,5 +470,28 @@ class MailComposeViewModel(
     override fun onCleared() {
         super.onCleared()
         disconnectWebSocket()
+    }
+
+    private fun scheduleRealtimeRetry(delayMs: Long = 500) {
+        if (!_ui.value.isRealtimeEnabled) return
+        val text = lastRealtimeRequestText?.trim() ?: return
+        val subject = lastRealtimeRequestSubject.orEmpty()
+        if (text.length <= 20) return
+        if (lastRetryAttemptedForText == text) return
+
+        lastRetryAttemptedForText = text
+        debounceJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
+
+        viewModelScope.launch {
+            delay(delayMs)
+            wsClient?.sendMessage(
+                systemPrompt = "메일 초안 작성",
+                text = text,
+                subject = subject,
+                maxTokens = 50
+            )
+        }
     }
 }
