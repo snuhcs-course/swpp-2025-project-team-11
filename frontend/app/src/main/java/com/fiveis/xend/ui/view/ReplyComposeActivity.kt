@@ -118,6 +118,10 @@ class ReplyComposeActivity : ComponentActivity() {
                     },
                     onUseOption = { selectedOption ->
                         // 선택한 옵션으로 직접 작성 화면으로 이동
+                        android.util.Log.d(
+                            "ReplyComposeActivity",
+                            "onUseOption: body length=${selectedOption.body.length}"
+                        )
                         val intent = Intent(this@ReplyComposeActivity, ReplyDirectComposeActivity::class.java).apply {
                             putExtra("recipient_email", senderEmailAddress)
                             putExtra("recipient_name", senderDisplay)
@@ -128,6 +132,7 @@ class ReplyComposeActivity : ComponentActivity() {
                             putExtra("original_body", body)
                             putExtra("generated_body", selectedOption.body)
                         }
+                        android.util.Log.d("ReplyComposeActivity", "Starting ReplyDirectComposeActivity")
                         startActivity(intent)
                     }
                 )

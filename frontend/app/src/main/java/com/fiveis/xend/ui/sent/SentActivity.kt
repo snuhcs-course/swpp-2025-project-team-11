@@ -63,6 +63,7 @@ class SentActivity : ComponentActivity() {
                     onEmailClick = {
                         val intent = Intent(this, MailDetailActivity::class.java)
                         intent.putExtra("message_id", it.id)
+                        intent.putExtra("is_sent_mail", true)
                         startActivity(intent)
                     },
                     onOpenSearch = {

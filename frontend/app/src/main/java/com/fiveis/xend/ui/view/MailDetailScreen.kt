@@ -126,7 +126,8 @@ fun MailDetailScreen(
     onDismissPreview: () -> Unit = {},
     onOpenAttachmentExternally: (Attachment) -> Unit = {},
     onConsumeExternalOpen: () -> Unit = {},
-    onClearExternalOpenError: () -> Unit = {}
+    onClearExternalOpenError: () -> Unit = {},
+    showReplyButton: Boolean = true
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
@@ -171,15 +172,17 @@ fun MailDetailScreen(
             }
         },
         bottomBar = {
-            val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-            Column(
-                modifier = Modifier.padding(bottom = navBarPadding.calculateBottomPadding())
-            ) {
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = ComposeOutline
-                )
-                ReplyButton(onClick = onReply)
+            if (showReplyButton) {
+                val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
+                Column(
+                    modifier = Modifier.padding(bottom = navBarPadding.calculateBottomPadding())
+                ) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = ComposeOutline
+                    )
+                    ReplyButton(onClick = onReply)
+                }
             }
         }
     ) { paddingValues ->

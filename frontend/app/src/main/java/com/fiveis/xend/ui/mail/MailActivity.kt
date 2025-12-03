@@ -80,6 +80,8 @@ class MailActivity : ComponentActivity() {
                     onEmailClick = {
                         val intent = Intent(this, MailDetailActivity::class.java)
                         intent.putExtra("message_id", it.id)
+                        val isSentMail = it.labelIds.contains("SENT")
+                        intent.putExtra("is_sent_mail", isSentMail)
                         startActivity(intent)
                     },
                     onAddContactClick = { email ->

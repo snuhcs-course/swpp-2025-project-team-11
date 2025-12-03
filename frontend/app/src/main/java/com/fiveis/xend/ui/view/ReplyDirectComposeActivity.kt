@@ -89,9 +89,12 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         val senderEmail = intent.getStringExtra("sender_email") ?: ""
         val date = intent.getStringExtra("date") ?: ""
         val originalBody = intent.getStringExtra("original_body") ?: ""
-        val generatedBody = intent.getStringExtra("generated_body")
+        val generatedBodyRaw = intent.getStringExtra("generated_body")
+        Log.d("ReplyDirectCompose", "onCreate: generatedBodyRaw length=${generatedBodyRaw?.length ?: 0}")
+        val generatedBody = generatedBodyRaw
             ?.normalizeAsHtml()
             .orEmpty()
+        Log.d("ReplyDirectCompose", "onCreate: generatedBody (normalized) length=${generatedBody.length}")
 
         // 이메일 주소 추출 ("이름 <email@example.com>" 형식에서 이메일만 추출)
         val recipientEmail = EmailUtils.extractEmailAddress(recipientEmailRaw)
@@ -174,19 +177,32 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             "editor=${editorState.editor}, applied=$generatedBodyApplied"
                     )
                     if (generatedBody.isNotEmpty() && !generatedBodyApplied) {
-                        // Wait for editor to be ready
-                        while (editorState.editor == null) {
+                        // Wait for editor to be ready with timeout
+                        var retries = 0
+                        while (editorState.editor == null && retries < 40) {
                             kotlinx.coroutines.delay(50)
+                            retries++
                         }
+
+                        if (editorState.editor == null) {
+                            android.util.Log.e("ReplyDirectCompose", "Editor not ready after timeout")
+                            return@LaunchedEffect
+                        }
+
                         // Additional delay to ensure WebView is fully loaded
-                        kotlinx.coroutines.delay(200)
+                        kotlinx.coroutines.delay(300)
+
                         android.util.Log.d("ReplyDirectCompose", "Setting HTML from generatedBody (after delay)")
-                        editorState.setHtml(generatedBody)
-                        generatedBodyApplied = true
-                        android.util.Log.d(
-                            "ReplyDirectCompose",
-                            "HTML set complete, applied flag = $generatedBodyApplied"
-                        )
+                        try {
+                            editorState.setHtml(generatedBody)
+                            generatedBodyApplied = true
+                            android.util.Log.d(
+                                "ReplyDirectCompose",
+                                "HTML set complete, applied flag = $generatedBodyApplied"
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("ReplyDirectCompose", "Failed to set HTML", e)
+                        }
                     }
                 }
 
