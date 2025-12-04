@@ -141,6 +141,24 @@ fun ContactBookScreen(
                         }
                     )
 
+                    // Success Banner
+                    if (uiState.showSuccessBanner && uiState.successMessage != null) {
+                        val shouldShowBanner = when (uiState.successMessage) {
+                            "그룹이 추가되었습니다" -> selectedTab == ContactBookTab.Groups
+                            "연락처가 추가되었습니다" -> selectedTab == ContactBookTab.Contacts
+                            else -> true // 기타 메시지는 항상 표시
+                        }
+
+                        if (shouldShowBanner) {
+                            com.fiveis.xend.ui.compose.Banner(
+                                message = uiState.successMessage,
+                                type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
+                                onDismiss = onDismissSuccessBanner,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+
                     // 탭
                     Row(
                         Modifier
@@ -206,12 +224,20 @@ fun ContactBookScreen(
 
                     // Success Banner
                     if (uiState.showSuccessBanner && uiState.successMessage != null) {
-                        com.fiveis.xend.ui.compose.Banner(
-                            message = uiState.successMessage,
-                            type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
-                            onDismiss = onDismissSuccessBanner,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
+                        val shouldShowBanner = when (uiState.successMessage) {
+                            "그룹이 추가되었습니다" -> selectedTab == ContactBookTab.Groups
+                            "연락처가 추가되었습니다" -> selectedTab == ContactBookTab.Contacts
+                            else -> true // 기타 메시지는 항상 표시
+                        }
+
+                        if (shouldShowBanner) {
+                            com.fiveis.xend.ui.compose.Banner(
+                                message = uiState.successMessage,
+                                type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
+                                onDismiss = onDismissSuccessBanner,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
                     }
 
                     // 탭
