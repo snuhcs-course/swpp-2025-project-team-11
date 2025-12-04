@@ -110,7 +110,7 @@ def collect_prompt_context(
         "personal_prompt": None,
         "sender_role": None,
         "recipient_role": None,
-        "language": language,
+        "language": language or "user's original language",
         "fewshots": [],
         "analysis": None,
         "profile": profile,
