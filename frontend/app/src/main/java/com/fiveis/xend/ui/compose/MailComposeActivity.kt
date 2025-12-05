@@ -103,7 +103,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -114,9 +113,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.text.HtmlCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -129,8 +125,8 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.toDomain
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.network.AiApiService
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
@@ -1171,11 +1167,11 @@ fun ContactChip(
 
 class ComposeVmFactory(
     private val sseClient: MailComposeSseClient,
-    private val wsClient: MailComposeWebSocketClient
+    private val aiApiService: AiApiService
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MailComposeViewModel(sseClient, wsClient) as T
+        return MailComposeViewModel(sseClient, aiApiService) as T
     }
 }
 
@@ -1221,10 +1217,7 @@ class MailComposeActivity : ComponentActivity() {
                             application.applicationContext,
                             endpointUrl = BuildConfig.BASE_URL + "/api/ai/mail/generate/stream/"
                         ),
-                        wsClient = MailComposeWebSocketClient(
-                            context = application.applicationContext,
-                            wsUrl = BuildConfig.WS_URL
-                        )
+                        aiApiService = RetrofitClient.getAiApiService(application.applicationContext)
                     )
                 )
 
@@ -1287,21 +1280,6 @@ class MailComposeActivity : ComponentActivity() {
                 var analysisError by remember { mutableStateOf<String?>(null) }
                 var isAnalyzingAttachment by remember { mutableStateOf(false) }
                 val attachmentContentKeys = remember { mutableStateMapOf<Uri, String>() }
-                val lifecycleOwner = LocalLifecycleOwner.current
-
-                // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
-                DisposableEffect(lifecycleOwner, aiRealtime) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME && aiRealtime) {
-                            composeVm.ensureRealtimeConnection()
-                        }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose {
-                        lifecycleOwner.lifecycle.removeObserver(observer)
-                    }
-                }
-
                 // Banner state
                 var bannerState by remember { mutableStateOf<BannerState?>(null) }
                 // Auto-dismiss logic for banners
@@ -1499,6 +1477,7 @@ class MailComposeActivity : ComponentActivity() {
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
+                        composeVm.skipNextTextChangeSend()
                         editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
@@ -1507,13 +1486,11 @@ class MailComposeActivity : ComponentActivity() {
                 LaunchedEffect(editorState.editor) {
                     editorState.editor?.setOnTextChangeListener { html ->
                         if (aiRealtime) {
-                            val plainText = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                                .toString()
-                                .replace("\u00A0", " ")
-                                .trimEnd()
                             composeVm.onTextChanged(
-                                currentText = plainText,
-                                subject = subject
+                                currentText = html,
+                                subject = subject,
+                                toEmails = contacts.map { it.email },
+                                cursorPosition = editorState.getCursorPosition()
                             )
                         }
                     }
@@ -1546,7 +1523,10 @@ class MailComposeActivity : ComponentActivity() {
                         delay(50)
                         composeVm.requestImmediateSuggestion(
                             currentText = editorState.getHtml(),
-                            subject = subject
+                            subject = subject,
+                            toEmails = contacts.map { it.email },
+                            cursorPosition = editorState.getCursorPosition(),
+                            force = true
                         )
                     }
                 }
@@ -1607,6 +1587,8 @@ class MailComposeActivity : ComponentActivity() {
                                         composeVm.requestImmediateSuggestion(
                                             currentText = editorState.getHtml(),
                                             subject = subject,
+                                            toEmails = contacts.map { contact -> contact.email },
+                                            cursorPosition = editorState.getCursorPosition(),
                                             force = true
                                         )
                                     }

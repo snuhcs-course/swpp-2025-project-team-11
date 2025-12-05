@@ -228,18 +228,20 @@ class XendRichEditor @JvmOverloads constructor(
                     var caretRange = sel.getRangeAt(0);
                     var suggestionRange = document.createRange();
                     suggestionRange.selectNode(suggestion);
-                    // If caret is at or after the end of the suggestion, snap it before the span
+                    // If caret is at or after the end of the suggestion, discard the suggestion
                     var compareEnd = caretRange.compareBoundaryPoints(Range.START_TO_END, suggestionRange);
                     var anchorInside = suggestion.contains(sel.anchorNode);
                     if (anchorInside || compareEnd >= 0) {
-                        var guardRange = document.createRange();
-                        guardRange.setStartBefore(suggestion);
-                        guardRange.collapse(true);
-                        sel.removeAllRanges();
-                        sel.addRange(guardRange);
+                        suggestion.remove();
+                        document.removeEventListener('selectionchange', window._xendSuggestionGuard);
+                        window._xendSuggestionGuard = null;
+                        if (typeof RE !== 'undefined' && RE.callback) {
+                            RE.callback();
+                        }
                     }
                 };
-                document.addEventListener('selectionchange', window._xendSuggestionGuard);
+                document.addEventListener('keyup', window._xendSuggestionGuard, true);
+                document.addEventListener('selectionchange', window._xendSuggestionGuard, true);
                 sel.removeAllRanges();
                 sel.addRange(caretRange);
             })();
@@ -258,7 +260,8 @@ class XendRichEditor @JvmOverloads constructor(
                     existing.remove();
                 }
                 if (window._xendSuggestionGuard) {
-                    document.removeEventListener('selectionchange', window._xendSuggestionGuard);
+                    document.removeEventListener('keyup', window._xendSuggestionGuard, true);
+                    document.removeEventListener('selectionchange', window._xendSuggestionGuard, true);
                     window._xendSuggestionGuard = null;
                 }
             })();
