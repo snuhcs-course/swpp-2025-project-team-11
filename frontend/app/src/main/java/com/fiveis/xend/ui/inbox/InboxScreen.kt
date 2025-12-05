@@ -594,14 +594,6 @@ private fun EmailRow(
     val offsetX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
-    // Animate when isRevealed changes
-    LaunchedEffect(isRevealed) {
-        offsetX.animateTo(
-            targetValue = if (isRevealed) -revealWidthPx else 0f,
-            animationSpec = tween(durationMillis = 300)
-        )
-    }
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -646,6 +638,19 @@ private fun EmailRow(
                                     // Snap to revealed or collapsed based on threshold
                                     val shouldReveal = offsetX.value < -revealWidthPx / 2
                                     isRevealed = shouldReveal
+                                    offsetX.animateTo(
+                                        targetValue = if (shouldReveal) -revealWidthPx else 0f,
+                                        animationSpec = tween(durationMillis = 250)
+                                    )
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch {
+                                    isRevealed = false
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(durationMillis = 250)
+                                    )
                                 }
                             },
                             onHorizontalDrag = { _, dragAmount ->
@@ -661,7 +666,13 @@ private fun EmailRow(
                     enabled = !isDeleting,
                     onClick = {
                         if (isRevealed) {
-                            isRevealed = false
+                            scope.launch {
+                                isRevealed = false
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(durationMillis = 250)
+                                )
+                            }
                         } else {
                             onClick()
                         }
