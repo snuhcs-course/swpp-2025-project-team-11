@@ -282,17 +282,12 @@ class ReplyDirectComposeActivity : ComponentActivity() {
 
                 LaunchedEffect(sendUiState.lastSuccessMsg) {
                     sendUiState.lastSuccessMsg?.let {
-                        bannerState = com.fiveis.xend.ui.compose.BannerState(
-                            message = "메일 전송에 성공했습니다.",
-                            type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
-                            actionText = "홈 화면 이동하기",
-                            onActionClick = {
-                                val intent = Intent(this@ReplyDirectComposeActivity, MailActivity::class.java)
-                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                startActivity(intent)
-                                finish()
-                            }
-                        )
+                        val intent = Intent(this@ReplyDirectComposeActivity, MailActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            putExtra("show_mail_sent_banner", true)
+                        }
+                        startActivity(intent)
+                        finish()
                     }
                 }
 

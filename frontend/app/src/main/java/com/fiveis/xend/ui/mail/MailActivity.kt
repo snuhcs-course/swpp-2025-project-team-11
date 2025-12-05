@@ -147,6 +147,14 @@ class MailActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Check if we need to show mail sent banner from ReplyDirectComposeActivity
+        if (intent.getBooleanExtra("show_mail_sent_banner", false)) {
+            inboxViewModel.showMailSentBanner()
+        }
+    }
 }
 
 class InboxViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
