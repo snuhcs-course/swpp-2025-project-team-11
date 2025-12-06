@@ -44,6 +44,8 @@ class MailComposeViewModel(
     companion object {
         private const val REALTIME_MIN_CHARS = 20
         private const val PLACEHOLDER_EMAIL = "placeholder@example.com"
+        private const val RETRY_DELAY_MS = 2000L
+        private const val MAX_RETRY_COUNT = 3
     }
 
     private val _ui = MutableStateFlow(MailComposeUiState())
@@ -53,11 +55,13 @@ class MailComposeViewModel(
     private val suggestionBuffer = StringBuilder()
     private var debounceJob: Job? = null
     private var realtimeRequestJob: Job? = null
+    private var retryJob: Job? = null
     private var skipNextDebouncedSend = false
     private var latestPlainText: String = ""
     private var latestSubject: String = ""
     private var lastRealtimeRequestSignature: String? = null
     private var lastObservedHtml: String? = null
+    private var retryCount = 0
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -192,8 +196,24 @@ class MailComposeViewModel(
         }
 
         debounceJob?.cancel()
+        retryJob?.cancel()
+
+        // 중복 검사: 중복이면 현재 추천 유지, 아니면 바로 지움
+        val signature = buildRealtimeSignature(
+            normalizedText = plainText,
+            htmlText = sanitizedHtml,
+            subject = subject,
+            cursorPosition = cursorPosition
+        )
+        if (signature == lastRealtimeRequestSignature) {
+            Log.d("MailComposeVM", "duplicate context, keeping current suggestion")
+            return
+        }
+
+        // 중복이 아니면 바로 추천 지우기
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
+
         debounceJob = viewModelScope.launch {
             delay(400)
             if (plainText != latestPlainText || subject != latestSubject) {
@@ -277,6 +297,8 @@ class MailComposeViewModel(
             _ui.update { it.copy(suggestionText = "") }
             debounceJob?.cancel()
             realtimeRequestJob?.cancel()
+            retryJob?.cancel()
+            retryCount = 0
         }
     }
 
@@ -324,6 +346,11 @@ class MailComposeViewModel(
                 if (response.isSuccessful) {
                     val suggestion = response.body()?.suggestion.orEmpty()
                     val singleSentence = extractFirstSentence(suggestion)
+                    Log.d(
+                        "MailComposeVM",
+                        "suggestion raw='${suggestion.take(100)}', " +
+                            "extracted='${singleSentence.take(100)}'"
+                    )
                     suggestionBuffer.clear()
                     suggestionBuffer.append(singleSentence)
                     _ui.update {
@@ -332,6 +359,15 @@ class MailComposeViewModel(
                             realtimeStatus = RealtimeConnectionStatus.CONNECTED,
                             realtimeErrorMessage = null
                         )
+                    }
+                    // 추천이 비어있으면 일정 시간 후 재시도
+                    if (singleSentence.isEmpty() && retryCount < MAX_RETRY_COUNT) {
+                        retryCount++
+                        lastRealtimeRequestSignature = null // 시그니처 초기화하여 재요청 허용
+                        Log.d("MailComposeVM", "Empty suggestion, scheduling retry ($retryCount/$MAX_RETRY_COUNT)")
+                        scheduleRetry(htmlText, normalizedText, subject, toEmails, cursorPosition)
+                    } else if (singleSentence.isNotEmpty()) {
+                        retryCount = 0 // 성공하면 재시도 카운트 초기화
                     }
                 } else {
                     val errorBody = response.errorBody()?.string().orEmpty()
@@ -419,9 +455,34 @@ class MailComposeViewModel(
         return normalized.substring(0, cutoff).trim()
     }
 
+    private fun scheduleRetry(
+        htmlText: String,
+        normalizedText: String,
+        subject: String,
+        toEmails: List<String>,
+        cursorPosition: Int
+    ) {
+        retryJob?.cancel()
+        retryJob = viewModelScope.launch {
+            delay(RETRY_DELAY_MS)
+            if (!_ui.value.isRealtimeEnabled) return@launch
+            Log.d("MailComposeVM", "Retry triggered for suggestion")
+            launchRealtimeSuggestion(
+                htmlText = htmlText,
+                normalizedText = normalizedText,
+                subject = subject,
+                toEmails = toEmails,
+                cursorPosition = cursorPosition,
+                includeHtmlInSignature = true,
+                force = true
+            )
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         debounceJob?.cancel()
         realtimeRequestJob?.cancel()
+        retryJob?.cancel()
     }
 }

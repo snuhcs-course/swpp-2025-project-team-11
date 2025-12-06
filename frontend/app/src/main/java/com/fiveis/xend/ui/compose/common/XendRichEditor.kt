@@ -202,13 +202,7 @@ class XendRichEditor @JvmOverloads constructor(
                 if (!sel.rangeCount) return;
                 var caretRange = sel.getRangeAt(0).cloneRange();
                 caretRange.collapse(false);
-                var afterRange = caretRange.cloneRange();
-                afterRange.selectNodeContents(document.body);
-                afterRange.setStart(caretRange.endContainer, caretRange.endOffset);
-                var textAfterCursor = afterRange.toString().trim();
-                if (textAfterCursor.length > 0) {
-                    return;
-                }
+
                 var insertRange = caretRange.cloneRange();
                 insertRange.collapse(false);
                 var textSpan = document.createElement('span');
@@ -220,6 +214,14 @@ class XendRichEditor @JvmOverloads constructor(
                 textSpan.style.pointerEvents = 'none';
                 textSpan.textContent = ' ' + '$escapedText';
                 insertRange.insertNode(textSpan);
+
+                // 커서를 원래 위치로 복원 (span 앞)
+                var restoreRange = document.createRange();
+                restoreRange.setStartBefore(textSpan);
+                restoreRange.setEndBefore(textSpan);
+                sel.removeAllRanges();
+                sel.addRange(restoreRange);
+
                 window._xendSuggestionGuard = function() {
                     var suggestion = document.getElementById('ai-suggestion');
                     if (!suggestion) return;
@@ -242,8 +244,6 @@ class XendRichEditor @JvmOverloads constructor(
                 };
                 document.addEventListener('keyup', window._xendSuggestionGuard, true);
                 document.addEventListener('selectionchange', window._xendSuggestionGuard, true);
-                sel.removeAllRanges();
-                sel.addRange(caretRange);
             })();
         """.trimIndent()
         evaluateJavascript(js, null)
