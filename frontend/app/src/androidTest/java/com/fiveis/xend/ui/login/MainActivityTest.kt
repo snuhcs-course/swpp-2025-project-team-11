@@ -26,11 +26,18 @@ class MainActivityTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         tokenManager = TokenManager(context)
         // Clear any existing tokens to ensure clean state
-        try {
-            tokenManager.clearTokens()
-            Thread.sleep(100) // Let cleanup settle
-        } catch (e: Exception) {
-            // Ignore cleanup errors
+        tokenManager.clearTokens()
+        // apply()는 비동기이므로 저장이 완료될 때까지 대기
+        waitForTokenState(isLoggedIn = false)
+    }
+
+    private fun waitForTokenState(isLoggedIn: Boolean, timeoutMs: Long = 2000) {
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            if (tokenManager.isLoggedIn() == isLoggedIn) {
+                return
+            }
+            Thread.sleep(50)
         }
     }
 
@@ -130,40 +137,29 @@ class MainActivityTest {
 
     @Test
     fun mainActivity_with_saved_tokens_should_not_crash() {
-        try {
-            // Given - Mock tokens (not real network call)
-            tokenManager.saveTokens(
-                access = "mock_access_token",
-                refresh = "mock_refresh_token",
-                email = "test@example.com"
-            )
+        // Given - Mock tokens (not real network call)
+        tokenManager.saveTokens(
+            access = "mock_access_token",
+            refresh = "mock_refresh_token",
+            email = "test@example.com"
+        )
 
-            // Wait a bit to ensure tokens are persisted
-            Thread.sleep(100)
+        // apply()는 비동기이므로 토큰 저장이 완료될 때까지 대기
+        waitForTokenState(isLoggedIn = true)
 
-            // When - Launch activity (may auto-login and navigate away)
-            val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
-            scenario = ActivityScenario.launch<MainActivity>(intent)
+        // When - Launch activity (may auto-login and navigate away)
+        val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+        scenario = ActivityScenario.launch<MainActivity>(intent)
 
-            // Wait for activity to initialize
-            Thread.sleep(500)
+        // Then - Should not crash, even if it finishes during auto-login
+        // The activity may be DESTROYED if it auto-navigated and finished
+        assertNotNull(scenario)
 
-            // Then - Should not crash, even if it finishes during auto-login
-            // The activity may be DESTROYED if it auto-navigated and finished
-            assertNotNull(scenario)
-
-            // Verify activity exists and either stayed or navigated successfully
-            val state = scenario?.state
-            assertNotNull(state)
-            // State could be RESUMED (stayed) or DESTROYED (auto-navigated and finished)
-            // Both are valid outcomes
-        } catch (e: Exception) {
-            // If the app crashes during token-based navigation,
-            // that's still a valid test - we just verify the intent is valid
-            val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
-            assertNotNull(intent)
-            assertEquals(MainActivity::class.java.name, intent.component?.className)
-        }
+        // Verify activity exists and either stayed or navigated successfully
+        val state = scenario?.state
+        assertNotNull(state)
+        // State could be RESUMED (stayed) or DESTROYED (auto-navigated and finished)
+        // Both are valid outcomes
     }
 
     @Test
@@ -262,9 +258,11 @@ class MainActivityTest {
     fun mainActivity_can_move_to_background() {
         // When
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        scenario?.moveToState(Lifecycle.State.CREATED)
 
-        // Then - Should handle background state
+        // Then - 먼저 RESUMED 상태 확인 후 CREATED로 이동
+        assertEquals(Lifecycle.State.RESUMED, scenario?.state)
+
+        scenario?.moveToState(Lifecycle.State.CREATED)
         assertEquals(Lifecycle.State.CREATED, scenario?.state)
     }
 

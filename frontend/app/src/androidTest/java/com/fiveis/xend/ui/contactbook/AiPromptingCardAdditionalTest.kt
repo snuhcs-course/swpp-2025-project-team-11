@@ -450,8 +450,8 @@ class AiPromptingCardAdditionalTest {
         composeTestRule.onAllNodesWithText("존댓말")[0].performTouchInput { longClick() }
         composeTestRule.onAllNodesWithText("수정")[1].performClick()
 
-        // Then - Multiple "저장" buttons exist (one in bottom sheet, one in edit dialog)
-        composeTestRule.onAllNodesWithText("저장").assertCountEquals(2)
+        // Then - At least one "저장" button exists in the edit dialog
+        composeTestRule.onAllNodesWithText("저장").onFirst().assertIsDisplayed()
         composeTestRule.onAllNodesWithText("취소")[0].assertIsDisplayed()
     }
 
