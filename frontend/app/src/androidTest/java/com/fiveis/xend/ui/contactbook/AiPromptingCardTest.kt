@@ -218,7 +218,8 @@ class AiPromptingCardTest {
         composeTestRule.onNodeWithText("수정").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("초기화").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("초기화", useUnmergedTree = true).onFirst()
+            .assertIsDisplayed()
     }
 
     @Test

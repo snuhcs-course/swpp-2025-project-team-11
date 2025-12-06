@@ -632,7 +632,9 @@ fun EmojiPickerDialog(currentEmoji: String?, onDismiss: () -> Unit, onEmojiSelec
                 Spacer(Modifier.height(16.dp))
 
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("emojiCategories"),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
@@ -656,7 +658,8 @@ fun EmojiPickerDialog(currentEmoji: String?, onDismiss: () -> Unit, onEmojiSelec
                     columns = GridCells.Fixed(6),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp),
+                        .height(300.dp)
+                        .testTag("emojiGrid"),
                     contentPadding = PaddingValues(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
