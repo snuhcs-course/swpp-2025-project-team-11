@@ -131,6 +131,37 @@ class MailComposeViewModelTest {
     }
 
     @Test
+    fun duplicate_html_event_does_not_clear_suggestion() = runTest {
+        val suggestion = "Hello world."
+        coEvery { aiApiService.suggestMail(any()) } returns Response.success(
+            MailSuggestResponse(target = "body", suggestion = suggestion)
+        )
+
+        viewModel.enableRealtimeMode(true)
+        val html = "<p>${"a".repeat(30)}</p>"
+
+        viewModel.onTextChanged(
+            currentText = html,
+            subject = "Subject",
+            toEmails = listOf("user@example.com"),
+            cursorPosition = 5
+        )
+        advanceUntilIdle()
+        assertEquals(suggestion, viewModel.ui.value.suggestionText)
+
+        viewModel.onTextChanged(
+            currentText = html,
+            subject = "Subject",
+            toEmails = listOf("user@example.com"),
+            cursorPosition = 5
+        )
+        advanceUntilIdle()
+
+        assertEquals(suggestion, viewModel.ui.value.suggestionText)
+        coVerify(exactly = 1) { aiApiService.suggestMail(any()) }
+    }
+
+    @Test
     fun on_text_changed_does_not_request_when_short() = runTest {
         viewModel.enableRealtimeMode(true)
 
