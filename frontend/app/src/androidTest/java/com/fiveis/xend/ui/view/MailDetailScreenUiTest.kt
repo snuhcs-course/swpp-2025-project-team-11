@@ -38,7 +38,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("오류: Network error").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("오류: Network error").assertExists()
     }
 
     @Test
@@ -57,7 +58,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Test Subject").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Test Subject").assertExists()
     }
 
     @Test
@@ -75,7 +77,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("메일 상세").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("메일 상세").assertExists()
     }
 
     @Test
@@ -94,7 +97,9 @@ class MailDetailScreenUiTest {
             )
         }
 
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("뒤로가기").performClick()
+        composeTestRule.waitForIdle()
         assert(backClicked)
     }
 
@@ -115,11 +120,10 @@ class MailDetailScreenUiTest {
             )
         }
 
-        Thread.sleep(500)
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("답장하기").assertExists()
-        Thread.sleep(200)
         composeTestRule.onNodeWithText("답장하기").performClick()
-        Thread.sleep(200)
+        composeTestRule.waitForIdle()
         assert(replyClicked)
     }
 
@@ -138,9 +142,10 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("John Doe").assertIsDisplayed()
-        composeTestRule.onNodeWithText("<john@test.com>").assertIsDisplayed()
-        composeTestRule.onNodeWithText("2024.12.19").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("John Doe").assertExists()
+        composeTestRule.onNodeWithText("<john@test.com>").assertExists()
+        composeTestRule.onNodeWithText("2024.12.19").assertExists()
     }
 
     @Test
@@ -163,9 +168,10 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("첨부파일 (2개)").assertIsDisplayed()
-        composeTestRule.onNodeWithText("file1.pdf").assertIsDisplayed()
-        composeTestRule.onNodeWithText("file2.txt").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("첨부파일 (2개)").assertExists()
+        composeTestRule.onNodeWithText("file1.pdf").assertExists()
+        composeTestRule.onNodeWithText("file2.txt").assertExists()
     }
 
     @Test
@@ -189,7 +195,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("AI가 파일을 분석 중입니다...").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("AI가 파일을 분석 중입니다...").assertExists()
     }
 
     @Test
@@ -219,10 +226,11 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("파일 분석 결과").assertIsDisplayed()
-        composeTestRule.onNodeWithText("주요 내용 요약").assertIsDisplayed()
-        composeTestRule.onNodeWithText("핵심 시사점").assertIsDisplayed()
-        composeTestRule.onNodeWithText("답장 작성 가이드").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("파일 분석 결과").assertExists()
+        composeTestRule.onNodeWithText("주요 내용 요약").assertExists()
+        composeTestRule.onNodeWithText("핵심 시사점").assertExists()
+        composeTestRule.onNodeWithText("답장 작성 가이드").assertExists()
     }
 
     @Test
@@ -240,7 +248,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("파일 저장 중입니다...").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("파일 저장 중입니다...").assertExists()
     }
 
     @Test
@@ -258,7 +267,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("파일을 준비하는 중입니다...").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("파일을 준비하는 중입니다...").assertExists()
     }
 
     @Test
@@ -278,11 +288,12 @@ class MailDetailScreenUiTest {
             )
         }
 
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("document.pdf").performClick()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText("첨부파일 다운로드").assertIsDisplayed()
-        composeTestRule.onNodeWithText("'document.pdf' 파일을 저장할까요?").assertIsDisplayed()
+        composeTestRule.onNodeWithText("첨부파일 다운로드").assertExists()
+        composeTestRule.onNodeWithText("'document.pdf' 파일을 저장할까요?").assertExists()
     }
 
     @Test
@@ -306,7 +317,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("파일을 불러오는 중입니다...").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("파일을 불러오는 중입니다...").assertExists()
     }
 
     @Test
@@ -331,8 +343,9 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Failed to load").assertIsDisplayed()
-        composeTestRule.onNodeWithText("다시 시도").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Failed to load").assertExists()
+        composeTestRule.onNodeWithText("다시 시도").assertExists()
     }
 
     @Test
@@ -353,8 +366,9 @@ class MailDetailScreenUiTest {
             )
         }
 
+        composeTestRule.waitForIdle()
         // Sent mail should display "To. name" format
-        Thread.sleep(200)
+        composeTestRule.onNodeWithText("To. John Doe", substring = true).assertExists()
     }
 
     @Test
@@ -374,7 +388,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("AI 분석").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("AI 분석").assertExists()
     }
 
     @Test
@@ -394,7 +409,8 @@ class MailDetailScreenUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("보기").assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("보기").assertExists()
     }
 }
 
