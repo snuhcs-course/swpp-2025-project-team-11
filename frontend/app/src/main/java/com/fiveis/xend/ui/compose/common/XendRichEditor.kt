@@ -214,6 +214,16 @@ class XendRichEditor @JvmOverloads constructor(
                 textSpan.style.pointerEvents = 'none';
                 textSpan.textContent = ' ' + '$escapedText';
                 insertRange.insertNode(textSpan);
+
+                // 제로 폭 텍스트 노드를 span 앞에 삽입하고 커서를 그 앞에 위치
+                var zeroWidthNode = document.createTextNode('\u200B');
+                textSpan.parentNode.insertBefore(zeroWidthNode, textSpan);
+                var cursorRange = document.createRange();
+                cursorRange.setStart(zeroWidthNode, 0);
+                cursorRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(cursorRange);
+
                 window._xendSuggestionGuard = function() {
                     var suggestion = document.getElementById('ai-suggestion');
                     if (!suggestion) return;

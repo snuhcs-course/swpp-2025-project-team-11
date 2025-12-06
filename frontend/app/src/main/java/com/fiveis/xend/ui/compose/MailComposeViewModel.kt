@@ -420,7 +420,7 @@ class MailComposeViewModel(
                 setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
             ),
             ""
-        )
+        ).replace("\u200B", "") // 제로 폭 문자 제거
     }
 
     private fun normalizePlainText(html: String): String {
