@@ -2,6 +2,7 @@ package com.fiveis.xend.ui.contactbook
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.PromptOption
@@ -344,8 +345,8 @@ class AddGroupScreenTest {
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithContentDescription("그룹 추가").assertIsDisplayed()
+        // Then - top app bar action should be visible
+        composeTestRule.onNodeWithText("저장").assertIsDisplayed()
     }
 
     @Test
@@ -365,7 +366,10 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithContentDescription("그룹 추가").performClick()
+        // Enable the save button
+        composeTestRule.onNodeWithTag("groupNameInput").performTextInput("New group")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("저장").performClick()
 
         // Then
         assert(addClicked)
@@ -676,10 +680,11 @@ class AddGroupScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithContentDescription("뒤로가기").performClick()
-        composeTestRule.onNodeWithContentDescription("그룹 추가").performClick()
         composeTestRule.onNodeWithTag("groupNameInput").performTextInput("Test")
         composeTestRule.onNodeWithText("그룹을 소개해 주세요").performTextInput("Desc")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("뒤로가기").performClick()
+        composeTestRule.onNodeWithText("저장").performClick()
 
         // Then
         assert(backClicked)
@@ -878,6 +883,45 @@ class AddGroupScreenTest {
 
         // Then - Should display emoji grid
         composeTestRule.onNodeWithText("심볼 이모지 선택").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_emojiPickerDialog_shows_category_chips() {
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = null,
+                onDismiss = {},
+                onEmojiSelected = {}
+            )
+        }
+
+        // Then - Category chips should be visible
+        composeTestRule.onNodeWithText("전체").assertIsDisplayed()
+        composeTestRule.onNodeWithText("표정/사람").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_emojiPickerDialog_filters_by_category() {
+        // When
+        composeTestRule.setContent {
+            EmojiPickerDialog(
+                currentEmoji = null,
+                onDismiss = {},
+                onEmojiSelected = {}
+            )
+        }
+
+        // Switch to 여행/장소 category and verify filtering
+        composeTestRule.onNodeWithTag("emojiCategories")
+            .performScrollToNode(hasText("여행/장소"))
+        composeTestRule.onAllNodesWithText("여행/장소", useUnmergedTree = true)
+            .onFirst()
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onAllNodesWithText("🚗", useUnmergedTree = true).onFirst()
+            .assertIsDisplayed()
     }
 
     @Test

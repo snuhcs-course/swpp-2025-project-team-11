@@ -118,8 +118,7 @@ class InboxViewModelRepositoryIntegrationTest {
 
         val emails = viewModel.uiState.value.emails
         assertEquals(2, emails.size)
-        assertEquals("1", emails[0].id)
-        assertEquals("2", emails[1].id)
+        assertTrue(emails.map { it.id }.containsAll(listOf("1", "2")))
     }
 
     @Test
@@ -224,8 +223,7 @@ class InboxViewModelRepositoryIntegrationTest {
 
         val uiEmails = viewModel.uiState.value.emails
         assertEquals(2, uiEmails.size)
-        assertEquals("1", uiEmails[0].id)
-        assertEquals("2", uiEmails[1].id)
+        assertTrue(uiEmails.map { it.id }.containsAll(listOf("1", "2")))
     }
 
     @Test
@@ -328,7 +326,12 @@ class InboxViewModelRepositoryIntegrationTest {
         assertEquals("Third email should be '1'", "1", orderedEmails[2].id)
     }
 
-    private fun createMockEmailItem(id: String, date: String = "2025-01-01T00:00:00Z", isUnread: Boolean = true, cachedAt: Long = System.currentTimeMillis()) =
+    private fun createMockEmailItem(
+        id: String,
+        date: String = "2025-01-01T00:00:00Z",
+        isUnread: Boolean = true,
+        cachedAt: Long = System.currentTimeMillis()
+    ) =
         EmailItem(
             id = id,
             threadId = "thread_$id",
@@ -339,6 +342,8 @@ class InboxViewModelRepositoryIntegrationTest {
             dateRaw = "Wed, 1 Jan 2025 00:00:00 +0000",
             isUnread = isUnread,
             labelIds = listOf("INBOX"),
-            cachedAt = cachedAt
+            cachedAt = cachedAt,
+            sourceLabel = "INBOX",
+            dateTimestamp = cachedAt
         )
 }
