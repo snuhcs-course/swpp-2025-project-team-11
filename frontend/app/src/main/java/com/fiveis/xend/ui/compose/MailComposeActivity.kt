@@ -1462,15 +1462,8 @@ class MailComposeActivity : ComponentActivity() {
                 }
 
                 // Enable/disable realtime mode when toggle changes
-                DisposableEffect(aiRealtime) {
+                LaunchedEffect(aiRealtime) {
                     composeVm.enableRealtimeMode(aiRealtime)
-
-                    onDispose {
-                        // Composable이 사라질 때 무조건 WebSocket 끊기
-                        if (aiRealtime) {
-                            composeVm.enableRealtimeMode(false)
-                        }
-                    }
                 }
 
                 // Sync state from AI ViewModel to local state

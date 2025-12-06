@@ -386,7 +386,19 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         },
                         onStopStreaming = { composeVm.stopStreaming() },
                         onAcceptSuggestion = acceptSuggestion,
-                        onAiRealtimeToggle = { aiRealtime = it },
+                        onAiRealtimeToggle = {
+                            aiRealtime = it
+                            if (it) {
+                                // Immediately ask for a suggestion with the current draft when toggled on
+                                composeVm.requestImmediateSuggestion(
+                                    currentText = editorState.getHtml(),
+                                    subject = currentSubject,
+                                    toEmails = listOf(recipientEmail),
+                                    cursorPosition = editorState.getCursorPosition(),
+                                    force = true
+                                )
+                            }
+                        },
                         realtimeStatus = composeUi.realtimeStatus,
                         realtimeErrorMessage = composeUi.realtimeErrorMessage,
                         bannerState = bannerState,
