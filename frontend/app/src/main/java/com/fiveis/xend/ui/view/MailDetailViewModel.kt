@@ -1,9 +1,12 @@
 package com.fiveis.xend.ui.view
 
+import android.app.ActivityManager
 import android.content.ContentValues
 import android.content.Context
+import android.graphics.pdf.PdfRenderer
 import android.os.Build
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -465,6 +468,7 @@ class MailDetailViewModel(
             try {
                 val safeFilename = attachment.filename.ifBlank { "attachment" }
                 val safeMimeType = attachment.mimeType.ifBlank { "application/octet-stream" }
+                var forcedExternalOpen = false
                 val response = inboxRepository.downloadAttachment(
                     mailId,
                     attachment.attachmentId,
@@ -494,11 +498,21 @@ class MailDetailViewModel(
                 val previewContent = body.use { responseBody ->
                     when (previewType) {
                         AttachmentPreviewType.TEXT -> AttachmentPreviewContent.Text(readTextPreview(responseBody))
-                        AttachmentPreviewType.PDF -> writePreviewFile(safeFilename, responseBody)?.let {
-                            AttachmentPreviewContent.Pdf(it.absolutePath)
+                        AttachmentPreviewType.PDF -> writePreviewFile(safeFilename, responseBody)?.let { pdfFile ->
+                            if (shouldFallbackToExternalPreview(pdfFile)) {
+                                forcedExternalOpen = true
+                                fallbackToExternalOpenFromPreview(pdfFile, safeMimeType)
+                                null
+                            } else {
+                                AttachmentPreviewContent.Pdf(pdfFile.absolutePath)
+                            }
                         }
                         AttachmentPreviewType.UNSUPPORTED -> null
                     }
+                }
+
+                if (forcedExternalOpen) {
+                    return@launch
                 }
 
                 if (previewContent == null) {
@@ -675,6 +689,25 @@ class MailDetailViewModel(
     private fun writeExternalOpenFile(filename: String, responseBody: ResponseBody): File? =
         writeCachedAttachmentFile("attachment_external", "external", filename, responseBody)
 
+    private fun fallbackToExternalOpenFromPreview(previewFile: File, mimeType: String) {
+        if (!previewFile.exists()) return
+        _uiState.update {
+            it.copy(
+                showPreviewDialog = false,
+                isPreviewLoading = false,
+                previewTarget = null,
+                previewContent = null,
+                previewErrorMessage = null,
+                externalOpenErrorMessage = null,
+                isExternalOpenLoading = false,
+                externalOpenContent = AttachmentExternalContent(
+                    filePath = previewFile.absolutePath,
+                    mimeType = mimeType
+                )
+            )
+        }
+    }
+
     private fun writeCachedAttachmentFile(
         subdirectory: String,
         prefix: String,
@@ -704,6 +737,42 @@ class MailDetailViewModel(
             Log.e("MailDetailViewModel", "Failed to cache attachment file", e)
             null
         }
+    }
+
+    private fun shouldFallbackToExternalPreview(pdfFile: File): Boolean {
+        val estimatedBytes = estimatePdfBitmapBytes(pdfFile) ?: return false
+        val budgetBytes = previewBitmapBudgetBytes() ?: return false
+        return estimatedBytes > budgetBytes
+    }
+
+    private fun estimatePdfBitmapBytes(pdfFile: File): Long? {
+        return runCatching {
+            val descriptor = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(descriptor)
+            var totalBytes = 0L
+            try {
+                for (index in 0 until renderer.pageCount) {
+                    renderer.openPage(index).use { page ->
+                        val width = page.width * PDF_RENDER_SCALE
+                        val height = page.height * PDF_RENDER_SCALE
+                        totalBytes += width.toLong() * height.toLong() * BYTES_PER_PIXEL
+                    }
+                }
+            } finally {
+                renderer.close()
+                descriptor.close()
+            }
+            totalBytes
+        }.getOrNull()
+    }
+
+    private fun previewBitmapBudgetBytes(): Long? {
+        val activityManager = appContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val memoryClassMb = activityManager?.memoryClass ?: DEFAULT_MEMORY_CLASS_MB
+        if (memoryClassMb <= 0) return null
+        val cappedMemoryClass = min(memoryClassMb, MAX_MEMORY_CLASS_MB_FOR_PREVIEW)
+        val budgetMb = (cappedMemoryClass * PREVIEW_MEMORY_BUDGET_RATIO).toLong()
+        return budgetMb * 1024L * 1024L
     }
 
     private fun clearCachedPreviewFile(content: AttachmentPreviewContent?) {
@@ -736,5 +805,10 @@ class MailDetailViewModel(
 
     companion object {
         private const val MAX_TEXT_PREVIEW_CHARS = 20_000
+        private const val PDF_RENDER_SCALE = 2
+        private const val BYTES_PER_PIXEL = 4
+        private const val PREVIEW_MEMORY_BUDGET_RATIO = 0.7
+        private const val MAX_MEMORY_CLASS_MB_FOR_PREVIEW = 256
+        private const val DEFAULT_MEMORY_CLASS_MB = 128
     }
 }

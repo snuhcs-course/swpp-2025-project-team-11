@@ -18,6 +18,8 @@ from .serializers import (
     AttachmentAnalyzeUploadSerializer,
     MailGenerateAnalysisResponseSerializer,
     MailGenerateRequest,
+    MailSuggestRequest,
+    MailSuggestResponseSerializer,
     PromptPreviewRequestSerializer,
     ReplyGenerateRequest,
 )
@@ -28,6 +30,7 @@ from .services.mail_generation import (
     stream_mail_generation_test,
     stream_mail_generation_with_plan,
 )
+from .services.mail_suggestion import suggest_mail_text
 from .services.prompt_preview import generate_prompt_preview
 from .services.reply import stream_reply_options_llm
 from .services.utils import get_attachments_for_content_keys, get_attachments_for_message
@@ -528,3 +531,53 @@ class MailGenerateStreamTestView(AuthRequiredMixin, generics.GenericAPIView):
         resp["Cache-Control"] = "no-cache"
         resp["X-Accel-Buffering"] = "no"
         return resp
+
+
+class MailSuggestView(AuthRequiredMixin, generics.GenericAPIView):
+    """
+    코파일럿 스타일의 메일 자동완성/이어쓰기 API.
+    - subject/body 일부를 받아서 그 뒤에 자연스럽게 이어질 텍스트를 반환.
+    - body + cursor 조합으로 본문 중간 자동완성도 지원.
+    """
+
+    serializer_class = MailSuggestRequest
+
+    @extend_schema(
+        operation_id="mail_suggest",
+        summary="Suggest continuation for mail subject/body (Copilot-style)",
+        description=(
+            "현재까지 작성한 메일 제목 또는 본문을 바탕으로, "
+            "자연스럽게 이어질 짧은 텍스트를 한 번에 반환합니다.\n\n"
+            "동작 방식:\n"
+            "- subject/body, 수신자(to_emails), (옵션) cursor를 입력으로 받습니다.\n"
+            "- cursor가 있으면 body를 before/after로 나눠 중간 삽입용 컨텍스트로 사용합니다.\n"
+        ),
+        request=MailSuggestRequest,
+        responses={
+            200: OpenApiResponse(
+                response=MailSuggestResponseSerializer,
+                description="자동완성 제안 결과",
+            )
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        suggestion = suggest_mail_text(
+            user=request.user,
+            subject=data.get("subject"),
+            body=data.get("body"),
+            to_emails=data["to_emails"],
+            target=data["target"],
+            cursor=data.get("cursor"),
+        )
+
+        resp = MailSuggestResponseSerializer(
+            {
+                "target": data["target"],
+                "suggestion": suggestion,
+            }
+        )
+        return Response(resp.data, status=status.HTTP_200_OK)
