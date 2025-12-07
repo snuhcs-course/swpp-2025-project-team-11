@@ -135,15 +135,15 @@ class MailDetailActivity : ComponentActivity() {
                         onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                             coroutineScope.launch {
                                 try {
-                                    contactRepository.addContact(
-                                        name = name,
-                                        email = email,
-                                        groupId = groupId,
-                                        senderRole = senderRole,
-                                        recipientRole = recipientRole,
-                                        personalPrompt = personalPrompt,
-                                        languagePreference = language
-                                    )
+                                    contactRepository.addContact {
+                                        this.name(name)
+                                        email(email)
+                                        groupId(groupId)
+                                        senderRole(senderRole)
+                                        recipientRole(recipientRole)
+                                        personalPrompt(personalPrompt)
+                                        languagePreference(language)
+                                    }
                                     // 연락처 추가 성공 - 다이얼로그 닫기
                                     showAddContactDialog = false
                                 } catch (e: Exception) {
