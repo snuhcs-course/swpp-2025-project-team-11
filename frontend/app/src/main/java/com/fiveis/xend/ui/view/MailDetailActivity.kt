@@ -57,6 +57,7 @@ class MailDetailActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val appContext = applicationContext
+        val isSentMail = intent.getBooleanExtra("is_sent_mail", false)
         setContent {
             XendTheme {
                 val uiState by viewModel.uiState.collectAsState()
@@ -78,6 +79,7 @@ class MailDetailActivity : ComponentActivity() {
                     uiState = uiState,
                     knownContactsByEmail = knownContacts,
                     onBack = { finish() },
+                    showReplyButton = !isSentMail,
                     onReply = {
                         uiState.mail?.let { mail ->
                             val intent = Intent(this@MailDetailActivity, ReplyComposeActivity::class.java).apply {
@@ -133,15 +135,15 @@ class MailDetailActivity : ComponentActivity() {
                         onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                             coroutineScope.launch {
                                 try {
-                                    contactRepository.addContact(
-                                        name = name,
-                                        email = email,
-                                        groupId = groupId,
-                                        senderRole = senderRole,
-                                        recipientRole = recipientRole,
-                                        personalPrompt = personalPrompt,
-                                        languagePreference = language
-                                    )
+                                    contactRepository.addContact {
+                                        this.name(name)
+                                        email(email)
+                                        groupId(groupId)
+                                        senderRole(senderRole)
+                                        recipientRole(recipientRole)
+                                        personalPrompt(personalPrompt)
+                                        languagePreference(language)
+                                    }
                                     // 연락처 추가 성공 - 다이얼로그 닫기
                                     showAddContactDialog = false
                                 } catch (e: Exception) {

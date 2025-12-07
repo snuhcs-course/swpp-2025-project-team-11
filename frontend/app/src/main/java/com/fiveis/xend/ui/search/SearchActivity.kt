@@ -35,6 +35,8 @@ class SearchActivity : ComponentActivity() {
                     onEmailClick = { email ->
                         val intent = Intent(this, MailDetailActivity::class.java)
                         intent.putExtra("message_id", email.id)
+                        val isSentMail = email.labelIds.contains("SENT")
+                        intent.putExtra("is_sent_mail", isSentMail)
                         startActivity(intent)
                     },
                     onBack = { finish() }

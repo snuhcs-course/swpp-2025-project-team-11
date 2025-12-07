@@ -36,6 +36,8 @@ data class InboxUiState(
     val showDraftSavedBanner: Boolean = false,
     // 메일 전송 성공 배너 표시 여부
     val showMailSentBanner: Boolean = false,
+    // 새 메일 배너 표시 여부
+    val showNewEmailBanner: Boolean = false,
     // 메일 삭제 관련
     val deletingEmailId: String? = null,
     val deleteError: String? = null
@@ -56,6 +58,10 @@ class InboxViewModel(
 
     private val _uiState = MutableStateFlow(InboxUiState())
     val uiState: StateFlow<InboxUiState> = _uiState.asStateFlow()
+
+    private var previousFirstEmailId: String? = null
+    private var isFirstEmailLoad = true
+    private var isInitialSyncComplete = false
 
     init {
         Log.d("InboxViewModel", "Initializing InboxViewModel")
@@ -144,6 +150,30 @@ class InboxViewModel(
         viewModelScope.launch {
             repository.getCachedEmails().collect { cachedEmails ->
                 Log.d("InboxViewModel", "Received ${cachedEmails.size} cached emails from DB")
+
+                val currentFirstEmailId = cachedEmails.firstOrNull()?.id
+                val shouldShowBanner =
+                    isInitialSyncComplete &&
+                        !isFirstEmailLoad &&
+                        previousFirstEmailId != null &&
+                        currentFirstEmailId != null &&
+                        currentFirstEmailId != previousFirstEmailId
+
+                if (shouldShowBanner) {
+                    Log.d(
+                        "InboxViewModel",
+                        "New emails detected! First email ID changed from $previousFirstEmailId to $currentFirstEmailId"
+                    )
+                }
+
+                if (currentFirstEmailId != null) {
+                    previousFirstEmailId = currentFirstEmailId
+                }
+
+                if (isFirstEmailLoad && cachedEmails.isNotEmpty()) {
+                    isFirstEmailLoad = false
+                }
+
                 _uiState.update { currentState ->
                     val deletingId = currentState.deletingEmailId
                     val shouldClearDeletingId = deletingId?.let { id ->
@@ -152,7 +182,8 @@ class InboxViewModel(
 
                     currentState.copy(
                         emails = cachedEmails,
-                        deletingEmailId = if (shouldClearDeletingId) null else deletingId
+                        deletingEmailId = if (shouldClearDeletingId) null else deletingId,
+                        showNewEmailBanner = if (shouldShowBanner) true else currentState.showNewEmailBanner
                     )
                 }
             }
@@ -165,7 +196,9 @@ class InboxViewModel(
     fun refreshEmails() {
         Log.d("InboxViewModel", "refreshEmails called (with UI loading)")
         _uiState.update { it.copy(isRefreshing = true) }
-        performRefresh(showLoading = true)
+        viewModelScope.launch {
+            performRefresh(showLoading = true)
+        }
     }
 
     /**
@@ -173,61 +206,64 @@ class InboxViewModel(
      */
     private fun silentRefreshEmails() {
         Log.d("InboxViewModel", "silentRefreshEmails called (background sync)")
-        performRefresh(showLoading = false)
+        viewModelScope.launch {
+            performRefresh(showLoading = false)
+            // 초기 동기화 완료 표시 (이후부터 새 메일 배너 활성화)
+            isInitialSyncComplete = true
+            Log.d("InboxViewModel", "Initial sync complete - new email banner now enabled")
+        }
     }
 
-    private fun performRefresh(showLoading: Boolean) {
-        viewModelScope.launch {
-            try {
-                val result = repository.refreshEmails()
-                if (result.isFailure) {
-                    val errorMessage = result.exceptionOrNull()?.message ?: "Unknown error"
-                    Log.e("InboxViewModel", "refreshEmails failed: $errorMessage")
-                    if (showLoading) {
-                        _uiState.update {
-                            it.copy(
-                                error = errorMessage,
-                                isRefreshing = false
-                            )
-                        }
-                    }
-                } else {
-                    val nextToken = result.getOrNull()
-                    Log.d("InboxViewModel", "refreshEmails succeeded, nextPageToken: $nextToken")
-
-                    _uiState.update { currentState ->
-                        // 저장된 토큰이 없고, 새 토큰이 있을 때만 설정
-                        // (이미 토큰이 있으면 유지 - loadMore로 받은 토큰이 더 정확함)
-                        val newLoadMoreToken = if (currentState.loadMoreNextPageToken == null && nextToken != null) {
-                            Log.d("InboxViewModel", "No existing token - setting loadMoreNextPageToken: $nextToken")
-                            // 새 토큰을 SharedPreferences에 저장
-                            savePageToken(nextToken)
-                            nextToken
-                        } else {
-                            Log.d(
-                                "InboxViewModel",
-                                "Keeping existing loadMoreNextPageToken: ${currentState.loadMoreNextPageToken}"
-                            )
-                            // 기존 토큰 유지 (이미 SharedPreferences에 저장되어 있음)
-                            currentState.loadMoreNextPageToken
-                        }
-
-                        currentState.copy(
-                            isRefreshing = false,
-                            error = null,
-                            loadMoreNextPageToken = newLoadMoreToken
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("InboxViewModel", "Exception during refreshEmails", e)
+    private suspend fun performRefresh(showLoading: Boolean) {
+        try {
+            val result = repository.refreshEmails()
+            if (result.isFailure) {
+                val errorMessage = result.exceptionOrNull()?.message ?: "Unknown error"
+                Log.e("InboxViewModel", "refreshEmails failed: $errorMessage")
                 if (showLoading) {
                     _uiState.update {
                         it.copy(
-                            error = e.message,
+                            error = errorMessage,
                             isRefreshing = false
                         )
                     }
+                }
+            } else {
+                val nextToken = result.getOrNull()
+                Log.d("InboxViewModel", "refreshEmails succeeded, nextPageToken: $nextToken")
+
+                _uiState.update { currentState ->
+                    // 저장된 토큰이 없고, 새 토큰이 있을 때만 설정
+                    // (이미 토큰이 있으면 유지 - loadMore로 받은 토큰이 더 정확함)
+                    val newLoadMoreToken = if (currentState.loadMoreNextPageToken == null && nextToken != null) {
+                        Log.d("InboxViewModel", "No existing token - setting loadMoreNextPageToken: $nextToken")
+                        // 새 토큰을 SharedPreferences에 저장
+                        savePageToken(nextToken)
+                        nextToken
+                    } else {
+                        Log.d(
+                            "InboxViewModel",
+                            "Keeping existing loadMoreNextPageToken: ${currentState.loadMoreNextPageToken}"
+                        )
+                        // 기존 토큰 유지 (이미 SharedPreferences에 저장되어 있음)
+                        currentState.loadMoreNextPageToken
+                    }
+
+                    currentState.copy(
+                        isRefreshing = false,
+                        error = null,
+                        loadMoreNextPageToken = newLoadMoreToken
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("InboxViewModel", "Exception during refreshEmails", e)
+            if (showLoading) {
+                _uiState.update {
+                    it.copy(
+                        error = e.message,
+                        isRefreshing = false
+                    )
                 }
             }
         }
@@ -376,6 +412,13 @@ class InboxViewModel(
     }
 
     /**
+     * 새 메일 배너 닫기
+     */
+    fun dismissNewEmailBanner() {
+        _uiState.update { it.copy(showNewEmailBanner = false) }
+    }
+
+    /**
      * 연락처 추가
      */
     fun addContact(
@@ -398,15 +441,15 @@ class InboxViewModel(
             }
             try {
                 Log.d("InboxViewModel", "Adding contact: name=$name, email=$email")
-                contactRepository.addContact(
-                    name = name,
-                    email = email,
-                    groupId = groupId,
-                    senderRole = senderRole,
-                    recipientRole = recipientRole,
-                    personalPrompt = personalPrompt,
-                    languagePreference = languagePreference
-                )
+                contactRepository.addContact {
+                    this.name(name)
+                    email(email)
+                    groupId(groupId)
+                    senderRole(senderRole)
+                    recipientRole(recipientRole)
+                    personalPrompt(personalPrompt)
+                    languagePreference(languagePreference)
+                }
                 Log.d("InboxViewModel", "Contact added successfully")
                 _uiState.update {
                     it.copy(

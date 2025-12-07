@@ -130,4 +130,30 @@ class AiApiServiceModelsTest {
 
         assert(string.contains("Test preview"))
     }
+
+    @Test
+    fun test_mailSuggestRequest_defaults() {
+        val request = MailSuggestRequest(
+            subject = "Hello",
+            body = "Body",
+            toEmails = listOf("user@example.com")
+        )
+
+        assertEquals("Hello", request.subject)
+        assertEquals("Body", request.body)
+        assertEquals(listOf("user@example.com"), request.toEmails)
+        assertEquals("body", request.target)
+        assertNull(request.cursor)
+    }
+
+    @Test
+    fun test_mailSuggestResponse_values() {
+        val response = MailSuggestResponse(
+            target = "body",
+            suggestion = "Hi there!"
+        )
+
+        assertEquals("body", response.target)
+        assertEquals("Hi there!", response.suggestion)
+    }
 }

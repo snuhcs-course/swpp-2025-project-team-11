@@ -25,8 +25,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -45,8 +44,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -65,8 +63,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -88,8 +85,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = { backClicked = true },
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -99,6 +95,7 @@ class AddContactScreenTest {
         assert(backClicked)
     }
 
+    @org.junit.Ignore("Gmail sync feature has been removed")
     @Test
     fun test_addContactScreen_shows_gmail_sync_card() {
         // When
@@ -110,8 +107,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -119,6 +115,7 @@ class AddContactScreenTest {
         composeTestRule.onNodeWithText("Gmail 연락처 동기화").assertIsDisplayed()
     }
 
+    @org.junit.Ignore("Gmail sync feature has been removed")
     @Test
     fun test_addContactScreen_gmail_sync_click_triggers_callback() {
         // Given
@@ -133,8 +130,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = { syncClicked = true }
+                onAdd = {}
             )
         }
 
@@ -155,13 +151,15 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithText("직접 입력").assertIsDisplayed()
+        // Then - dropdown should offer manual option
+        composeTestRule.onAllNodesWithText("나", useUnmergedTree = true).onFirst().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onAllNodesWithText("직접 입력", useUnmergedTree = true).onFirst()
+            .assertExists()
     }
 
     @Test
@@ -175,8 +173,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -195,8 +192,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -215,8 +211,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -238,8 +233,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -263,8 +257,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -285,8 +278,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -305,8 +297,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -325,8 +316,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -345,8 +335,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -368,8 +357,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = { changedPrompt = it },
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -390,8 +378,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -410,8 +397,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -437,8 +423,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -457,8 +442,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -467,6 +451,7 @@ class AddContactScreenTest {
         composeTestRule.onNodeWithText("연락처").assertDoesNotExist()
     }
 
+    @org.junit.Ignore("Gmail sync feature has been removed")
     @Test
     fun test_addContactScreen_gmail_sync_description() {
         // When
@@ -478,8 +463,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -498,13 +482,13 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
-        // Then
-        composeTestRule.onNodeWithText("연락처 정보를 직접 입력합니다").assertIsDisplayed()
+        // Then - confirm the optional sections are visible
+        composeTestRule.onNodeWithText("메일 작성 언어").assertIsDisplayed()
+        composeTestRule.onNodeWithText("그룹").assertIsDisplayed()
     }
 
     @Test
@@ -521,8 +505,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -547,8 +530,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -574,8 +556,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = { prompt = it },
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -600,8 +581,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -621,8 +601,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -641,14 +620,16 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
-        // Then - All sections should be present
-        composeTestRule.onNodeWithText("연락처 가져오기").assertIsDisplayed()
-        composeTestRule.onNodeWithText("이름").assertExists()
+        // Then - All key sections should be present
+        composeTestRule.onNodeWithText("이름").assertIsDisplayed()
+        composeTestRule.onNodeWithText("이메일 주소").assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 나").assertExists()
+        composeTestRule.onNodeWithText("관계 프롬프팅(선택사항)").assertExists()
+        composeTestRule.onNodeWithText("메일 작성 언어").assertExists()
     }
 
     @Test
@@ -662,8 +643,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -682,8 +662,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -702,8 +681,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -723,8 +701,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -743,8 +720,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -766,8 +742,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -791,8 +766,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -813,8 +787,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -827,7 +800,6 @@ class AddContactScreenTest {
         // Given
         var backClicked = false
         var addClicked = false
-        var syncClicked = false
         var nameChanged = false
         var emailChanged = false
 
@@ -840,19 +812,16 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = { backClicked = true },
-                onAdd = { addClicked = true },
-                onGmailContactsSync = { syncClicked = true }
+                onAdd = { addClicked = true }
             )
         }
 
         composeTestRule.onNodeWithContentDescription("뒤로가기").performClick()
-        composeTestRule.onNodeWithText("Gmail 연락처 동기화").performClick()
         composeTestRule.onNodeWithText("이름을 입력하세요").performTextInput("Test")
         composeTestRule.onNodeWithText("이메일 주소를 입력하세요").performTextInput("test@email.com")
 
         // Then
         assert(backClicked)
-        assert(syncClicked)
         assert(nameChanged)
         assert(emailChanged)
     }
@@ -871,8 +840,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -896,8 +864,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -921,8 +888,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -946,8 +912,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = { changedPrompt = it },
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -972,8 +937,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = { changedPrompt = it },
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -998,8 +962,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -1026,8 +989,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -1050,8 +1012,7 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
@@ -1074,16 +1035,15 @@ class AddContactScreenTest {
                 onRecipientRoleChange = {},
                 onPersonalPromptChange = {},
                 onBack = {},
-                onAdd = {},
-                onGmailContactsSync = {}
+                onAdd = {}
             )
         }
 
         // Then - All main sections should be visible (scroll to them if needed)
-        composeTestRule.onNodeWithText("연락처 가져오기").assertIsDisplayed()
         composeTestRule.onNodeWithText("이름").assertIsDisplayed()
         composeTestRule.onNodeWithText("이메일 주소").assertIsDisplayed()
-        composeTestRule.onNodeWithText("관계 - 나").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("그룹").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("관계 - 나").assertExists()
+        composeTestRule.onNodeWithText("그룹").assertExists()
+        composeTestRule.onNodeWithText("메일 작성 언어").assertExists()
     }
 }

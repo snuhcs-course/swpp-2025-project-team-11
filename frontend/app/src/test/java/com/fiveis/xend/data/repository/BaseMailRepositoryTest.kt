@@ -32,6 +32,7 @@ class BaseMailRepositoryTest {
     fun setup() {
         mailApiService = mockk(relaxed = true)
         emailDao = mockk(relaxed = true)
+        coEvery { emailDao.getEmailsByIds(any()) } returns emptyList()
         repository = TestMailRepository(mailApiService, emailDao, "INBOX", "TestRepo")
     }
 
@@ -98,7 +99,7 @@ class BaseMailRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns null
         coEvery { mailApiService.getEmails(any(), any(), any(), any()) } returns mockResponse
         coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 1
@@ -107,7 +108,13 @@ class BaseMailRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals("token123", result.getOrNull())
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify {
+            emailDao.insertEmails(
+                match { inserted ->
+                    inserted.size == mockEmails.size && inserted.all { it.sourceLabel == "INBOX" }
+                }
+            )
+        }
     }
 
     @Test
@@ -134,7 +141,7 @@ class BaseMailRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns latestDate
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns latestDate
         coEvery { mailApiService.getEmails(any(), any(), any(), any()) } returns mockResponse
         coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 2
@@ -143,7 +150,13 @@ class BaseMailRepositoryTest {
 
         assertTrue(result.isSuccess)
         coVerify { mailApiService.getEmails("INBOX", 20, null, latestDate) }
-        coVerify { emailDao.insertEmails(mockEmails) }
+        coVerify {
+            emailDao.insertEmails(
+                match { inserted ->
+                    inserted.size == mockEmails.size && inserted.all { it.sourceLabel == "INBOX" }
+                }
+            )
+        }
     }
 
     @Test
@@ -153,7 +166,7 @@ class BaseMailRepositoryTest {
             ResponseBody.create(null, "Not found")
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns null
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns null
         coEvery { mailApiService.getEmails(any(), any(), any(), any()) } returns failureResponse
 
         val result = repository.refreshEmails()
@@ -256,7 +269,13 @@ class BaseMailRepositoryTest {
 
         repository.saveEmailsToCache(emails)
 
-        coVerify { emailDao.insertEmails(emails) }
+        coVerify {
+            emailDao.insertEmails(
+                match { inserted ->
+                    inserted.size == emails.size && inserted.all { it.sourceLabel == "INBOX" }
+                }
+            )
+        }
     }
 
     @Test
@@ -294,7 +313,7 @@ class BaseMailRepositoryTest {
             )
         )
 
-        coEvery { emailDao.getLatestEmailDate() } returns latestDate
+        coEvery { emailDao.getLatestEmailDate("INBOX") } returns latestDate
         coEvery { emailDao.insertEmails(any()) } returns Unit
         coEvery { emailDao.getEmailCount() } returns 1
         coEvery {

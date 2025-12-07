@@ -1,6 +1,5 @@
 package com.fiveis.xend.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -78,7 +77,7 @@ object StableColor {
      */
     @Composable
     fun forId(id: Long, spec: Spec = widerHue): Color {
-        val isDark = isSystemInDarkTheme()
+        val isDark = false
         return remember(id, isDark) { forId(id, isDark, spec) }
     }
 

@@ -103,7 +103,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -114,9 +113,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.text.HtmlCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -129,8 +125,8 @@ import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.model.toDomain
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.data.repository.InboxRepository
+import com.fiveis.xend.network.AiApiService
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.common.AttachmentAnalysisSection
 import com.fiveis.xend.ui.compose.common.AIEnhancedRichTextEditor
@@ -772,8 +768,15 @@ private fun RecipientSection(
                                     "newContact.isEmpty=${newContact.text.isEmpty()}"
                             )
 
-                            // Only collapse if we were previously focused
-                            if (!focused && isInputFocused && newContact.text.isEmpty() &&
+                            // Auto-add contact when losing focus if there's text
+                            if (!focused && isInputFocused && newContact.text.isNotEmpty()) {
+                                Log.d(
+                                    "RecipientSection",
+                                    "onFocusChanged: Auto-adding contact on focus loss"
+                                )
+                                addContact()
+                                forceExpanded = false
+                            } else if (!focused && isInputFocused && newContact.text.isEmpty() &&
                                 contacts.isNotEmpty() && !isExpanding
                             ) {
                                 Log.d(
@@ -1164,11 +1167,11 @@ fun ContactChip(
 
 class ComposeVmFactory(
     private val sseClient: MailComposeSseClient,
-    private val wsClient: MailComposeWebSocketClient
+    private val aiApiService: AiApiService
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MailComposeViewModel(sseClient, wsClient) as T
+        return MailComposeViewModel(sseClient, aiApiService) as T
     }
 }
 
@@ -1214,10 +1217,7 @@ class MailComposeActivity : ComponentActivity() {
                             application.applicationContext,
                             endpointUrl = BuildConfig.BASE_URL + "/api/ai/mail/generate/stream/"
                         ),
-                        wsClient = MailComposeWebSocketClient(
-                            context = application.applicationContext,
-                            wsUrl = BuildConfig.WS_URL
-                        )
+                        aiApiService = RetrofitClient.getAiApiService(application.applicationContext)
                     )
                 )
 
@@ -1280,21 +1280,6 @@ class MailComposeActivity : ComponentActivity() {
                 var analysisError by remember { mutableStateOf<String?>(null) }
                 var isAnalyzingAttachment by remember { mutableStateOf(false) }
                 val attachmentContentKeys = remember { mutableStateMapOf<Uri, String>() }
-                val lifecycleOwner = LocalLifecycleOwner.current
-
-                // ON_RESUME 감지하여 실시간 추천 웹소켓 재연결 시도
-                DisposableEffect(lifecycleOwner, aiRealtime) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME && aiRealtime) {
-                            composeVm.ensureRealtimeConnection()
-                        }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose {
-                        lifecycleOwner.lifecycle.removeObserver(observer)
-                    }
-                }
-
                 // Banner state
                 var bannerState by remember { mutableStateOf<BannerState?>(null) }
                 // Auto-dismiss logic for banners
@@ -1477,21 +1462,15 @@ class MailComposeActivity : ComponentActivity() {
                 }
 
                 // Enable/disable realtime mode when toggle changes
-                DisposableEffect(aiRealtime) {
+                LaunchedEffect(aiRealtime) {
                     composeVm.enableRealtimeMode(aiRealtime)
-
-                    onDispose {
-                        // Composable이 사라질 때 무조건 WebSocket 끊기
-                        if (aiRealtime) {
-                            composeVm.enableRealtimeMode(false)
-                        }
-                    }
                 }
 
                 // Sync state from AI ViewModel to local state
                 LaunchedEffect(composeUi.subject) { if (composeUi.subject.isNotBlank()) subject = composeUi.subject }
                 LaunchedEffect(composeUi.bodyRendered) {
                     if (composeUi.bodyRendered.isNotEmpty()) {
+                        composeVm.skipNextTextChangeSend()
                         editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
@@ -1500,11 +1479,12 @@ class MailComposeActivity : ComponentActivity() {
                 LaunchedEffect(editorState.editor) {
                     editorState.editor?.setOnTextChangeListener { html ->
                         if (aiRealtime) {
-                            val plainText = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                                .toString()
-                                .replace("\u00A0", " ")
-                                .trimEnd()
-                            composeVm.onTextChanged(plainText)
+                            composeVm.onTextChanged(
+                                currentText = html,
+                                subject = subject,
+                                toEmails = contacts.map { it.email },
+                                cursorPosition = editorState.getCursorPosition()
+                            )
                         }
                     }
                 }
@@ -1527,10 +1507,21 @@ class MailComposeActivity : ComponentActivity() {
                 }
 
                 val acceptSuggestion: () -> Unit = {
+                    composeVm.skipNextTextChangeSend()
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                    // Give the editor a brief moment to apply the accepted text before requesting.
+                    coroutineScope.launch {
+                        delay(50)
+                        composeVm.requestImmediateSuggestion(
+                            currentText = editorState.getHtml(),
+                            subject = subject,
+                            toEmails = contacts.map { it.email },
+                            cursorPosition = editorState.getCursorPosition(),
+                            force = true
+                        )
+                    }
                 }
                 LaunchedEffect(pendingTemplateBody, showTemplateScreen, editorState.editor) {
                     val body = pendingTemplateBody
@@ -1588,6 +1579,9 @@ class MailComposeActivity : ComponentActivity() {
                                         // 토글을 켜면 현재 텍스트를 대기열에 넣고 연결 준비되면 전송
                                         composeVm.requestImmediateSuggestion(
                                             currentText = editorState.getHtml(),
+                                            subject = subject,
+                                            toEmails = contacts.map { contact -> contact.email },
+                                            cursorPosition = editorState.getCursorPosition(),
                                             force = true
                                         )
                                     }
@@ -1681,15 +1675,15 @@ class MailComposeActivity : ComponentActivity() {
                                         onConfirm = { name, email, sRole, rRole, personalPrompt, groupId, language ->
                                             coroutineScope.launch {
                                                 try {
-                                                    val added = contactRepository.addContact(
-                                                        name = name,
-                                                        email = email,
-                                                        groupId = groupId,
-                                                        senderRole = sRole,
-                                                        recipientRole = rRole,
-                                                        personalPrompt = personalPrompt,
-                                                        languagePreference = language
-                                                    ).toDomain()
+                                                    val added = contactRepository.addContact {
+                                                        this.name(name)
+                                                        email(email)
+                                                        groupId(groupId)
+                                                        senderRole(sRole)
+                                                        recipientRole(rRole)
+                                                        personalPrompt(personalPrompt)
+                                                        languagePreference(language)
+                                                    }.toDomain()
                                                     contacts = if (contacts.any
                                                             { it.email.equals(added.email, ignoreCase = true) }
                                                     ) {

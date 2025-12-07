@@ -121,7 +121,7 @@ class AddContactRequestContextTest {
         assertEquals("", context.recipientRole)
         assertEquals("", context.relationshipDetails)
         assertEquals("", context.personalPrompt)
-        assertEquals("KOR", context.languagePreference)
+        assertEquals("", context.languagePreference)
     }
 
     @Test
@@ -142,20 +142,20 @@ class AddContactRequestContextTest {
     }
 
     @Test
-    fun create_context_with_null_values() {
+    fun create_context_with_empty_values() {
         val context = AddContactRequestContext(
-            senderRole = null,
-            recipientRole = null,
-            relationshipDetails = null,
-            personalPrompt = null,
-            languagePreference = null
+            senderRole = "",
+            recipientRole = "",
+            relationshipDetails = "",
+            personalPrompt = "",
+            languagePreference = ""
         )
 
-        assertNull(context.senderRole)
-        assertNull(context.recipientRole)
-        assertNull(context.relationshipDetails)
-        assertNull(context.personalPrompt)
-        assertNull(context.languagePreference)
+        assertEquals("", context.senderRole)
+        assertEquals("", context.recipientRole)
+        assertEquals("", context.relationshipDetails)
+        assertEquals("", context.personalPrompt)
+        assertEquals("", context.languagePreference)
     }
 
     @Test
@@ -188,10 +188,10 @@ class AddContactRequestContextTest {
     }
 
     @Test
-    fun default_language_preference_is_korean() {
+    fun default_language_preference_is_empty() {
         val context = AddContactRequestContext()
 
-        assertEquals("KOR", context.languagePreference)
+        assertEquals("", context.languagePreference)
     }
 
     @Test

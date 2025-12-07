@@ -3,6 +3,7 @@ package com.fiveis.xend.ui.contactbook
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
@@ -1140,6 +1141,97 @@ class GroupDetailScreenTest {
         composeTestRule.onNodeWithContentDescription("그룹 정보 수정").performClick()
         composeTestRule.waitForIdle()
         Thread.sleep(200)
+    }
+
+    @Test
+    fun test_groupDetailScreen_emoji_picker_shows_categories() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("그룹 정보 수정").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("😀").performClick()
+
+        composeTestRule.onNodeWithText("전체").assertIsDisplayed()
+        composeTestRule.onNodeWithText("표정/사람").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_groupDetailScreen_emoji_picker_filters_by_category() {
+        val group = Group(
+            id = 1L,
+            name = "Team",
+            description = null,
+            emoji = null,
+            options = emptyList(),
+            members = emptyList()
+        )
+
+        val uiState = GroupDetailUiState(
+            group = group,
+            contacts = emptyList()
+        )
+
+        composeTestRule.setContent {
+            GroupDetailScreen(
+                themeColor = androidx.compose.ui.graphics.Color.Blue,
+                uiState = uiState,
+                onBack = {},
+                onRefresh = {},
+                onMemberClick = {},
+                onRemoveMember = {},
+                onAddMembers = {},
+                onRenameGroup = { _, _, _ -> },
+                onClearRenameError = {},
+                onRefreshPromptOptions = {},
+                onSavePromptOptions = {},
+                onAddPromptOption = { _, _, _, _, _ -> },
+                onClearPromptError = {}
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("그룹 정보 수정").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onAllNodesWithText("😀", useUnmergedTree = true).onFirst().performClick()
+
+        composeTestRule.onNodeWithTag("emojiCategories")
+            .performScrollToNode(hasText("기호"))
+        composeTestRule.onAllNodesWithText("기호", useUnmergedTree = true)
+            .onFirst()
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onAllNodesWithText("❤️", useUnmergedTree = true).onFirst()
+            .assertIsDisplayed()
     }
 
     @Test

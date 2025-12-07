@@ -8,11 +8,13 @@ import com.fiveis.xend.data.model.MailSendRequest
 import com.fiveis.xend.data.model.SendResponse
 import com.fiveis.xend.data.model.toMultipartParts
 import com.fiveis.xend.data.repository.MailSendRepository
+import com.fiveis.xend.network.AiApiService
 import com.fiveis.xend.network.MailApiService
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.network.MailComposeWebSocketClient
+import com.fiveis.xend.network.MailSuggestResponse
 import com.fiveis.xend.ui.compose.MailComposeViewModel
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +45,7 @@ class MailComposeIntegrationTest {
     private lateinit var mailApiService: MailApiService
     private lateinit var repository: MailSendRepository
     private lateinit var sseClient: MailComposeSseClient
-    private lateinit var wsClient: MailComposeWebSocketClient
+    private lateinit var aiApiService: AiApiService
     private lateinit var viewModel: MailComposeViewModel
 
     @Before
@@ -51,7 +53,7 @@ class MailComposeIntegrationTest {
         context = ApplicationProvider.getApplicationContext()
         mailApiService = mockk()
         sseClient = mockk(relaxed = true)
-        wsClient = mockk(relaxed = true)
+        aiApiService = mockk(relaxed = true)
     }
 
     @After
@@ -88,7 +90,7 @@ class MailComposeIntegrationTest {
 
     @Test(timeout = 10000)
     fun viewModel_starts_streaming_successfully() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         val payload = JSONObject().apply {
             put("subject", "Test")
@@ -105,7 +107,7 @@ class MailComposeIntegrationTest {
 
     @Test(timeout = 5000)
     fun viewModel_stops_streaming_successfully() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         val payload = JSONObject().apply {
             put("subject", "Test")
@@ -122,77 +124,64 @@ class MailComposeIntegrationTest {
     }
 
     @Test(timeout = 5000)
-    fun viewModel_enables_realtime_mode_connects_websocket() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
-
-        viewModel.enableRealtimeMode(true)
-        Thread.sleep(100)
-
-        assertTrue(viewModel.ui.value.isRealtimeEnabled)
-        verify { wsClient.connect(any(), any(), any(), any()) }
-    }
-
-    @Test(timeout = 5000)
-    fun viewModel_disables_realtime_mode_disconnects_websocket() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
-
-        viewModel.enableRealtimeMode(true)
-        Thread.sleep(100)
-
-        viewModel.enableRealtimeMode(false)
-        Thread.sleep(100)
-
-        assertFalse(viewModel.ui.value.isRealtimeEnabled)
-        verify(atLeast = 1) { wsClient.disconnect() }
-    }
-
-    @Test(timeout = 5000)
     fun viewModel_handles_text_changed_with_realtime_enabled() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        coEvery { aiApiService.suggestMail(any()) } returns Response.success(
+            MailSuggestResponse(target = "body", suggestion = "Hello there.")
+        )
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         viewModel.enableRealtimeMode(true)
-        Thread.sleep(100)
+        viewModel.onTextChanged(
+            currentText = "This is a long enough message for realtime.",
+            subject = "Subject",
+            toEmails = listOf("user@example.com"),
+            cursorPosition = 5
+        )
+        Thread.sleep(500) // wait for debounce
 
-        viewModel.onTextChanged("Test message")
-        Thread.sleep(100)
-
-        verify { wsClient.connect(any(), any(), any(), any()) }
+        coVerify { aiApiService.suggestMail(any()) }
+        assertEquals("Hello there.", viewModel.ui.value.suggestionText)
     }
 
     @Test(timeout = 5000)
     fun viewModel_ignores_text_changed_with_realtime_disabled() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
-        viewModel.onTextChanged("Test message")
+        viewModel.enableRealtimeMode(false)
+        viewModel.onTextChanged(
+            currentText = "This is ignored because realtime is off.",
+            subject = "Subject",
+            toEmails = listOf("user@example.com"),
+            cursorPosition = 0
+        )
         Thread.sleep(600)  // Wait for debounce timeout
 
-        verify(exactly = 0) { wsClient.sendMessage(any(), any(), any()) }
+        coVerify(exactly = 0) { aiApiService.suggestMail(any()) }
     }
 
     @Test(timeout = 5000)
     fun viewModel_accepts_suggestion_clears_text() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        coEvery { aiApiService.suggestMail(any()) } returns Response.success(
+            MailSuggestResponse(target = "body", suggestion = "Hi!")
+        )
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         viewModel.enableRealtimeMode(true)
-        Thread.sleep(100)
+        viewModel.requestImmediateSuggestion(
+            currentText = "This text is long enough to trigger the API.",
+            subject = "Subject",
+            toEmails = listOf("user@example.com"),
+            cursorPosition = 5,
+            force = true
+        )
+        Thread.sleep(200)
+
+        assertEquals("Hi!", viewModel.ui.value.suggestionText)
 
         viewModel.acceptSuggestion()
         Thread.sleep(100)
 
         assertEquals("", viewModel.ui.value.suggestionText)
-    }
-
-    @Test(timeout = 5000)
-    fun viewModel_clears_websocket_on_destruction() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
-
-        viewModel.enableRealtimeMode(true)
-        Thread.sleep(100)
-
-        viewModel.enableRealtimeMode(false)
-        Thread.sleep(100)
-
-        verify(atLeast = 1) { wsClient.disconnect() }
     }
 
     @Test
@@ -223,7 +212,7 @@ class MailComposeIntegrationTest {
 
     @Test
     fun viewModel_ui_state_initial_values_are_correct() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         val state = viewModel.ui.value
 
@@ -257,7 +246,7 @@ class MailComposeIntegrationTest {
 
     @Test(timeout = 5000)
     fun viewModel_handles_multiple_start_stop_cycles() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         val payload = JSONObject().apply {
             put("subject", "Test")
@@ -279,23 +268,24 @@ class MailComposeIntegrationTest {
 
     @Test(timeout = 5000)
     fun viewModel_handles_realtime_toggle_multiple_times() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         viewModel.enableRealtimeMode(true)
         Thread.sleep(50)
+        assertTrue(viewModel.ui.value.isRealtimeEnabled)
+
         viewModel.enableRealtimeMode(false)
         Thread.sleep(50)
+        assertFalse(viewModel.ui.value.isRealtimeEnabled)
+
         viewModel.enableRealtimeMode(true)
         Thread.sleep(50)
-
-        // Connect is called twice (once for each enable), disconnect is called twice (once for disable, once on second enable)
-        verify(atLeast = 2) { wsClient.connect(any(), any(), any(), any()) }
-        verify(atLeast = 1) { wsClient.disconnect() }
+        assertTrue(viewModel.ui.value.isRealtimeEnabled)
     }
 
     @Test(timeout = 5000)
     fun viewModel_handles_empty_payload() {
-        viewModel = MailComposeViewModel(sseClient, wsClient)
+        viewModel = MailComposeViewModel(sseClient, aiApiService)
 
         val emptyPayload = JSONObject()
 

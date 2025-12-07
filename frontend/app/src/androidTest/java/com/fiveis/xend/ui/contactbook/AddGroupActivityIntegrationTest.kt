@@ -136,7 +136,7 @@ class AddGroupActivityIntegrationTest {
     @Test
     fun activity_fab_displays() {
         // Then
-        composeTestRule.onNodeWithContentDescription("그룹 추가").assertIsDisplayed()
+        composeTestRule.onNodeWithText("저장").assertIsDisplayed()
     }
 
     @Test

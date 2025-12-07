@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -83,7 +84,6 @@ fun AIEnhancedRichTextEditor(
     showInlineSwipeBar: Boolean = true,
     onEditorFocused: (() -> Unit)? = null
 ) {
-    val editorHeight = 360.dp
     val coroutineScope = rememberCoroutineScope()
 
     DisposableEffect(editorState.editor) {
@@ -134,7 +134,7 @@ fun AIEnhancedRichTextEditor(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(editorHeight)
+                    .heightIn(min = 360.dp)
                     .padding(8.dp)
             ) {
                 XendRichEditorView(

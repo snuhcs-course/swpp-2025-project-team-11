@@ -1,9 +1,13 @@
 package com.fiveis.xend.ui.compose
 
+import android.util.Log
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fiveis.xend.network.AiApiService
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.network.MailComposeWebSocketClient
+import com.fiveis.xend.network.MailSuggestRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -11,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 enum class RealtimeConnectionStatus {
@@ -33,16 +38,30 @@ data class MailComposeUiState(
 
 class MailComposeViewModel(
     private val api: MailComposeSseClient,
-    private val wsClient: MailComposeWebSocketClient? = null
+    private val aiApiService: AiApiService
 ) : ViewModel() {
+
+    companion object {
+        private const val REALTIME_MIN_CHARS = 20
+        private const val PLACEHOLDER_EMAIL = "placeholder@example.com"
+        private const val RETRY_DELAY_MS = 2000L
+        private const val MAX_RETRY_COUNT = 3
+    }
 
     private val _ui = MutableStateFlow(MailComposeUiState())
     val ui: StateFlow<MailComposeUiState> = _ui
 
     private val bodyBuffer = StringBuilder()
-    private var debounceJob: Job? = null
     private val suggestionBuffer = StringBuilder()
-    private var pendingSuggestionText: String? = null
+    private var debounceJob: Job? = null
+    private var realtimeRequestJob: Job? = null
+    private var retryJob: Job? = null
+    private var skipNextDebouncedSend = false
+    private var latestPlainText: String = ""
+    private var latestSubject: String = ""
+    private var lastRealtimeRequestSignature: String? = null
+    private var lastObservedHtml: String? = null
+    private var retryCount = 0
 
     // Undo/redo snapshots
     private var undoSnapshot: UndoSnapshot? = null
@@ -121,14 +140,20 @@ class MailComposeViewModel(
 
     fun enableRealtimeMode(enabled: Boolean) {
         if (enabled) {
+            Log.d("MailComposeVM", "Realtime mode enabled")
             _ui.update {
                 it.copy(
                     isRealtimeEnabled = true,
+                    realtimeStatus = RealtimeConnectionStatus.CONNECTED,
                     realtimeErrorMessage = null
                 )
             }
-            connectWebSocket()
         } else {
+            Log.d("MailComposeVM", "Realtime mode disabled")
+            debounceJob?.cancel()
+            realtimeRequestJob?.cancel()
+            suggestionBuffer.clear()
+            lastRealtimeRequestSignature = null
             _ui.update {
                 it.copy(
                     isRealtimeEnabled = false,
@@ -137,156 +162,126 @@ class MailComposeViewModel(
                     suggestionText = ""
                 )
             }
-            disconnectWebSocket()
         }
     }
 
-    fun ensureRealtimeConnection() {
-        if (_ui.value.isRealtimeEnabled) {
-            connectWebSocket()
-        }
+    fun skipNextTextChangeSend() {
+        skipNextDebouncedSend = true
+        debounceJob?.cancel()
+        realtimeRequestJob?.cancel()
+        lastRealtimeRequestSignature = null
     }
 
-    private fun connectWebSocket() {
-        if (_ui.value.realtimeStatus == RealtimeConnectionStatus.CONNECTING ||
-            _ui.value.realtimeStatus == RealtimeConnectionStatus.CONNECTED
-        ) {
-            return
-        }
-        wsClient?.let { client ->
-            _ui.update { it.copy(realtimeStatus = RealtimeConnectionStatus.CONNECTING, realtimeErrorMessage = null) }
-            client.connect(
-                onMessage = { message ->
-                    try {
-                        val json = JSONObject(message)
-                        val type = json.optString("type")
-                        when (type) {
-                            "gpu.message" -> {
-                                val data = json.optJSONObject("data")
-                                val rawText = data?.optString("text") ?: ""
-
-                                if (suggestionBuffer.isNotEmpty() && rawText.isNotEmpty()) {
-                                    suggestionBuffer.append(" ")
-                                }
-                                suggestionBuffer.append(rawText)
-
-                                val parsed = parseOutputFromMarkdown(suggestionBuffer.toString())
-                                val singleSentence = extractFirstSentence(parsed)
-                                _ui.update {
-                                    it.copy(
-                                        suggestionText = singleSentence,
-                                        realtimeErrorMessage = null
-                                        // 메시지 정상 수신 시 에러 클리어
-                                    )
-                                }
-                            }
-                            "gpu.done" -> {
-                                suggestionBuffer.clear()
-                            }
-                        }
-                    } catch (e: Exception) {
-                        _ui.update {
-                            it.copy(
-                                realtimeStatus = RealtimeConnectionStatus.ERROR,
-                                realtimeErrorMessage = "실시간 AI 메시지 처리 중 오류가 발생했습니다."
-                            )
-                        }
-                    }
-                },
-                onError = { error ->
-                    handleRealtimeError(error)
-                },
-                onClose = {
-                    val stillEnabled = _ui.value.isRealtimeEnabled
-                    _ui.update {
-                        it.copy(
-                            isRealtimeEnabled = if (stillEnabled) it.isRealtimeEnabled else false,
-                            realtimeStatus = if (stillEnabled) {
-                                RealtimeConnectionStatus.ERROR
-                            } else {
-                                RealtimeConnectionStatus.IDLE
-                            },
-                            realtimeErrorMessage = if (stillEnabled) "실시간 AI 연결이 종료되었습니다. 다시 시도해 주세요." else null
-                        )
-                    }
-                },
-                onConnected = {
-                    _ui.update {
-                        it.copy(
-                            realtimeStatus = RealtimeConnectionStatus.CONNECTED,
-                            realtimeErrorMessage = null
-                        )
-                    }
-                    sendPendingSuggestion()
-                }
-            )
-            client.connectIfNeeded()
-        }
-    }
-
-    private fun disconnectWebSocket() {
-        wsClient?.disconnect()
-        suggestionBuffer.clear()
-        _ui.update {
-            it.copy(
-                suggestionText = "",
-                realtimeStatus = RealtimeConnectionStatus.IDLE,
-                realtimeErrorMessage = null
-            )
-        }
-    }
-
-    private fun handleRealtimeError(rawMessage: String) {
-        val friendlyMessage = mapRealtimeError(rawMessage) ?: return
-        _ui.update {
-            it.copy(
-                realtimeStatus = RealtimeConnectionStatus.ERROR,
-                realtimeErrorMessage = friendlyMessage
-            )
-        }
-    }
-
-    private fun mapRealtimeError(rawMessage: String): String? {
-        val lower = rawMessage.lowercase()
-        return when {
-            lower.contains("이미 연결 중") -> null
-            lower.contains("websocket이 연결되지 않았습니다") ->
-                "실시간 AI 연결이 아직 준비 중입니다. 잠시 후 다시 시도해 주세요."
-            else -> "실시간 AI 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
-        }
-    }
-
-    fun onTextChanged(currentText: String) {
+    fun onTextChanged(currentText: String, subject: String, toEmails: List<String>, cursorPosition: Int) {
         if (!_ui.value.isRealtimeEnabled) return
 
+        val sanitizedHtml = stripSuggestionFromText(currentText)
+        Log.d("MailComposeVM1", "sanitizedHtml(afterChange)=${sanitizedHtml.take(120)}")
+        val plainText = normalizePlainText(sanitizedHtml)
+        Log.d("MailComposeVM", "onTextChanged plainLength=${plainText.length}, subject='$subject'")
+        latestPlainText = plainText
+        latestSubject = subject
+
+        if (skipNextDebouncedSend) {
+            skipNextDebouncedSend = false
+            return
+        }
+
+        if (plainText.length <= REALTIME_MIN_CHARS) {
+            debounceJob?.cancel()
+            suggestionBuffer.clear()
+            Log.d("MailComposeVM", "onTextChanged -> below min chars, skipping")
+            _ui.update { it.copy(suggestionText = "") }
+            return
+        }
+
         debounceJob?.cancel()
+        retryJob?.cancel()
+
+        // 중복 검사: 중복이면 현재 추천 유지, 아니면 바로 지움
+        val signature = buildRealtimeSignature(
+            normalizedText = plainText,
+            htmlText = sanitizedHtml,
+            subject = subject,
+            cursorPosition = cursorPosition
+        )
+        if (signature == lastRealtimeRequestSignature) {
+            Log.d("MailComposeVM", "duplicate context, keeping current suggestion")
+            return
+        }
+
+        // 중복이 아니면 바로 추천 지우기
         suggestionBuffer.clear()
         _ui.update { it.copy(suggestionText = "") }
+
         debounceJob = viewModelScope.launch {
-            delay(500)
-            wsClient?.sendMessage(
-                systemPrompt = "메일 초안 작성",
-                text = currentText,
-                maxTokens = 50
+            delay(400)
+            if (plainText != latestPlainText || subject != latestSubject) {
+                Log.d("MailComposeVM", "onTextChanged debounced text changed, abort")
+                return@launch
+            }
+            launchRealtimeSuggestion(
+                htmlText = sanitizedHtml,
+                normalizedText = plainText,
+                subject = subject,
+                toEmails = toEmails,
+                cursorPosition = cursorPosition,
+                includeHtmlInSignature = true,
+                force = false
             )
         }
+    }
+
+    fun requestImmediateSuggestion(
+        currentText: String,
+        subject: String,
+        toEmails: List<String>,
+        cursorPosition: Int,
+        force: Boolean = false
+    ) {
+        if (!_ui.value.isRealtimeEnabled && !force) return
+
+        val sanitizedHtml = stripSuggestionFromText(currentText)
+        Log.d("MailComposeVM1", "sanitizedHtml(immediate)=${sanitizedHtml.take(120)}")
+        val plainText = normalizePlainText(sanitizedHtml)
+        lastObservedHtml = sanitizedHtml
+
+        if (plainText.length <= REALTIME_MIN_CHARS && !force) {
+            debounceJob?.cancel()
+            suggestionBuffer.clear()
+            Log.d("MailComposeVM", "requestImmediateSuggestion -> below min chars")
+            _ui.update { it.copy(suggestionText = "") }
+            return
+        }
+
+        latestPlainText = plainText
+        latestSubject = subject
+        debounceJob?.cancel()
+        realtimeRequestJob?.cancel()
+        suggestionBuffer.clear()
+        _ui.update { it.copy(suggestionText = "") }
+
+        launchRealtimeSuggestion(
+            htmlText = sanitizedHtml,
+            normalizedText = plainText,
+            subject = subject,
+            toEmails = toEmails,
+            cursorPosition = cursorPosition,
+            includeHtmlInSignature = true,
+            force = force
+        )
     }
 
     fun acceptNextWord(): String? {
         val suggestion = _ui.value.suggestionText
         if (suggestion.isEmpty()) return null
 
-        // 공백 기준으로 단어 분리
         val words = suggestion.trim().split("\\s+".toRegex())
         if (words.isEmpty()) return null
 
-        // 첫 번째 단어 가져오기
         val firstWord = words.first()
-
-        // 남은 단어들로 업데이트
         val remainingText = words.drop(1).joinToString(" ")
 
-        // suggestionBuffer도 업데이트
         suggestionBuffer.clear()
         suggestionBuffer.append(remainingText)
 
@@ -301,76 +296,149 @@ class MailComposeViewModel(
             suggestionBuffer.clear()
             _ui.update { it.copy(suggestionText = "") }
             debounceJob?.cancel()
+            realtimeRequestJob?.cancel()
+            retryJob?.cancel()
+            retryCount = 0
         }
     }
 
-    /**
-     * Request new suggestion immediately (for tab completion)
-     */
-    fun requestImmediateSuggestion(currentText: String, force: Boolean = false) {
-        if (!_ui.value.isRealtimeEnabled && !force) return
+    private fun launchRealtimeSuggestion(
+        htmlText: String,
+        normalizedText: String,
+        subject: String,
+        toEmails: List<String>,
+        cursorPosition: Int,
+        includeHtmlInSignature: Boolean,
+        force: Boolean
+    ) {
+        if (normalizedText.isBlank()) return
 
-        debounceJob?.cancel()
-        suggestionBuffer.clear()
-        _ui.update { it.copy(suggestionText = "") }
-
-        viewModelScope.launch(Dispatchers.Main) {
-            pendingSuggestionText = currentText
+        val signature = buildRealtimeSignature(
+            normalizedText = normalizedText,
+            htmlText = htmlText.takeIf { includeHtmlInSignature },
+            subject = subject,
+            cursorPosition = cursorPosition
+        )
+        if (!force && signature == lastRealtimeRequestSignature) {
+            Log.d("MailComposeVM", "duplicate context, skip")
+            return
         }
+        lastRealtimeRequestSignature = signature
 
-        wsClient?.let { client ->
-            if (client.isActive()) {
-                sendPendingSuggestion()
-            } else {
-                // 연결이 준비되면 onConnected에서 처리
-                ensureRealtimeConnection()
-                schedulePendingSendFallback()
+        val request = buildSuggestRequest(
+            htmlText = htmlText,
+            subject = subject,
+            toEmails = toEmails,
+            cursorPosition = cursorPosition,
+            plainTextLength = normalizedText.length
+        )
+        realtimeRequestJob?.cancel()
+        realtimeRequestJob = viewModelScope.launch {
+            try {
+                _ui.update {
+                    it.copy(
+                        realtimeStatus = RealtimeConnectionStatus.CONNECTING,
+                        realtimeErrorMessage = null
+                    )
+                }
+                val response = withContext(Dispatchers.IO) { aiApiService.suggestMail(request) }
+                Log.d("MailComposeVM", "suggestMail response=${response.code()}")
+                if (response.isSuccessful) {
+                    val suggestion = response.body()?.suggestion.orEmpty()
+                    val singleSentence = extractFirstSentence(suggestion)
+                    Log.d(
+                        "MailComposeVM",
+                        "suggestion raw='${suggestion.take(100)}', " +
+                            "extracted='${singleSentence.take(100)}'"
+                    )
+                    suggestionBuffer.clear()
+                    suggestionBuffer.append(singleSentence)
+                    _ui.update {
+                        it.copy(
+                            suggestionText = singleSentence,
+                            realtimeStatus = RealtimeConnectionStatus.CONNECTED,
+                            realtimeErrorMessage = null
+                        )
+                    }
+                    // 추천이 비어있으면 일정 시간 후 재시도
+                    if (singleSentence.isEmpty() && retryCount < MAX_RETRY_COUNT) {
+                        retryCount++
+                        lastRealtimeRequestSignature = null // 시그니처 초기화하여 재요청 허용
+                        Log.d("MailComposeVM", "Empty suggestion, scheduling retry ($retryCount/$MAX_RETRY_COUNT)")
+                        scheduleRetry(htmlText, normalizedText, subject, toEmails, cursorPosition)
+                    } else if (singleSentence.isNotEmpty()) {
+                        retryCount = 0 // 성공하면 재시도 카운트 초기화
+                    }
+                } else {
+                    val errorBody = response.errorBody()?.string().orEmpty()
+                    val message = "실시간 추천 요청 실패 (${response.code()}) ${errorBody.take(200)}"
+                    Log.e("MailComposeVM", message)
+                    lastRealtimeRequestSignature = null
+                    _ui.update {
+                        it.copy(
+                            realtimeStatus = RealtimeConnectionStatus.ERROR,
+                            realtimeErrorMessage = message
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                lastRealtimeRequestSignature = null
+                _ui.update {
+                    it.copy(
+                        realtimeStatus = RealtimeConnectionStatus.ERROR,
+                        realtimeErrorMessage = e.message ?: "실시간 추천 처리 중 오류가 발생했습니다."
+                    )
+                }
             }
         }
     }
 
-    private fun sendPendingSuggestion() {
-        viewModelScope.launch(Dispatchers.Main) {
-            val text = pendingSuggestionText ?: return@launch
-            pendingSuggestionText = null
-            delay(100) // Short delay to let the UI update
-            wsClient?.sendMessage(
-                systemPrompt = "메일 초안 작성",
-                text = text,
-                maxTokens = 50
-            )
-        }
+    private fun buildSuggestRequest(
+        htmlText: String,
+        subject: String,
+        toEmails: List<String>,
+        cursorPosition: Int,
+        plainTextLength: Int
+    ): MailSuggestRequest {
+        val normalizedRecipients = toEmails.filter { it.isNotBlank() }
+            .ifEmpty { listOf(PLACEHOLDER_EMAIL) }
+        Log.d("MailComposeVM", "buildSuggestRequest recipients=$normalizedRecipients")
+        return MailSuggestRequest(
+            subject = subject.takeIf { it.isNotBlank() },
+            body = htmlText,
+            toEmails = normalizedRecipients,
+            target = "body",
+            cursor = cursorPosition.coerceIn(0, plainTextLength)
+        )
     }
 
-    private fun schedulePendingSendFallback(timeoutMs: Long = 2000, intervalMs: Long = 100) {
-        viewModelScope.launch {
-            var waited = 0L
-            while (waited < timeoutMs && !(wsClient?.isActive() ?: false)) {
-                delay(intervalMs)
-                waited += intervalMs
-            }
-            if (wsClient?.isActive() == true) {
-                sendPendingSuggestion()
-            }
-        }
+    private fun stripSuggestionFromText(text: String): String {
+        return text.replace(
+            Regex(
+                """<span[^>]*id=["']ai-suggestion["'][^>]*>.*?</span>""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            ),
+            ""
+        ).replace("\u200B", "") // 제로 폭 문자 제거
     }
 
-    private fun parseOutputFromMarkdown(rawText: String): String {
-        // Remove markdown code block markers: ```json ... ```
-        var text = rawText.trim()
-            .removePrefix("```json")
-            .removePrefix("```")
-            .removeSuffix("```")
+    private fun normalizePlainText(html: String): String {
+        return HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY)
+            .toString()
+            .replace("\u00A0", " ")
+            .replace("\\s+".toRegex(), " ")
             .trim()
+    }
 
-        // Try to parse JSON and extract "output" field
-        return try {
-            val json = JSONObject(text)
-            json.optString("output", text)
-        } catch (e: Exception) {
-            // If parsing fails, return original text
-            text
-        }
+    private fun buildRealtimeSignature(
+        normalizedText: String,
+        htmlText: String?,
+        subject: String,
+        cursorPosition: Int
+    ): String {
+        val base = "$subject:$cursorPosition:${normalizedText.hashCode()}"
+        return if (htmlText != null) "$base:${htmlText.hashCode()}" else base
     }
 
     private fun extractFirstSentence(text: String): String {
@@ -387,8 +455,34 @@ class MailComposeViewModel(
         return normalized.substring(0, cutoff).trim()
     }
 
+    private fun scheduleRetry(
+        htmlText: String,
+        normalizedText: String,
+        subject: String,
+        toEmails: List<String>,
+        cursorPosition: Int
+    ) {
+        retryJob?.cancel()
+        retryJob = viewModelScope.launch {
+            delay(RETRY_DELAY_MS)
+            if (!_ui.value.isRealtimeEnabled) return@launch
+            Log.d("MailComposeVM", "Retry triggered for suggestion")
+            launchRealtimeSuggestion(
+                htmlText = htmlText,
+                normalizedText = normalizedText,
+                subject = subject,
+                toEmails = toEmails,
+                cursorPosition = cursorPosition,
+                includeHtmlInSignature = true,
+                force = true
+            )
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        disconnectWebSocket()
+        debounceJob?.cancel()
+        realtimeRequestJob?.cancel()
+        retryJob?.cancel()
     }
 }

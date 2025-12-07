@@ -52,7 +52,6 @@ import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.compose.MailComposeViewModel
@@ -71,6 +70,7 @@ import com.fiveis.xend.ui.theme.TextSecondary
 import com.fiveis.xend.ui.theme.ToolbarIconTint
 import com.fiveis.xend.ui.theme.XendTheme
 import com.fiveis.xend.utils.EmailUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -89,9 +89,12 @@ class ReplyDirectComposeActivity : ComponentActivity() {
         val senderEmail = intent.getStringExtra("sender_email") ?: ""
         val date = intent.getStringExtra("date") ?: ""
         val originalBody = intent.getStringExtra("original_body") ?: ""
-        val generatedBody = intent.getStringExtra("generated_body")
+        val generatedBodyRaw = intent.getStringExtra("generated_body")
+        Log.d("ReplyDirectCompose", "onCreate: generatedBodyRaw length=${generatedBodyRaw?.length ?: 0}")
+        val generatedBody = generatedBodyRaw
             ?.normalizeAsHtml()
             .orEmpty()
+        Log.d("ReplyDirectCompose", "onCreate: generatedBody (normalized) length=${generatedBody.length}")
 
         // 이메일 주소 추출 ("이름 <email@example.com>" 형식에서 이메일만 추출)
         val recipientEmail = EmailUtils.extractEmailAddress(recipientEmailRaw)
@@ -108,10 +111,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                                     application.applicationContext,
                                     endpointUrl = BuildConfig.BASE_URL + "/api/ai/mail/generate/stream/"
                                 ),
-                                wsClient = MailComposeWebSocketClient(
-                                    context = application.applicationContext,
-                                    wsUrl = BuildConfig.WS_URL
-                                )
+                                aiApiService = RetrofitClient.getAiApiService(application.applicationContext)
                             ) as T
                         }
                     }
@@ -174,19 +174,32 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             "editor=${editorState.editor}, applied=$generatedBodyApplied"
                     )
                     if (generatedBody.isNotEmpty() && !generatedBodyApplied) {
-                        // Wait for editor to be ready
-                        while (editorState.editor == null) {
+                        // Wait for editor to be ready with timeout
+                        var retries = 0
+                        while (editorState.editor == null && retries < 40) {
                             kotlinx.coroutines.delay(50)
+                            retries++
                         }
+
+                        if (editorState.editor == null) {
+                            android.util.Log.e("ReplyDirectCompose", "Editor not ready after timeout")
+                            return@LaunchedEffect
+                        }
+
                         // Additional delay to ensure WebView is fully loaded
-                        kotlinx.coroutines.delay(200)
+                        kotlinx.coroutines.delay(300)
+
                         android.util.Log.d("ReplyDirectCompose", "Setting HTML from generatedBody (after delay)")
-                        editorState.setHtml(generatedBody)
-                        generatedBodyApplied = true
-                        android.util.Log.d(
-                            "ReplyDirectCompose",
-                            "HTML set complete, applied flag = $generatedBodyApplied"
-                        )
+                        try {
+                            editorState.setHtml(generatedBody)
+                            generatedBodyApplied = true
+                            android.util.Log.d(
+                                "ReplyDirectCompose",
+                                "HTML set complete, applied flag = $generatedBodyApplied"
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("ReplyDirectCompose", "Failed to set HTML", e)
+                        }
                     }
                 }
 
@@ -195,7 +208,12 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     if (generatedBody.isEmpty() || generatedBodyApplied) {
                         editorState.editor?.setTextChangedListener { html ->
                             if (aiRealtime) {
-                                composeVm.onTextChanged(html)
+                                composeVm.onTextChanged(
+                                    currentText = html,
+                                    subject = currentSubject,
+                                    toEmails = listOf(recipientEmail),
+                                    cursorPosition = editorState.getCursorPosition()
+                                )
                             }
                         }
                     }
@@ -221,6 +239,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     // Apply AI-streamed body only when allowed
                     if (composeUi.bodyRendered.isNotEmpty() && allowAiOverwrite) {
                         android.util.Log.d("ReplyDirectCompose", "Setting HTML from bodyRendered")
+                        composeVm.skipNextTextChangeSend()
                         editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
@@ -262,17 +281,12 @@ class ReplyDirectComposeActivity : ComponentActivity() {
 
                 LaunchedEffect(sendUiState.lastSuccessMsg) {
                     sendUiState.lastSuccessMsg?.let {
-                        bannerState = com.fiveis.xend.ui.compose.BannerState(
-                            message = "메일 전송에 성공했습니다.",
-                            type = com.fiveis.xend.ui.compose.BannerType.SUCCESS,
-                            actionText = "홈 화면 이동하기",
-                            onActionClick = {
-                                val intent = Intent(this@ReplyDirectComposeActivity, MailActivity::class.java)
-                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                startActivity(intent)
-                                finish()
-                            }
-                        )
+                        val intent = Intent(this@ReplyDirectComposeActivity, MailActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            putExtra("show_mail_sent_banner", true)
+                        }
+                        startActivity(intent)
+                        finish()
                     }
                 }
 
@@ -286,10 +300,21 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                 }
 
                 val acceptSuggestion: () -> Unit = {
+                    composeVm.skipNextTextChangeSend()
                     editorState.acceptSuggestion()
                     editorState.requestFocusAndShowKeyboard()
                     composeVm.acceptSuggestion()
-                    composeVm.requestImmediateSuggestion(editorState.getHtml())
+                    // Allow the editor to reflect the accepted text before sending.
+                    coroutineScope.launch {
+                        delay(50)
+                        composeVm.requestImmediateSuggestion(
+                            currentText = editorState.getHtml(),
+                            subject = currentSubject,
+                            toEmails = listOf(recipientEmail),
+                            cursorPosition = editorState.getCursorPosition(),
+                            force = true
+                        )
+                    }
                 }
 
                 val undoAction: () -> Unit = {
@@ -361,7 +386,19 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         },
                         onStopStreaming = { composeVm.stopStreaming() },
                         onAcceptSuggestion = acceptSuggestion,
-                        onAiRealtimeToggle = { aiRealtime = it },
+                        onAiRealtimeToggle = {
+                            aiRealtime = it
+                            if (it) {
+                                // Immediately ask for a suggestion with the current draft when toggled on
+                                composeVm.requestImmediateSuggestion(
+                                    currentText = editorState.getHtml(),
+                                    subject = currentSubject,
+                                    toEmails = listOf(recipientEmail),
+                                    cursorPosition = editorState.getCursorPosition(),
+                                    force = true
+                                )
+                            }
+                        },
                         realtimeStatus = composeUi.realtimeStatus,
                         realtimeErrorMessage = composeUi.realtimeErrorMessage,
                         bannerState = bannerState,
@@ -418,15 +455,15 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                                 coroutineScope.launch {
                                     try {
-                                        contactRepository.addContact(
-                                            name = name,
-                                            email = email,
-                                            groupId = groupId,
-                                            senderRole = senderRole,
-                                            recipientRole = recipientRole,
-                                            personalPrompt = personalPrompt,
-                                            languagePreference = language
-                                        )
+                                        contactRepository.addContact {
+                                            this.name(name)
+                                            email(email)
+                                            groupId(groupId)
+                                            senderRole(senderRole)
+                                            recipientRole(recipientRole)
+                                            personalPrompt(personalPrompt)
+                                            languagePreference(language)
+                                        }
                                         showAddContactDialog = false
                                         selectedContactForDialog = null
                                         recipientGroupNames = groupId?.let { id ->

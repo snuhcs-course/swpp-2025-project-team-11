@@ -39,15 +39,18 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +70,7 @@ import com.fiveis.xend.ui.sent.SentUiState
 import com.fiveis.xend.ui.theme.Blue60
 import com.fiveis.xend.ui.theme.Blue80
 import kotlin.math.absoluteValue
+import kotlinx.coroutines.launch
 
 enum class MailTab {
     INBOX,
@@ -93,6 +97,8 @@ fun MailScreen(
     showMailSentBanner: Boolean = false,
     onDismissMailSentBanner: () -> Unit = {},
     onInboxDeleteEmail: (String) -> Unit = {},
+    showNewEmailBanner: Boolean = false,
+    onDismissNewEmailBanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(MailTab.INBOX) }
@@ -103,6 +109,7 @@ fun MailScreen(
     val scrollThresholdPx = with(LocalDensity.current) { 12.dp.toPx() }
 
     // 각 탭의 스크롤 위치 저장 (Activity 재시작 시에도 복원)
+    val coroutineScope = rememberCoroutineScope()
     val inboxScrollIndex = rememberSaveable { mutableStateOf(0) }
     val inboxScrollOffset = rememberSaveable { mutableStateOf(0) }
     val sentScrollIndex = rememberSaveable { mutableStateOf(0) }
@@ -117,6 +124,24 @@ fun MailScreen(
         initialFirstVisibleItemIndex = sentScrollIndex.value,
         initialFirstVisibleItemScrollOffset = sentScrollOffset.value
     )
+
+    val lastInboxTopEmailId = remember { mutableStateOf<String?>(null) }
+    val inboxTopEmailId = inboxUiState.emails.firstOrNull()?.id
+    LaunchedEffect(inboxTopEmailId) {
+        if (inboxTopEmailId == null) return@LaunchedEffect
+
+        if (lastInboxTopEmailId.value == null) {
+            lastInboxTopEmailId.value = inboxTopEmailId
+            return@LaunchedEffect
+        }
+
+        if (inboxTopEmailId != lastInboxTopEmailId.value) {
+            lastInboxTopEmailId.value = inboxTopEmailId
+            if (selectedTab == MailTab.INBOX) {
+                inboxListState.scrollToItem(0)
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -175,6 +200,47 @@ fun MailScreen(
                     onSearch = onOpenSearch,
                     onProfile = onOpenProfile
                 )
+
+                // New Email Banner (Inbox tab only)
+                AnimatedVisibility(
+                    visible = showNewEmailBanner && selectedTab == MailTab.INBOX,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                                .background(
+                                    color = Blue80,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    coroutineScope.launch {
+                                        inboxListState.animateScrollToItem(0)
+                                    }
+                                    onDismissNewEmailBanner()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "새로운 메일이 도착했습니다. 탭하여 확인하세요.",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                        }
+                    }
+                }
 
                 // Success Banner (for Add Contact)
                 AnimatedVisibility(

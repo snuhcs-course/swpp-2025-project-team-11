@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Create
@@ -100,9 +101,11 @@ fun InboxScreen(
     onAddContactClick: (EmailItem) -> Unit = {},
     onDismissSuccessBanner: () -> Unit = {},
     onDeleteEmail: (String) -> Unit = {},
+    onDismissNewEmailBanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     // 스크롤 상태 감지
     var showBottomBar by remember { mutableStateOf(true) }
@@ -184,6 +187,49 @@ fun InboxScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 ScreenHeader(onSearch = onOpenSearch, onProfile = onOpenProfile)
+
+                // New Email Banner
+                AnimatedVisibility(
+                    visible = uiState.showNewEmailBanner,
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        initialOffsetY = { -it }
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { -it }
+                    ) + fadeOut(animationSpec = tween(300))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .padding(top = 8.dp, bottom = 8.dp)
+                                .background(
+                                    color = Blue80,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(0)
+                                    }
+                                    onDismissNewEmailBanner()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "새로운 메일이 도착했습니다. 탭하여 확인하세요.",
+                                color = Color.White,
+                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
+                }
 
                 // Success Banner
                 AnimatedVisibility(
@@ -548,14 +594,6 @@ private fun EmailRow(
     val offsetX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
-    // Animate when isRevealed changes
-    LaunchedEffect(isRevealed) {
-        offsetX.animateTo(
-            targetValue = if (isRevealed) -revealWidthPx else 0f,
-            animationSpec = tween(durationMillis = 300)
-        )
-    }
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -600,6 +638,19 @@ private fun EmailRow(
                                     // Snap to revealed or collapsed based on threshold
                                     val shouldReveal = offsetX.value < -revealWidthPx / 2
                                     isRevealed = shouldReveal
+                                    offsetX.animateTo(
+                                        targetValue = if (shouldReveal) -revealWidthPx else 0f,
+                                        animationSpec = tween(durationMillis = 250)
+                                    )
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch {
+                                    isRevealed = false
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(durationMillis = 250)
+                                    )
                                 }
                             },
                             onHorizontalDrag = { _, dragAmount ->
@@ -615,7 +666,13 @@ private fun EmailRow(
                     enabled = !isDeleting,
                     onClick = {
                         if (isRevealed) {
-                            isRevealed = false
+                            scope.launch {
+                                isRevealed = false
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(durationMillis = 250)
+                                )
+                            }
                         } else {
                             onClick()
                         }

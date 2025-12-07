@@ -1,11 +1,14 @@
 package com.fiveis.xend.ui.login
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fiveis.xend.data.database.AppDatabase
 import com.fiveis.xend.data.repository.AuthRepository
 import com.fiveis.xend.data.repository.AuthResult
 import com.fiveis.xend.data.source.TokenManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +29,7 @@ data class LoginUiState(
  * 로그인 화면 ViewModel
  */
 class LoginViewModel(
+    private val context: Context,
     private val tokenManager: TokenManager,
     private val authRepository: AuthRepository = AuthRepository()
 ) : ViewModel() {
@@ -70,7 +74,10 @@ class LoginViewModel(
     fun handleAuthCodeReceived(authCode: String, email: String) {
         _uiState.update { it.copy(isLoading = true) }
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) { // Use Dispatchers.IO for DB operation
+            // 새로운 계정으로 로그인 시, 기존 로컬 데이터 삭제
+            clearLocalData()
+
             when (val result = authRepository.sendAuthCodeToServer(authCode)) {
                 is AuthResult.Success -> {
                     tokenManager.saveTokens(
@@ -105,7 +112,7 @@ class LoginViewModel(
     fun logout() {
         _uiState.update { it.copy(isLoading = true) }
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) { // Use Dispatchers.IO for DB operation
             val refreshToken = tokenManager.getRefreshToken()
 
             // 서버에 로그아웃 요청
@@ -113,6 +120,9 @@ class LoginViewModel(
 
             // 로컬 토큰 삭제
             tokenManager.clearTokens()
+
+            // 로그아웃 시 로컬 데이터도 삭제 (ProfileViewModel과 일관성 유지)
+            clearLocalData()
 
             _uiState.update {
                 it.copy(
@@ -131,5 +141,16 @@ class LoginViewModel(
      */
     fun updateMessages(message: String) {
         _uiState.update { it.copy(messages = message) }
+    }
+
+    private suspend fun clearLocalData() {
+        try {
+            val database = AppDatabase.getDatabase(context)
+            database.clearAllTables()
+            Log.d("LoginViewModel", "Local database cleared successfully.")
+        } catch (e: Exception) {
+            Log.e("LoginViewModel", "Failed to clear local database: ${e.message}")
+            // 데이터베이스 클리어 실패는 치명적이지 않을 수 있으므로, 예외를 다시 던지지 않음.
+        }
     }
 }

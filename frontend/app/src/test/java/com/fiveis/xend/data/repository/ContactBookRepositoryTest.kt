@@ -140,14 +140,14 @@ class ContactBookRepositoryTest {
         } returns Response.success(expectedResponse)
         coEvery { contactDao.upsertContacts(any()) } returns Unit
 
-        val result = repository.addContact(
-            name = name,
-            email = email,
-            groupId = groupId,
-            senderRole = senderRole,
-            recipientRole = recipientRole,
-            personalPrompt = personalPrompt
-        )
+        val result = repository.addContact {
+            this.name(name)
+            email(email)
+            groupId(groupId)
+            senderRole(senderRole)
+            recipientRole(recipientRole)
+            personalPrompt(personalPrompt)
+        }
 
         assertEquals(expectedResponse, result)
         coVerify {
@@ -181,14 +181,14 @@ class ContactBookRepositoryTest {
         } returns Response.success(expectedResponse)
         coEvery { contactDao.upsertContacts(any()) } returns Unit
 
-        repository.addContact(
-            name = name,
-            email = email,
-            groupId = null,
-            senderRole = null,
-            recipientRole = recipientRole,
-            personalPrompt = null
-        )
+        repository.addContact {
+            this.name(name)
+            email(email)
+            groupId(null)
+            senderRole(null)
+            recipientRole(recipientRole)
+            personalPrompt(null)
+        }
 
         coVerify {
             contactApiService.addContact(
@@ -206,14 +206,14 @@ class ContactBookRepositoryTest {
         } returns Response.success(null)
 
         val exception = try {
-            repository.addContact(
-                name = "Test",
-                email = "test@example.com",
-                groupId = null,
-                senderRole = null,
-                recipientRole = "Test",
-                personalPrompt = null
-            )
+            repository.addContact {
+                name("Test")
+                email("test@example.com")
+                groupId(null)
+                senderRole(null)
+                recipientRole("Test")
+                personalPrompt(null)
+            }
             null
         } catch (e: Exception) {
             e
@@ -230,14 +230,14 @@ class ContactBookRepositoryTest {
         } returns Response.error(400, "Bad request".toResponseBody())
 
         val exception = try {
-            repository.addContact(
-                name = "Test",
-                email = "test@example.com",
-                groupId = null,
-                senderRole = null,
-                recipientRole = "Test",
-                personalPrompt = null
-            )
+            repository.addContact {
+                name("Test")
+                email("test@example.com")
+                groupId(null)
+                senderRole(null)
+                recipientRole("Test")
+                personalPrompt(null)
+            }
             null
         } catch (e: IllegalStateException) {
             e
@@ -832,10 +832,14 @@ class ContactBookRepositoryTest {
         )
         coEvery { contactDao.upsertContacts(any()) } returns Unit
 
-        repository.addContact(
-            name = "N", email = "e@x.com",
-            groupId = null, senderRole = "Writer", recipientRole = "Emp", personalPrompt = null
-        )
+        repository.addContact {
+            name("N")
+            email("e@x.com")
+            groupId(null)
+            senderRole("Writer")
+            recipientRole("Emp")
+            personalPrompt(null)
+        }
 
         assertTrue(reqSlot.captured.context?.personalPrompt == null || reqSlot.captured.context?.personalPrompt == "")
     }
@@ -852,7 +856,14 @@ class ContactBookRepositoryTest {
         coEvery { contactDao.upsertContacts(any()) } returns Unit
         coEvery { contactDao.upsertContexts(capture(ctxSlot)) } returns Unit
 
-        repository.addContact("New", "n@x.com", null, "Mgr", "Emp", null)
+        repository.addContact {
+            name("New")
+            email("n@x.com")
+            groupId(null)
+            senderRole("Mgr")
+            recipientRole("Emp")
+            personalPrompt(null)
+        }
 
         assertEquals(listOf(77L), ctxSlot.captured.map { it.contactId })
         assertEquals("Mgr", ctxSlot.captured.first().senderRole)

@@ -80,6 +80,8 @@ class MailActivity : ComponentActivity() {
                     onEmailClick = {
                         val intent = Intent(this, MailDetailActivity::class.java)
                         intent.putExtra("message_id", it.id)
+                        val isSentMail = it.labelIds.contains("SENT")
+                        intent.putExtra("is_sent_mail", isSentMail)
                         startActivity(intent)
                     },
                     onAddContactClick = { email ->
@@ -116,7 +118,9 @@ class MailActivity : ComponentActivity() {
                     onDismissDraftSavedBanner = inboxViewModel::dismissDraftSavedBanner,
                     showMailSentBanner = inboxUiState.showMailSentBanner,
                     onDismissMailSentBanner = inboxViewModel::dismissMailSentBanner,
-                    onInboxDeleteEmail = inboxViewModel::deleteEmail
+                    onInboxDeleteEmail = inboxViewModel::deleteEmail,
+                    showNewEmailBanner = inboxUiState.showNewEmailBanner,
+                    onDismissNewEmailBanner = inboxViewModel::dismissNewEmailBanner
                 )
 
                 if (inboxUiState.showAddContactDialog) {
@@ -141,6 +145,14 @@ class MailActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Check if we need to show mail sent banner from ReplyDirectComposeActivity
+        if (intent.getBooleanExtra("show_mail_sent_banner", false)) {
+            inboxViewModel.showMailSentBanner()
         }
     }
 }

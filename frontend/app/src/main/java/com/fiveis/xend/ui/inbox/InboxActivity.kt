@@ -53,6 +53,7 @@ class InboxActivity : ComponentActivity() {
                     onEmailClick = {
                         val intent = Intent(this, MailDetailActivity::class.java)
                         intent.putExtra("message_id", it.id)
+                        intent.putExtra("is_sent_mail", false)
                         startActivity(intent)
                     },
                     onOpenSearch = {
@@ -85,6 +86,9 @@ class InboxActivity : ComponentActivity() {
                     },
                     onDismissSuccessBanner = {
                         viewModel.dismissSuccessBanner()
+                    },
+                    onDismissNewEmailBanner = {
+                        viewModel.dismissNewEmailBanner()
                     }
                 )
 
