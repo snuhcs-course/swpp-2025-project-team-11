@@ -64,10 +64,16 @@ class MailDetailViewModelAttachmentTest {
         } returns Response.success(responseBody)
 
         val viewModel = MailDetailViewModel(context, emailDao, mockRepository, "msg1", Dispatchers.IO)
-        delay(100)
+        delay(500) // Wait for initial mail load
 
         viewModel.downloadAttachment(attachment)
-        delay(500)
+
+        // Wait until download completes with retries
+        var attempts = 0
+        while (viewModel.uiState.value.isDownloadingAttachment && attempts < 20) {
+            delay(200)
+            attempts++
+        }
 
         val state = viewModel.uiState.first()
         assertFalse(state.isDownloadingAttachment)
