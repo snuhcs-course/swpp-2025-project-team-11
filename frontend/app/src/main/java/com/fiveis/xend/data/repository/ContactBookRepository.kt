@@ -181,23 +181,9 @@ class ContactBookRepository(
     // 쓰기 API (성공 시 로컬 갱신)
     // ======================
 
-    suspend fun addContact(
-        name: String,
-        email: String,
-        groupId: Long?,
-        senderRole: String?,
-        recipientRole: String?,
-        personalPrompt: String?,
-        languagePreference: String? = null
-    ): ContactResponse {
+    suspend fun addContact(build: ContactRequestBuilder.() -> Unit): ContactResponse {
         val request = ContactRequestBuilder()
-            .name(name)
-            .email(email)
-            .groupId(groupId)
-            .senderRole(senderRole)
-            .recipientRole(recipientRole)
-            .personalPrompt(personalPrompt)
-            .languagePreference(languagePreference)
+            .apply(build)
             .build()
         val res = api.addContact(request)
         if (!res.isSuccessful) {

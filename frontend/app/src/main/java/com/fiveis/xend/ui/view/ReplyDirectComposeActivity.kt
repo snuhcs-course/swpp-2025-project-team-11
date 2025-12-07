@@ -52,7 +52,6 @@ import com.fiveis.xend.data.model.Contact
 import com.fiveis.xend.data.model.Group
 import com.fiveis.xend.data.repository.ContactBookRepository
 import com.fiveis.xend.network.MailComposeSseClient
-import com.fiveis.xend.network.MailComposeWebSocketClient
 import com.fiveis.xend.network.RetrofitClient
 import com.fiveis.xend.ui.compose.ContactLookupViewModel
 import com.fiveis.xend.ui.compose.MailComposeViewModel
@@ -112,10 +111,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                                     application.applicationContext,
                                     endpointUrl = BuildConfig.BASE_URL + "/api/ai/mail/generate/stream/"
                                 ),
-                                wsClient = MailComposeWebSocketClient(
-                                    context = application.applicationContext,
-                                    wsUrl = BuildConfig.WS_URL
-                                )
+                                aiApiService = RetrofitClient.getAiApiService(application.applicationContext)
                             ) as T
                         }
                     }
@@ -214,7 +210,9 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             if (aiRealtime) {
                                 composeVm.onTextChanged(
                                     currentText = html,
-                                    subject = currentSubject
+                                    subject = currentSubject,
+                                    toEmails = listOf(recipientEmail),
+                                    cursorPosition = editorState.getCursorPosition()
                                 )
                             }
                         }
@@ -241,6 +239,7 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                     // Apply AI-streamed body only when allowed
                     if (composeUi.bodyRendered.isNotEmpty() && allowAiOverwrite) {
                         android.util.Log.d("ReplyDirectCompose", "Setting HTML from bodyRendered")
+                        composeVm.skipNextTextChangeSend()
                         editorState.setHtml(composeUi.bodyRendered)
                     }
                 }
@@ -310,7 +309,10 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         delay(50)
                         composeVm.requestImmediateSuggestion(
                             currentText = editorState.getHtml(),
-                            subject = currentSubject
+                            subject = currentSubject,
+                            toEmails = listOf(recipientEmail),
+                            cursorPosition = editorState.getCursorPosition(),
+                            force = true
                         )
                     }
                 }
@@ -384,7 +386,19 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         },
                         onStopStreaming = { composeVm.stopStreaming() },
                         onAcceptSuggestion = acceptSuggestion,
-                        onAiRealtimeToggle = { aiRealtime = it },
+                        onAiRealtimeToggle = {
+                            aiRealtime = it
+                            if (it) {
+                                // Immediately ask for a suggestion with the current draft when toggled on
+                                composeVm.requestImmediateSuggestion(
+                                    currentText = editorState.getHtml(),
+                                    subject = currentSubject,
+                                    toEmails = listOf(recipientEmail),
+                                    cursorPosition = editorState.getCursorPosition(),
+                                    force = true
+                                )
+                            }
+                        },
                         realtimeStatus = composeUi.realtimeStatus,
                         realtimeErrorMessage = composeUi.realtimeErrorMessage,
                         bannerState = bannerState,
@@ -441,15 +455,15 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                                 coroutineScope.launch {
                                     try {
-                                        contactRepository.addContact(
-                                            name = name,
-                                            email = email,
-                                            groupId = groupId,
-                                            senderRole = senderRole,
-                                            recipientRole = recipientRole,
-                                            personalPrompt = personalPrompt,
-                                            languagePreference = language
-                                        )
+                                        contactRepository.addContact {
+                                            this.name(name)
+                                            email(email)
+                                            groupId(groupId)
+                                            senderRole(senderRole)
+                                            recipientRole(recipientRole)
+                                            personalPrompt(personalPrompt)
+                                            languagePreference(language)
+                                        }
                                         showAddContactDialog = false
                                         selectedContactForDialog = null
                                         recipientGroupNames = groupId?.let { id ->

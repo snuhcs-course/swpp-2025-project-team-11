@@ -202,13 +202,7 @@ class XendRichEditor @JvmOverloads constructor(
                 if (!sel.rangeCount) return;
                 var caretRange = sel.getRangeAt(0).cloneRange();
                 caretRange.collapse(false);
-                var afterRange = caretRange.cloneRange();
-                afterRange.selectNodeContents(document.body);
-                afterRange.setStart(caretRange.endContainer, caretRange.endOffset);
-                var textAfterCursor = afterRange.toString().trim();
-                if (textAfterCursor.length > 0) {
-                    return;
-                }
+
                 var insertRange = caretRange.cloneRange();
                 insertRange.collapse(false);
                 var textSpan = document.createElement('span');
@@ -220,6 +214,16 @@ class XendRichEditor @JvmOverloads constructor(
                 textSpan.style.pointerEvents = 'none';
                 textSpan.textContent = ' ' + '$escapedText';
                 insertRange.insertNode(textSpan);
+
+                // 제로 폭 텍스트 노드를 span 앞에 삽입하고 커서를 그 앞에 위치
+                var zeroWidthNode = document.createTextNode('\u200B');
+                textSpan.parentNode.insertBefore(zeroWidthNode, textSpan);
+                var cursorRange = document.createRange();
+                cursorRange.setStart(zeroWidthNode, 0);
+                cursorRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(cursorRange);
+
                 window._xendSuggestionGuard = function() {
                     var suggestion = document.getElementById('ai-suggestion');
                     if (!suggestion) return;
@@ -228,20 +232,20 @@ class XendRichEditor @JvmOverloads constructor(
                     var caretRange = sel.getRangeAt(0);
                     var suggestionRange = document.createRange();
                     suggestionRange.selectNode(suggestion);
-                    // If caret is at or after the end of the suggestion, snap it before the span
+                    // If caret is at or after the end of the suggestion, discard the suggestion
                     var compareEnd = caretRange.compareBoundaryPoints(Range.START_TO_END, suggestionRange);
                     var anchorInside = suggestion.contains(sel.anchorNode);
                     if (anchorInside || compareEnd >= 0) {
-                        var guardRange = document.createRange();
-                        guardRange.setStartBefore(suggestion);
-                        guardRange.collapse(true);
-                        sel.removeAllRanges();
-                        sel.addRange(guardRange);
+                        suggestion.remove();
+                        document.removeEventListener('selectionchange', window._xendSuggestionGuard);
+                        window._xendSuggestionGuard = null;
+                        if (typeof RE !== 'undefined' && RE.callback) {
+                            RE.callback();
+                        }
                     }
                 };
-                document.addEventListener('selectionchange', window._xendSuggestionGuard);
-                sel.removeAllRanges();
-                sel.addRange(caretRange);
+                document.addEventListener('keyup', window._xendSuggestionGuard, true);
+                document.addEventListener('selectionchange', window._xendSuggestionGuard, true);
             })();
         """.trimIndent()
         evaluateJavascript(js, null)
@@ -258,7 +262,8 @@ class XendRichEditor @JvmOverloads constructor(
                     existing.remove();
                 }
                 if (window._xendSuggestionGuard) {
-                    document.removeEventListener('selectionchange', window._xendSuggestionGuard);
+                    document.removeEventListener('keyup', window._xendSuggestionGuard, true);
+                    document.removeEventListener('selectionchange', window._xendSuggestionGuard, true);
                     window._xendSuggestionGuard = null;
                 }
             })();

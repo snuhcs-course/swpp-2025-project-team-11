@@ -47,15 +47,15 @@ class AddContactViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = AddContactUiState(isLoading = true)
         viewModelScope.launch {
             try {
-                val res = repository.addContact(
-                    name = name,
-                    email = email,
-                    groupId = group?.id,
-                    senderRole = senderRole,
-                    recipientRole = recipientRole,
-                    personalPrompt = personalPrompt,
-                    languagePreference = languagePreference
-                )
+                val res = repository.addContact {
+                    this.name(name)
+                    email(email)
+                    groupId(group?.id)
+                    senderRole(senderRole)
+                    recipientRole(recipientRole)
+                    personalPrompt(personalPrompt)
+                    languagePreference(languagePreference)
+                }
                 _uiState.value = AddContactUiState(
                     isLoading = false,
                     showSuccessBanner = true,
