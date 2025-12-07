@@ -441,15 +441,15 @@ class InboxViewModel(
             }
             try {
                 Log.d("InboxViewModel", "Adding contact: name=$name, email=$email")
-                contactRepository.addContact(
-                    name = name,
-                    email = email,
-                    groupId = groupId,
-                    senderRole = senderRole,
-                    recipientRole = recipientRole,
-                    personalPrompt = personalPrompt,
-                    languagePreference = languagePreference
-                )
+                contactRepository.addContact {
+                    this.name(name)
+                    email(email)
+                    groupId(groupId)
+                    senderRole(senderRole)
+                    recipientRole(recipientRole)
+                    personalPrompt(personalPrompt)
+                    languagePreference(languagePreference)
+                }
                 Log.d("InboxViewModel", "Contact added successfully")
                 _uiState.update {
                     it.copy(

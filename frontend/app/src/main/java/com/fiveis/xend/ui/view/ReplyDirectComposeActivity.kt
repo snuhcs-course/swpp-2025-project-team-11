@@ -386,7 +386,19 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                         },
                         onStopStreaming = { composeVm.stopStreaming() },
                         onAcceptSuggestion = acceptSuggestion,
-                        onAiRealtimeToggle = { aiRealtime = it },
+                        onAiRealtimeToggle = {
+                            aiRealtime = it
+                            if (it) {
+                                // Immediately ask for a suggestion with the current draft when toggled on
+                                composeVm.requestImmediateSuggestion(
+                                    currentText = editorState.getHtml(),
+                                    subject = currentSubject,
+                                    toEmails = listOf(recipientEmail),
+                                    cursorPosition = editorState.getCursorPosition(),
+                                    force = true
+                                )
+                            }
+                        },
                         realtimeStatus = composeUi.realtimeStatus,
                         realtimeErrorMessage = composeUi.realtimeErrorMessage,
                         bannerState = bannerState,
@@ -443,15 +455,15 @@ class ReplyDirectComposeActivity : ComponentActivity() {
                             onConfirm = { name, email, senderRole, recipientRole, personalPrompt, groupId, language ->
                                 coroutineScope.launch {
                                     try {
-                                        contactRepository.addContact(
-                                            name = name,
-                                            email = email,
-                                            groupId = groupId,
-                                            senderRole = senderRole,
-                                            recipientRole = recipientRole,
-                                            personalPrompt = personalPrompt,
-                                            languagePreference = language
-                                        )
+                                        contactRepository.addContact {
+                                            this.name(name)
+                                            email(email)
+                                            groupId(groupId)
+                                            senderRole(senderRole)
+                                            recipientRole(recipientRole)
+                                            personalPrompt(personalPrompt)
+                                            languagePreference(language)
+                                        }
                                         showAddContactDialog = false
                                         selectedContactForDialog = null
                                         recipientGroupNames = groupId?.let { id ->

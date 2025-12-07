@@ -87,17 +87,7 @@ class AddContactViewModelTest {
             email = "john@example.com"
         )
 
-        coEvery {
-            anyConstructed<ContactBookRepository>().addContact(
-                "John Doe",
-                "john@example.com",
-                null,
-                "Sender",
-                "Recipient",
-                "Be formal",
-                null
-            )
-        } returns mockResponse
+        coEvery { anyConstructed<ContactBookRepository>().addContact(any()) } returns mockResponse
 
         viewModel = AddContactViewModel(application)
 
@@ -126,17 +116,7 @@ class AddContactViewModelTest {
             email = "john@example.com"
         )
 
-        coEvery {
-            anyConstructed<ContactBookRepository>().addContact(
-                "John Doe",
-                "john@example.com",
-                5L,
-                null,
-                "Recipient",
-                null,
-                null
-            )
-        } returns mockResponse
+        coEvery { anyConstructed<ContactBookRepository>().addContact(any()) } returns mockResponse
 
         viewModel = AddContactViewModel(application)
 
@@ -156,9 +136,7 @@ class AddContactViewModelTest {
 
     @Test
     fun add_contact_failure_sets_error() = runTest {
-        coEvery {
-            anyConstructed<ContactBookRepository>().addContact(any(), any(), any(), any(), any(), any(), any())
-        } throws Exception("Network error")
+        coEvery { anyConstructed<ContactBookRepository>().addContact(any()) } throws Exception("Network error")
 
         viewModel = AddContactViewModel(application)
 
@@ -187,17 +165,7 @@ class AddContactViewModelTest {
             email = longEmail
         )
 
-        coEvery {
-            anyConstructed<ContactBookRepository>().addContact(
-                "Test User",
-                longEmail,
-                null,
-                null,
-                "Recipient",
-                null,
-                null
-            )
-        } returns mockResponse
+        coEvery { anyConstructed<ContactBookRepository>().addContact(any()) } returns mockResponse
 
         viewModel = AddContactViewModel(application)
 
@@ -221,29 +189,10 @@ class AddContactViewModelTest {
         val mockResponse1 = ContactResponse(id = 1L, name = "User1", email = "user1@test.com")
         val mockResponse2 = ContactResponse(id = 2L, name = "User2", email = "user2@test.com")
 
-        coEvery {
-            anyConstructed<ContactBookRepository>().addContact(
-                "User1",
-                "user1@test.com",
-                null,
-                null,
-                "Recipient",
-                null,
-                null
-            )
-        } returns mockResponse1
-
-        coEvery {
-            anyConstructed<ContactBookRepository>().addContact(
-                "User2",
-                "user2@test.com",
-                null,
-                null,
-                "Recipient",
-                null,
-                null
-            )
-        } returns mockResponse2
+        coEvery { anyConstructed<ContactBookRepository>().addContact(any()) } returnsMany listOf(
+            mockResponse1,
+            mockResponse2
+        )
 
         viewModel = AddContactViewModel(application)
 
